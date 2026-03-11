@@ -115,20 +115,22 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
 
   const updateRates = () => setLastUpdated(new Date());
 
+  // Helper function for wrapped setCurrency that persists to localStorage
+  const setAndPersistCurrency = (next: Currency) => {
+    setCurrency(next);
+    if (typeof window !== 'undefined') window.localStorage.setItem(STORAGE_KEY, next);
+  };
+
   return (
     <CurrencyContext.Provider
       value={{
         currency,
-        setCurrency: (next) => {
-          setCurrency(next);
-          if (typeof window !== 'undefined') window.localStorage.setItem(STORAGE_KEY, next);
-        },
+        setCurrency: setAndPersistCurrency,
         toggleCurrency: () => {
           const order: Currency[] = ['VND', 'KRW', 'USD', 'JPY', 'CNY'];
           const idx = order.indexOf(currency);
           const next = order[(idx + 1) % order.length];
-          setCurrency(next);
-          if (typeof window !== 'undefined') window.localStorage.setItem(STORAGE_KEY, next);
+          setAndPersistCurrency(next);
         },
         format,
         formatFrom,
