@@ -13,6 +13,15 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useDropzone } from 'react-dropzone';
+import {
+  validateCost,
+  validateWordCount,
+  validateImage,
+  validateUniversityName,
+  validateCountry,
+  combineValidationErrors,
+  createFieldValidationResult,
+} from '../utils/validation';
 
 /**
  * Unified university form for creating and editing universities
@@ -50,10 +59,12 @@ export default function UniversityForm({ university, onClose, onSave }: Universi
 
   // UI State
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [wordCount, setWordCount] = useState(0);
   const [autoSaveStatus, setAutoSaveStatus] = useState<'saved' | 'saving' | 'idle'>('idle');
   const [isDragging, setIsDragging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [autoSaveErrorShown, setAutoSaveErrorShown] = useState(false);
 
   // Temporary fee input state
   const [newFeeType, setNewFeeType] = useState('');
@@ -107,14 +118,24 @@ export default function UniversityForm({ university, onClose, onSave }: Universi
           // Reset to idle after 2 seconds
           setTimeout(() => setAutoSaveStatus('idle'), 2000);
         } catch (e) {
-          // Silent fail for draft saving
+          // Handle quota exceeded or other localStorage errors gracefully
+          console.warn('Auto-save failed:', e);
           setAutoSaveStatus('idle');
+
+          // Show user-friendly error only once per session
+          if (!autoSaveErrorShown) {
+            toast.warning('Could not auto-save draft (storage quota may be full)', {
+              description: 'Your changes are still in the form. Save before closing.',
+              duration: 5000,
+            });
+            setAutoSaveErrorShown(true);
+          }
         }
       }, 1000); // Auto-save after 1 second of no typing
 
       return () => clearTimeout(timeoutId);
     }
-  }, [formData.overview, isEditMode, draftKey, university?.overview]);
+  }, [formData.overview, isEditMode, draftKey, university?.overview, autoSaveErrorShown]);
 
   /**
    * Count words in description
@@ -130,19 +151,44 @@ export default function UniversityForm({ university, onClose, onSave }: Universi
   const onDrop = useCallback((acceptedFiles: File[]) => {
     setIsDragging(false);
 
+    let validFiles = 0;
+    const imageErrors: string[] = [];
+
     acceptedFiles.forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result as string;
-        setFormData((prev) => ({
-          ...prev,
-          galleryImages: [...prev.galleryImages, result],
-        }));
-      };
-      reader.readAsDataURL(file);
+      // Validate image
+      const errors = validateImage(file);
+      if (errors.length > 0) {
+        imageErrors.push(...errors);
+      } else {
+        validFiles++;
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          setFormData((prev) => ({
+            ...prev,
+            galleryImages: [...prev.galleryImages, result],
+          }));
+          // Clear gallery error after adding image
+          setFieldErrors((prev) => {
+            const newErrors = { ...prev };
+            delete newErrors.galleryImages;
+            return newErrors;
+          });
+        };
+        reader.readAsDataURL(file);
+      }
     });
 
-    toast.success(`${acceptedFiles.length} image(s) added`);
+    if (imageErrors.length > 0) {
+      toast.error('Some images could not be added', {
+        description: imageErrors.join('; '),
+        duration: 5000,
+      });
+    }
+
+    if (validFiles > 0) {
+      toast.success(`${validFiles} image(s) added`);
+    }
   }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -205,39 +251,94 @@ export default function UniversityForm({ university, onClose, onSave }: Universi
   };
 
   /**
+   * Validate individual fields and update fieldErrors state
+   */
+  const validateFieldName = (value: string) => {
+    const errors = validateUniversityName(value);
+    setFieldErrors((prev) => ({ ...prev, name: errors }));
+  };
+
+  const validateFieldCountry = (value: string) => {
+    const errors = validateCountry(value);
+    setFieldErrors((prev) => ({ ...prev, country: errors }));
+  };
+
+  const validateFieldCost = (fieldName: string, value: number | string) => {
+    const errors = validateCost(value);
+    setFieldErrors((prev) => ({ ...prev, [fieldName]: errors }));
+  };
+
+  const validateFieldDescription = (value: string) => {
+    const result = validateWordCount(value);
+    setFieldErrors((prev) => ({ ...prev, overview: result.errors }));
+  };
+
+  /**
    * Validate form data
    * For new universities: skip images and description
    * For existing: validate both
    */
   const validateForm = (): boolean => {
     const errors: string[] = [];
+    const newFieldErrors: Record<string, string[]> = {};
 
-    // Common validation for both modes
-    if (!formData.name.trim()) {
-      errors.push('University name is required');
+    // Validate university name
+    const nameErrors = validateUniversityName(formData.name);
+    if (nameErrors.length > 0) {
+      errors.push(...nameErrors);
+      newFieldErrors.name = nameErrors;
     }
 
-    if (!formData.country.trim()) {
-      errors.push('Country is required');
+    // Validate country
+    const countryErrors = validateCountry(formData.country);
+    if (countryErrors.length > 0) {
+      errors.push(...countryErrors);
+      newFieldErrors.country = countryErrors;
+    }
+
+    // Validate costs
+    const tuitionErrors = validateCost(formData.generalTuition);
+    if (tuitionErrors.length > 0) {
+      errors.push(...tuitionErrors);
+      newFieldErrors.generalTuition = tuitionErrors;
+    }
+
+    const visaErrors = validateCost(formData.visaFee);
+    if (visaErrors.length > 0) {
+      errors.push(...visaErrors);
+      newFieldErrors.visaFee = visaErrors;
+    }
+
+    const accommodationErrors = validateCost(formData.accommodationFee);
+    if (accommodationErrors.length > 0) {
+      errors.push(...accommodationErrors);
+      newFieldErrors.accommodationFee = accommodationErrors;
+    }
+
+    const insuranceErrors = validateCost(formData.insuranceFee);
+    if (insuranceErrors.length > 0) {
+      errors.push(...insuranceErrors);
+      newFieldErrors.insuranceFee = insuranceErrors;
     }
 
     // Edit-mode specific validation
     if (isEditMode) {
+      // Validate description word count
+      const descriptionResult = validateWordCount(formData.overview);
+      if (!descriptionResult.isValid) {
+        errors.push(...descriptionResult.errors);
+        newFieldErrors.overview = descriptionResult.errors;
+      }
+
       // Validate images (at least 1 required)
       if (formData.galleryImages.length === 0) {
         errors.push('At least 1 image is required in the gallery');
-      }
-
-      // Validate description (100-250 words)
-      if (wordCount < 100) {
-        errors.push(`Description must be at least 100 words (current: ${wordCount} words)`);
-      }
-      if (wordCount > 250) {
-        errors.push(`Description must be at most 250 words (current: ${wordCount} words)`);
+        newFieldErrors.galleryImages = ['At least 1 image is required'];
       }
     }
 
     setValidationErrors(errors);
+    setFieldErrors(newFieldErrors);
     return errors.length === 0;
   };
 
@@ -356,12 +457,27 @@ export default function UniversityForm({ university, onClose, onSave }: Universi
                   <input
                     type="text"
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                    onChange={(e) => {
+                      setFormData({ ...formData, name: e.target.value });
+                      // Clear error on change
+                      setFieldErrors((prev) => ({ ...prev, name: [] }));
+                    }}
+                    onBlur={() => validateFieldName(formData.name)}
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 transition-colors ${
+                      fieldErrors.name && fieldErrors.name.length > 0
+                        ? 'border-red-500 focus:border-red-500'
+                        : 'border-slate-300 focus:border-primary'
+                    }`}
                     placeholder="Enter university name"
                     required
                     disabled={isSubmitting}
                   />
+                  {fieldErrors.name && fieldErrors.name.length > 0 && (
+                    <p className="text-sm text-red-600 mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" />
+                      {fieldErrors.name[0]}
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -371,12 +487,27 @@ export default function UniversityForm({ university, onClose, onSave }: Universi
                   <input
                     type="text"
                     value={formData.country}
-                    onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                    onChange={(e) => {
+                      setFormData({ ...formData, country: e.target.value });
+                      // Clear error on change
+                      setFieldErrors((prev) => ({ ...prev, country: [] }));
+                    }}
+                    onBlur={() => validateFieldCountry(formData.country)}
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 transition-colors ${
+                      fieldErrors.country && fieldErrors.country.length > 0
+                        ? 'border-red-500 focus:border-red-500'
+                        : 'border-slate-300 focus:border-primary'
+                    }`}
                     placeholder="Enter country name"
                     required
                     disabled={isSubmitting}
                   />
+                  {fieldErrors.country && fieldErrors.country.length > 0 && (
+                    <p className="text-sm text-red-600 mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" />
+                      {fieldErrors.country[0]}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -401,15 +532,32 @@ export default function UniversityForm({ university, onClose, onSave }: Universi
                 </div>
                 <textarea
                   value={formData.overview}
-                  onChange={(e) => setFormData({ ...formData, overview: e.target.value })}
-                  className={`w-full px-4 py-3 rounded-lg border ${
-                    wordCount > 250 || (wordCount > 0 && wordCount < 100)
+                  onChange={(e) => {
+                    setFormData({ ...formData, overview: e.target.value });
+                    // Clear error on change
+                    setFieldErrors((prev) => ({ ...prev, overview: [] }));
+                  }}
+                  onBlur={() => validateFieldDescription(formData.overview)}
+                  className={`w-full px-4 py-3 rounded-lg border transition-colors ${
+                    fieldErrors.overview && fieldErrors.overview.length > 0
+                      ? 'border-red-500 focus:border-red-500'
+                      : wordCount > 250 || (wordCount > 0 && wordCount < 100)
                       ? 'border-orange-400'
                       : 'border-slate-300'
                   } focus:outline-none focus:ring-2 focus:ring-primary/20 min-h-[150px]`}
                   placeholder="Describe the university (100–250 words)..."
                   disabled={isSubmitting}
                 />
+                {fieldErrors.overview && fieldErrors.overview.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {fieldErrors.overview.map((error, idx) => (
+                      <p key={idx} className="text-sm text-red-600 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" />
+                        {error}
+                      </p>
+                    ))}
+                  </div>
+                )}
                 <p className="text-xs text-slate-500 mt-1">
                   Your draft is automatically saved as you type
                 </p>
@@ -439,13 +587,19 @@ export default function UniversityForm({ university, onClose, onSave }: Universi
                   className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all ${
                     isDragActive || isDragging
                       ? 'border-primary bg-primary/5 scale-[0.98]'
+                      : fieldErrors.galleryImages && fieldErrors.galleryImages.length > 0
+                      ? 'border-red-400 bg-red-50 hover:border-red-500'
                       : 'border-slate-300 hover:border-primary hover:bg-slate-50'
                   }`}
                 >
                   <input {...getInputProps()} />
                   <Upload
                     className={`w-12 h-12 mx-auto mb-3 ${
-                      isDragActive ? 'text-primary' : 'text-slate-400'
+                      isDragActive
+                        ? 'text-primary'
+                        : fieldErrors.galleryImages && fieldErrors.galleryImages.length > 0
+                        ? 'text-red-500'
+                        : 'text-slate-400'
                     }`}
                   />
                   <p className="text-slate-700 font-medium mb-1">
@@ -456,6 +610,13 @@ export default function UniversityForm({ university, onClose, onSave }: Universi
                     Supports: PNG, JPG, JPEG, GIF, WebP
                   </p>
                 </div>
+
+                {fieldErrors.galleryImages && fieldErrors.galleryImages.length > 0 && (
+                  <p className="text-sm text-red-600 mt-2 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" />
+                    {fieldErrors.galleryImages[0]}
+                  </p>
+                )}
 
                 {/* Image Preview Grid */}
                 {formData.galleryImages.length > 0 && (
@@ -503,7 +664,7 @@ export default function UniversityForm({ university, onClose, onSave }: Universi
                     value={Math.round(
                       convertAmount(formData.generalTuition, currency, 'USD')
                     )}
-                    onChange={(e) =>
+                    onChange={(e) => {
                       setFormData({
                         ...formData,
                         generalTuition: convertAmount(
@@ -511,13 +672,26 @@ export default function UniversityForm({ university, onClose, onSave }: Universi
                           'USD',
                           currency
                         ),
-                      })
-                    }
-                    className="w-full px-4 py-2 bg-white rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      });
+                      // Clear error on change
+                      setFieldErrors((prev) => ({ ...prev, generalTuition: [] }));
+                    }}
+                    onBlur={() => validateFieldCost('generalTuition', formData.generalTuition)}
+                    className={`w-full px-4 py-2 bg-white rounded-lg border focus:outline-none focus:ring-2 focus:ring-primary/20 transition-colors ${
+                      fieldErrors.generalTuition && fieldErrors.generalTuition.length > 0
+                        ? 'border-red-500 focus:border-red-500'
+                        : 'border-slate-300 focus:border-primary'
+                    }`}
                     required
                     disabled={isSubmitting}
                     min="0"
                   />
+                  {fieldErrors.generalTuition && fieldErrors.generalTuition.length > 0 && (
+                    <p className="text-sm text-red-600 mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" />
+                      {fieldErrors.generalTuition[0]}
+                    </p>
+                  )}
                   <p className="text-xs text-slate-500 mt-1">
                     Stored internally in USD. Displayed in {currency}.
                   </p>
@@ -530,17 +704,30 @@ export default function UniversityForm({ university, onClose, onSave }: Universi
                   <input
                     type="number"
                     value={Math.round(convertAmount(formData.visaFee, currency, 'USD'))}
-                    onChange={(e) =>
+                    onChange={(e) => {
                       setFormData({
                         ...formData,
                         visaFee: convertAmount(Number(e.target.value), 'USD', currency),
-                      })
-                    }
-                    className="w-full px-4 py-2 bg-white rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      });
+                      // Clear error on change
+                      setFieldErrors((prev) => ({ ...prev, visaFee: [] }));
+                    }}
+                    onBlur={() => validateFieldCost('visaFee', formData.visaFee)}
+                    className={`w-full px-4 py-2 bg-white rounded-lg border focus:outline-none focus:ring-2 focus:ring-primary/20 transition-colors ${
+                      fieldErrors.visaFee && fieldErrors.visaFee.length > 0
+                        ? 'border-red-500 focus:border-red-500'
+                        : 'border-slate-300 focus:border-primary'
+                    }`}
                     required
                     disabled={isSubmitting}
                     min="0"
                   />
+                  {fieldErrors.visaFee && fieldErrors.visaFee.length > 0 && (
+                    <p className="text-sm text-red-600 mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" />
+                      {fieldErrors.visaFee[0]}
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -552,7 +739,7 @@ export default function UniversityForm({ university, onClose, onSave }: Universi
                     value={Math.round(
                       convertAmount(formData.accommodationFee, currency, 'USD')
                     )}
-                    onChange={(e) =>
+                    onChange={(e) => {
                       setFormData({
                         ...formData,
                         accommodationFee: convertAmount(
@@ -560,13 +747,26 @@ export default function UniversityForm({ university, onClose, onSave }: Universi
                           'USD',
                           currency
                         ),
-                      })
-                    }
-                    className="w-full px-4 py-2 bg-white rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      });
+                      // Clear error on change
+                      setFieldErrors((prev) => ({ ...prev, accommodationFee: [] }));
+                    }}
+                    onBlur={() => validateFieldCost('accommodationFee', formData.accommodationFee)}
+                    className={`w-full px-4 py-2 bg-white rounded-lg border focus:outline-none focus:ring-2 focus:ring-primary/20 transition-colors ${
+                      fieldErrors.accommodationFee && fieldErrors.accommodationFee.length > 0
+                        ? 'border-red-500 focus:border-red-500'
+                        : 'border-slate-300 focus:border-primary'
+                    }`}
                     required
                     disabled={isSubmitting}
                     min="0"
                   />
+                  {fieldErrors.accommodationFee && fieldErrors.accommodationFee.length > 0 && (
+                    <p className="text-sm text-red-600 mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" />
+                      {fieldErrors.accommodationFee[0]}
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -576,17 +776,30 @@ export default function UniversityForm({ university, onClose, onSave }: Universi
                   <input
                     type="number"
                     value={Math.round(convertAmount(formData.insuranceFee, currency, 'USD'))}
-                    onChange={(e) =>
+                    onChange={(e) => {
                       setFormData({
                         ...formData,
                         insuranceFee: convertAmount(Number(e.target.value), 'USD', currency),
-                      })
-                    }
-                    className="w-full px-4 py-2 bg-white rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      });
+                      // Clear error on change
+                      setFieldErrors((prev) => ({ ...prev, insuranceFee: [] }));
+                    }}
+                    onBlur={() => validateFieldCost('insuranceFee', formData.insuranceFee)}
+                    className={`w-full px-4 py-2 bg-white rounded-lg border focus:outline-none focus:ring-2 focus:ring-primary/20 transition-colors ${
+                      fieldErrors.insuranceFee && fieldErrors.insuranceFee.length > 0
+                        ? 'border-red-500 focus:border-red-500'
+                        : 'border-slate-300 focus:border-primary'
+                    }`}
                     required
                     disabled={isSubmitting}
                     min="0"
                   />
+                  {fieldErrors.insuranceFee && fieldErrors.insuranceFee.length > 0 && (
+                    <p className="text-sm text-red-600 mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" />
+                      {fieldErrors.insuranceFee[0]}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
