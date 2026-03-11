@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
+import { type Currency } from '../../types';
 
-export type Currency = 'USD' | 'VND' | 'KRW' | 'JPY' | 'CNY';
+// Re-export for backward compatibility
+export type { Currency } from '../../types';
 
 interface CurrencyContextType {
   currency: Currency;
