@@ -1,0 +1,574 @@
+import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router';
+import { useApp } from '../context/AppContext';
+import { useCurrency } from '../context/CurrencyContext';
+import { 
+  School, 
+  Users, 
+  DollarSign, 
+  AlertCircle, 
+  Search, 
+  Plus,
+  Edit,
+  Eye,
+  ChevronUp,
+  ChevronDown,
+  X,
+  RefreshCw,
+  Upload
+} from 'lucide-react';
+import type { University, AdditionalFee } from '../context/AppContext';
+import { toast } from 'sonner';
+import ImportUniversitiesModal from '../components/ImportUniversitiesModal';
+
+type SortKey = 'name' | 'country' | 'generalTuition' | 'lastUpdated';
+type SortOrder = 'asc' | 'desc';
+
+export default function AdminDashboard() {
+  const { universities, registrations, updateUniversity, addUniversities } = useApp();
+  const { currency, toggleCurrency, formatFrom } = useCurrency();
+  const navigate = useNavigate();
+  
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortKey, setSortKey] = useState<SortKey>('name');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+
+  // Calculate stats
+  const totalUniversities = universities.length;
+  const activeStudents = registrations.length;
+  const totalCostManaged = universities.reduce((sum, uni) => 
+    sum + uni.generalTuition + uni.visaFee + uni.accommodationFee + uni.insuranceFee +
+    uni.additionalFees.reduce((feeSum, fee) => feeSum + fee.amount, 0), 0
+  );
+  const pendingUpdates = 0; // Mock value
+
+  // Filter and sort universities
+  const filteredAndSortedUniversities = useMemo(() => {
+    let filtered = universities.filter(uni =>
+      uni.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      uni.country.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    filtered.sort((a, b) => {
+      let aValue: string | number = '';
+      let bValue: string | number = '';
+
+      switch (sortKey) {
+        case 'name':
+          aValue = a.name;
+          bValue = b.name;
+          break;
+        case 'country':
+          aValue = a.country;
+          bValue = b.country;
+          break;
+        case 'generalTuition':
+          aValue = a.generalTuition;
+          bValue = b.generalTuition;
+          break;
+        case 'lastUpdated':
+          // Mock last updated dates
+          aValue = a.id;
+          bValue = b.id;
+          break;
+      }
+
+      if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return filtered;
+  }, [universities, searchTerm, sortKey, sortOrder]);
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(key);
+      setSortOrder('asc');
+    }
+  };
+
+  const SortIcon = ({ columnKey }: { columnKey: SortKey }) => {
+    if (sortKey !== columnKey) return null;
+    return sortOrder === 'asc' ? 
+      <ChevronUp className="w-4 h-4" /> : 
+      <ChevronDown className="w-4 h-4" />;
+  };
+
+  return (
+    <div className="space-y-6 p-6">
+      {/* Currency Toggle Button - Fixed Position */}
+      <button
+        onClick={toggleCurrency}
+        className="fixed bottom-6 right-6 z-40 flex items-center gap-2 px-4 py-3 bg-white border-2 border-primary text-primary rounded-full shadow-lg hover:bg-primary hover:text-white transition-colors"
+        title="Toggle currency"
+      >
+        <RefreshCw className="w-5 h-5" />
+        <span className="font-semibold">{currency}</span>
+      </button>
+
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-bold text-slate-900">Admin Dashboard</h1>
+        <p className="text-slate-600 mt-1">Manage universities and view registration analytics</p>
+      </div>
+
+      {/* Stat Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="bg-white rounded-lg border border-slate-200 p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-slate-600">Total Partner Universities</span>
+            <School className="w-5 h-5 text-primary" />
+          </div>
+          <p className="text-3xl font-bold text-slate-900">{totalUniversities}</p>
+        </div>
+
+        <div className="bg-white rounded-lg border border-slate-200 p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-slate-600">Active Students</span>
+            <Users className="w-5 h-5 text-primary" />
+          </div>
+          <p className="text-3xl font-bold text-slate-900">{activeStudents}</p>
+        </div>
+
+        <div className="bg-white rounded-lg border border-slate-200 p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-slate-600">Total Cost Managed</span>
+            <DollarSign className="w-5 h-5 text-primary" />
+          </div>
+          <p className="text-3xl font-bold text-slate-900">
+            {formatFrom(totalCostManaged, 'USD')}
+          </p>
+        </div>
+
+        <div className="bg-white rounded-lg border border-slate-200 p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-slate-600">Pending Updates</span>
+            <AlertCircle className="w-5 h-5 text-primary" />
+          </div>
+          <div className="flex items-center gap-2">
+            <p className="text-3xl font-bold text-slate-900">{pendingUpdates}</p>
+            {pendingUpdates > 0 && (
+              <span className="px-2 py-1 text-xs font-semibold bg-red-100 text-red-700 rounded-full">
+                New
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Search and Add Button */}
+      <div className="mb-6 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search universities..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+          />
+        </div>
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+        >
+          <Plus className="w-5 h-5" />
+          Add New University
+        </button>
+        <button
+          onClick={() => setShowImportModal(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+        >
+          <Upload className="w-5 h-5" />
+          Import Universities
+        </button>
+      </div>
+
+      {/* Universities Table */}
+      <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-slate-50 border-b border-slate-200">
+              <tr>
+                <th 
+                  className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider cursor-pointer hover:bg-slate-100"
+                  onClick={() => handleSort('name')}
+                >
+                  <div className="flex items-center gap-2">
+                    Name
+                    <SortIcon columnKey="name" />
+                  </div>
+                </th>
+                <th 
+                  className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider cursor-pointer hover:bg-slate-100"
+                  onClick={() => handleSort('country')}
+                >
+                  <div className="flex items-center gap-2">
+                    Country
+                    <SortIcon columnKey="country" />
+                  </div>
+                </th>
+                <th 
+                  className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider cursor-pointer hover:bg-slate-100"
+                  onClick={() => handleSort('generalTuition')}
+                >
+                  <div className="flex items-center gap-2">
+                    General Cost (USD)
+                    <SortIcon columnKey="generalTuition" />
+                  </div>
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                  Additional Fees
+                </th>
+                <th 
+                  className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider cursor-pointer hover:bg-slate-100"
+                  onClick={() => handleSort('lastUpdated')}
+                >
+                  <div className="flex items-center gap-2">
+                    Last Updated
+                    <SortIcon columnKey="lastUpdated" />
+                  </div>
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {filteredAndSortedUniversities.map((uni) => (
+                <tr 
+                  key={uni.id}
+                  onClick={() => navigate(`/admin/universities`)}
+                  className="hover:bg-slate-50 cursor-pointer transition-colors"
+                >
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="font-medium text-slate-900">{uni.name}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="text-slate-700">{uni.country}</span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="font-semibold text-slate-900">
+                      ${uni.generalTuition.toLocaleString()}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex flex-wrap gap-1">
+                      {uni.additionalFees.slice(0, 2).map((fee, idx) => (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-50 text-blue-700 rounded"
+                        >
+                          {fee.type}: ${fee.amount}
+                        </span>
+                      ))}
+                      {uni.additionalFees.length > 2 && (
+                        <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-slate-100 text-slate-600 rounded">
+                          +{uni.additionalFees.length - 2} more
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                    {new Date().toLocaleDateString()}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/admin/universities`);
+                        }}
+                        className="text-primary hover:text-primary/80 font-medium"
+                      >
+                        <Edit className="w-4 h-4 inline mr-1" />
+                        Edit
+                      </button>
+                      <span className="text-slate-300">|</span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/admin/universities`);
+                        }}
+                        className="text-slate-600 hover:text-slate-800 font-medium"
+                      >
+                        <Eye className="w-4 h-4 inline mr-1" />
+                        View
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {filteredAndSortedUniversities.length === 0 && (
+          <div className="text-center py-12 text-slate-500">
+            No universities found matching your search.
+          </div>
+        )}
+      </div>
+
+      {/* Add University Modal */}
+      {showAddModal && (
+        <AddUniversityModal
+          onClose={() => setShowAddModal(false)}
+          onAdd={(university) => {
+            // In a real app, this would call an API
+            toast.success('University added successfully!');
+            setShowAddModal(false);
+          }}
+        />
+      )}
+
+      {/* Import Universities Modal */}
+      {showImportModal && (
+        <ImportUniversitiesModal
+          isOpen={showImportModal}
+          onClose={() => setShowImportModal(false)}
+          onImport={(universities) => {
+            addUniversities(universities);
+            toast.success('Universities imported successfully!');
+            setShowImportModal(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Add University Modal Component
+function AddUniversityModal({ 
+  onClose, 
+  onAdd 
+}: { 
+  onClose: () => void;
+  onAdd: (university: Omit<University, 'id'>) => void;
+}) {
+  const { currency, convertAmount } = useCurrency();
+  const [formData, setFormData] = useState({
+    name: '',
+    country: '',
+    generalTuition: '',
+    visaFee: '',
+    accommodationFee: '',
+    insuranceFee: '',
+  });
+  const [additionalFees, setAdditionalFees] = useState<AdditionalFee[]>([]);
+  const [newFeeType, setNewFeeType] = useState('');
+  const [newFeeAmount, setNewFeeAmount] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const university: Omit<University, 'id'> = {
+      name: formData.name,
+      country: formData.country,
+      countryCode: formData.country.slice(0, 2).toUpperCase() || 'XX',
+      tagline: 'New partner university',
+      thumbnail: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=800&q=80',
+      heroImage: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=1600&q=80',
+      overview: 'Demo university added from Admin Dashboard.',
+      academicPrograms: [],
+      galleryImages: [],
+      ranking: 'N/A',
+      worldRanking: 9999,
+      generalTuition: convertAmount(Number(formData.generalTuition), 'USD', currency),
+      visaFee: convertAmount(Number(formData.visaFee), 'USD', currency),
+      accommodationFee: convertAmount(Number(formData.accommodationFee), 'USD', currency),
+      insuranceFee: convertAmount(Number(formData.insuranceFee), 'USD', currency),
+      additionalFees,
+      majors: [],
+    };
+
+    onAdd(university);
+  };
+
+  const addFee = () => {
+    if (newFeeType && newFeeAmount) {
+      setAdditionalFees([...additionalFees, { type: newFeeType, amount: Number(newFeeAmount) }]);
+      setNewFeeType('');
+      setNewFeeAmount('');
+    }
+  };
+
+  const removeFee = (index: number) => {
+    setAdditionalFees(additionalFees.filter((_, i) => i !== index));
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+          <h2 className="text-xl font-bold text-slate-900">Add New University</h2>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-600"
+          >
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6">
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  University Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Country *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.country}
+                  onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    General Tuition ({currency}) *
+                  </label>
+                <input
+                  type="number"
+                  required
+                  min="0"
+                  value={formData.generalTuition}
+                  onChange={(e) => setFormData({ ...formData, generalTuition: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                />
+              </div>
+
+              <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Visa Fee ({currency}) *
+                  </label>
+                <input
+                  type="number"
+                  required
+                  min="0"
+                  value={formData.visaFee}
+                  onChange={(e) => setFormData({ ...formData, visaFee: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Accommodation Fee ({currency}) *
+                  </label>
+                <input
+                  type="number"
+                  required
+                  min="0"
+                  value={formData.accommodationFee}
+                  onChange={(e) => setFormData({ ...formData, accommodationFee: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                />
+              </div>
+
+              <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Insurance Fee ({currency}) *
+                  </label>
+                <input
+                  type="number"
+                  required
+                  min="0"
+                  value={formData.insuranceFee}
+                  onChange={(e) => setFormData({ ...formData, insuranceFee: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                />
+              </div>
+            </div>
+
+            <div className="border-t border-slate-200 pt-4">
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Additional Fees
+              </label>
+              
+              {additionalFees.map((fee, index) => (
+                <div key={index} className="flex items-center gap-2 mb-2">
+                  <span className="flex-1 px-3 py-2 bg-slate-50 rounded-lg text-sm">
+                    {fee.type}: ${fee.amount}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeFee(index)}
+                    className="text-red-600 hover:text-red-700"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              ))}
+
+              <div className="flex gap-2 mt-2">
+                <input
+                  type="text"
+                  placeholder="Fee type"
+                  value={newFeeType}
+                  onChange={(e) => setNewFeeType(e.target.value)}
+                  className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                />
+                <input
+                  type="number"
+                  placeholder="Amount"
+                  min="0"
+                  value={newFeeAmount}
+                  onChange={(e) => setNewFeeAmount(e.target.value)}
+                  className="w-32 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                />
+                <button
+                  type="button"
+                  onClick={addFee}
+                  className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
+                >
+                  Add
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-3 mt-6 pt-6 border-t border-slate-200">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+            >
+              Add University
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
