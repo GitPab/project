@@ -2,24 +2,24 @@ import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { useApp } from '../context/AppContext';
 import { useCurrency } from '../context/CurrencyContext';
-import { 
-  School, 
-  Users, 
-  DollarSign, 
-  AlertCircle, 
-  Search, 
+import {
+  School,
+  Users,
+  DollarSign,
+  AlertCircle,
+  Search,
   Plus,
-  Edit,
   Eye,
   ChevronUp,
   ChevronDown,
-  X,
   RefreshCw,
-  Upload
+  Upload,
+  Edit,
 } from 'lucide-react';
-import type { University, AdditionalFee } from '../context/AppContext';
+import type { University } from '../context/AppContext';
 import { toast } from 'sonner';
 import ImportUniversitiesModal from '../components/ImportUniversitiesModal';
+import UniversityForm from '../components/UniversityForm';
 
 type SortKey = 'name' | 'country' | 'generalTuition' | 'lastUpdated';
 type SortOrder = 'asc' | 'desc';
@@ -315,12 +315,11 @@ export default function AdminDashboard() {
         )}
       </div>
 
-      {/* Add University Modal */}
+      {/* Add University Form */}
       {showAddModal && (
-        <AddUniversityModal
+        <UniversityForm
           onClose={() => setShowAddModal(false)}
-          onAdd={(university) => {
-            // In a real app, this would call an API
+          onSave={() => {
             toast.success('University added successfully!');
             setShowAddModal(false);
           }}
@@ -339,236 +338,6 @@ export default function AdminDashboard() {
           }}
         />
       )}
-    </div>
-  );
-}
-
-// Add University Modal Component
-function AddUniversityModal({ 
-  onClose, 
-  onAdd 
-}: { 
-  onClose: () => void;
-  onAdd: (university: Omit<University, 'id'>) => void;
-}) {
-  const { currency, convertAmount } = useCurrency();
-  const [formData, setFormData] = useState({
-    name: '',
-    country: '',
-    generalTuition: '',
-    visaFee: '',
-    accommodationFee: '',
-    insuranceFee: '',
-  });
-  const [additionalFees, setAdditionalFees] = useState<AdditionalFee[]>([]);
-  const [newFeeType, setNewFeeType] = useState('');
-  const [newFeeAmount, setNewFeeAmount] = useState('');
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    const university: Omit<University, 'id'> = {
-      name: formData.name,
-      country: formData.country,
-      countryCode: formData.country.slice(0, 2).toUpperCase() || 'XX',
-      tagline: 'New partner university',
-      thumbnail: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=800&q=80',
-      heroImage: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=1600&q=80',
-      overview: 'Demo university added from Admin Dashboard.',
-      academicPrograms: [],
-      galleryImages: [],
-      ranking: 'N/A',
-      worldRanking: 9999,
-      generalTuition: convertAmount(Number(formData.generalTuition), 'USD', currency),
-      visaFee: convertAmount(Number(formData.visaFee), 'USD', currency),
-      accommodationFee: convertAmount(Number(formData.accommodationFee), 'USD', currency),
-      insuranceFee: convertAmount(Number(formData.insuranceFee), 'USD', currency),
-      additionalFees,
-      majors: [],
-    };
-
-    onAdd(university);
-  };
-
-  const addFee = () => {
-    if (newFeeType && newFeeAmount) {
-      setAdditionalFees([...additionalFees, { type: newFeeType, amount: Number(newFeeAmount) }]);
-      setNewFeeType('');
-      setNewFeeAmount('');
-    }
-  };
-
-  const removeFee = (index: number) => {
-    setAdditionalFees(additionalFees.filter((_, i) => i !== index));
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-slate-900">Add New University</h2>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-600"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-6">
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  University Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Country *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.country}
-                  onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    General Tuition ({currency}) *
-                  </label>
-                <input
-                  type="number"
-                  required
-                  min="0"
-                  value={formData.generalTuition}
-                  onChange={(e) => setFormData({ ...formData, generalTuition: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                />
-              </div>
-
-              <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Visa Fee ({currency}) *
-                  </label>
-                <input
-                  type="number"
-                  required
-                  min="0"
-                  value={formData.visaFee}
-                  onChange={(e) => setFormData({ ...formData, visaFee: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Accommodation Fee ({currency}) *
-                  </label>
-                <input
-                  type="number"
-                  required
-                  min="0"
-                  value={formData.accommodationFee}
-                  onChange={(e) => setFormData({ ...formData, accommodationFee: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                />
-              </div>
-
-              <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Insurance Fee ({currency}) *
-                  </label>
-                <input
-                  type="number"
-                  required
-                  min="0"
-                  value={formData.insuranceFee}
-                  onChange={(e) => setFormData({ ...formData, insuranceFee: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                />
-              </div>
-            </div>
-
-            <div className="border-t border-slate-200 pt-4">
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Additional Fees
-              </label>
-              
-              {additionalFees.map((fee, index) => (
-                <div key={index} className="flex items-center gap-2 mb-2">
-                  <span className="flex-1 px-3 py-2 bg-slate-50 rounded-lg text-sm">
-                    {fee.type}: ${fee.amount}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => removeFee(index)}
-                    className="text-red-600 hover:text-red-700"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-              ))}
-
-              <div className="flex gap-2 mt-2">
-                <input
-                  type="text"
-                  placeholder="Fee type"
-                  value={newFeeType}
-                  onChange={(e) => setNewFeeType(e.target.value)}
-                  className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                />
-                <input
-                  type="number"
-                  placeholder="Amount"
-                  min="0"
-                  value={newFeeAmount}
-                  onChange={(e) => setNewFeeAmount(e.target.value)}
-                  className="w-32 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                />
-                <button
-                  type="button"
-                  onClick={addFee}
-                  className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
-                >
-                  Add
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex gap-3 mt-6 pt-6 border-t border-slate-200">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
-            >
-              Add University
-            </button>
-          </div>
-        </form>
-      </div>
     </div>
   );
 }
