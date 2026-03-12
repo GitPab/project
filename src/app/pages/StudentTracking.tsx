@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import { ArrowLeft, Copy, Check, AlertCircle, Info } from 'lucide-react';
+import { ArrowLeft, Copy, Check, AlertCircle, Info, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { getTrackingCode } from '../services/trackingCodeService';
 import type { TrackingCode } from '@/types/tracking';
@@ -151,6 +151,23 @@ export default function StudentTracking() {
                   ? '이 코드를 사용하여 신청서를 추적하세요'
                   : 'Use this code to track your application'}
               </p>
+            </div>
+
+            {/* Success Message */}
+            <div className="bg-green-50 rounded-2xl shadow-lg border border-green-200 p-6 mb-6 flex items-start gap-4">
+              <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0 mt-1" />
+              <div>
+                <h2 className="text-lg font-bold text-green-900 mb-2">
+                  {language === 'vi' ? 'Đăng ký thành công!' : language === 'ko' ? '등록 완료!' : 'Registration Complete!'}
+                </h2>
+                <p className="text-sm text-green-800">
+                  {language === 'vi'
+                    ? 'Cảm ơn bạn đã đăng ký. Chúng tôi sẽ xem xét hồ sơ của bạn và liên hệ với bạn sớm.'
+                    : language === 'ko'
+                    ? '등록해주셔서 감사합니다. 곧 신청서를 검토하고 연락드리겠습니다.'
+                    : 'Thank you for registering. We will review your application and contact you shortly.'}
+                </p>
+              </div>
             </div>
 
             {/* Application Status */}
