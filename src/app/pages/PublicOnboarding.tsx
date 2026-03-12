@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router';
 import { useApp, University } from '../context/AppContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useLanguage } from '../context/LanguageContext';
+import { generateUniqueTrackingCode, saveTrackingCode } from '../services/trackingCodeService';
 import {
   GraduationCap,
   Phone,
@@ -82,22 +83,21 @@ export default function PublicOnboarding() {
 
     let totalCost = 0;
 
-    // Add fixed costs
+    // Add fixed costs (keep as VND)
     if (selectedUni.fixedCosts) {
       totalCost += selectedUni.fixedCosts.reduce((sum, cost) => {
-        const costInUSD = convertAmount(cost.amount, 'USD', cost.currency || 'VND');
-        return sum + costInUSD;
+        const costInVND = convertAmount(cost.amount, 'VND', cost.currency || 'VND');
+        return sum + costInVND;
       }, 0);
     }
 
-    // Add language course if D4-1
+    // Add language course if D4-1 (already in VND)
     if (selectedSystem === 'D4-1' && selectedUni.koreanData?.languageCourse?.available) {
       const languageCostVND = selectedUni.koreanData.languageCourse.priceVND || 13000000;
-      const languageCostUSD = convertAmount(languageCostVND, 'USD', 'VND');
-      totalCost += languageCostUSD;
+      totalCost += languageCostVND;
     }
 
-    // Add system-specific costs
+    // Add system-specific costs (convert to VND)
     if (selectedUni.koreanData?.visaSystems) {
       const visaSystem = selectedUni.koreanData.visaSystems.find(vs => {
         if (selectedSystem === 'D4-1') return vs.visaType === 'D4-1';
@@ -107,26 +107,26 @@ export default function PublicOnboarding() {
       });
 
       if (visaSystem) {
-        // Add tuition
+        // Add tuition (convert from KRW to VND)
         if (visaSystem.tuitionPerTerm) {
-          const tuitionUSD = convertAmount(visaSystem.tuitionPerTerm, 'USD', 'KRW');
-          totalCost += tuitionUSD;
+          const tuitionVND = convertAmount(visaSystem.tuitionPerTerm, 'VND', 'KRW');
+          totalCost += tuitionVND;
         } else if (visaSystem.tuitionRange) {
           const avgTuition = (visaSystem.tuitionRange.min + visaSystem.tuitionRange.max) / 2;
-          const tuitionUSD = convertAmount(avgTuition, 'USD', 'KRW');
-          totalCost += tuitionUSD;
+          const tuitionVND = convertAmount(avgTuition, 'VND', 'KRW');
+          totalCost += tuitionVND;
         }
 
-        // Add application fee
+        // Add application fee (convert from KRW to VND)
         if (visaSystem.applicationFee) {
-          const appFeeUSD = convertAmount(visaSystem.applicationFee, 'USD', 'KRW');
-          totalCost += appFeeUSD;
+          const appFeeVND = convertAmount(visaSystem.applicationFee, 'VND', 'KRW');
+          totalCost += appFeeVND;
         }
 
-        // Add enrollment fee
+        // Add enrollment fee (convert from KRW to VND)
         if (visaSystem.enrollmentFee) {
-          const enrollFeeUSD = convertAmount(visaSystem.enrollmentFee, 'USD', 'KRW');
-          totalCost += enrollFeeUSD;
+          const enrollFeeVND = convertAmount(visaSystem.enrollmentFee, 'VND', 'KRW');
+          totalCost += enrollFeeVND;
         }
       }
     }
@@ -164,7 +164,7 @@ export default function PublicOnboarding() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validate required fields
@@ -186,6 +186,16 @@ export default function PublicOnboarding() {
     // Generate email from name
     const generatedEmail = `${fullName.toLowerCase().replace(/\s+/g, '')}@student.temp`;
 
+    // Generate unique tracking code
+    let trackingCode = '';
+    try {
+      trackingCode = await generateUniqueTrackingCode();
+    } catch (err) {
+      console.error('Failed to generate tracking code:', err);
+      toast.error(language === 'vi' ? 'Lỗi tạo mã theo dõi' : 'Failed to generate tracking code');
+      return;
+    }
+
     // Save onboarding data
     addStudentOnboarding({
       name: fullName,
@@ -199,13 +209,34 @@ export default function PublicOnboarding() {
       notes: `TOPIK Level: ${topikLevel}, System: ${selectedSystem}`
     });
 
+    // Save tracking code to storage
+    const saved = await saveTrackingCode({
+      code: trackingCode,
+      studentEmail: generatedEmail,
+      studentName: fullName,
+      studentPhone: phoneNumber,
+      desiredUniversityId: desiredUniversity,
+      desiredUniversityName: selectedUni?.name || '',
+      visaSystem: selectedSystem,
+      topikLevel: topikLevel.toString(),
+      ieltsScore: '',
+      initialTotalCostVnd: initialCost,
+      notes: `TOPIK Level: ${topikLevel}, System: ${selectedSystem}`
+    });
+
+    if (!saved) {
+      console.error('Failed to save tracking code');
+      toast.error(language === 'vi' ? 'Lỗi lưu mã theo dõi' : 'Failed to save tracking code');
+      return;
+    }
+
     // Auto-login the user as a student
     login(generatedEmail, 'temp-password', 'student');
 
     toast.success(language === 'vi' ? 'Đăng ký tư vấn thành công!' : language === 'ko' ? '상담 신청 완료!' : 'Consultation request submitted!');
 
-    // Navigate to university detail page
-    navigate(`/student/university/${desiredUniversity}`);
+    // Navigate to tracking code display page with the generated code
+    navigate(`/student/tracking/${trackingCode}`);
   };
 
   const getLabel = (item: any, field: string) => {
