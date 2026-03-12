@@ -1,11 +1,43 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useCurrency } from '../context/CurrencyContext';
-import { Calendar, School, User, RefreshCw } from 'lucide-react';
+import { Calendar, School, User, RefreshCw, Code } from 'lucide-react';
+import { searchTrackingCodesByEmail } from '../services/trackingCodeService';
+import type { TrackingCode } from '@/types/tracking';
 
 export default function AdminRegistrations() {
   const { registrations, universities, user: currentUser } = useApp();
   const { currency, toggleCurrency, formatCurrency } = useCurrency();
+  const [trackingCodesByEmail, setTrackingCodesByEmail] = useState<Map<string, TrackingCode>>(new Map());
+  const [loading, setLoading] = useState(true);
+
+  // Load all tracking codes on component mount
+  useEffect(() => {
+    const loadTrackingCodes = async () => {
+      try {
+        const codeMap = new Map<string, TrackingCode>();
+
+        // Search for tracking codes for each unique email in registrations
+        const uniqueEmails = [...new Set(registrations.map(r => r.studentEmail))];
+
+        for (const email of uniqueEmails) {
+          const codes = await searchTrackingCodesByEmail(email);
+          if (codes.length > 0) {
+            // Store the first (most recent) tracking code for this email
+            codeMap.set(email, codes[0]);
+          }
+        }
+
+        setTrackingCodesByEmail(codeMap);
+      } catch (error) {
+        console.error('Failed to load tracking codes:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadTrackingCodes();
+  }, [registrations]);
 
   const getUniversityById = (id: string) => {
     return universities.find(uni => uni.id === id);
@@ -64,12 +96,20 @@ export default function AdminRegistrations() {
                     <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
                       <School className="w-6 h-6 text-primary" />
                     </div>
-                    <div>
+                    <div className="flex-1">
                       <h4 className="text-base font-semibold text-slate-900 mb-1">{university.name}</h4>
                       <p className="text-sm text-slate-600">{university.country}</p>
                       <p className="text-xs text-slate-500 mt-1">
                         <span className="font-medium">Student:</span> {registration.studentEmail}
                       </p>
+                      {trackingCodesByEmail.has(registration.studentEmail) && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <Code className="w-3 h-3 text-blue-600" />
+                          <code className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded">
+                            {trackingCodesByEmail.get(registration.studentEmail)?.code}
+                          </code>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2 text-sm text-slate-600">

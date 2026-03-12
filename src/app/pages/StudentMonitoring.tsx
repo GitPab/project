@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp, StudentOnboardingData } from '../context/AppContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useCurrency } from '../context/CurrencyContext';
@@ -20,11 +20,14 @@ import {
   UserCheck,
   AlertCircle,
   Filter,
-  X
+  X,
+  Code,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
+import { searchTrackingCodesByEmail } from '../services/trackingCodeService';
+import type { TrackingCode } from '@/types/tracking';
 
 export default function StudentMonitoring() {
   const { studentOnboardings, universities, updateStudentOnboardingStatus, deleteStudentOnboarding } = useApp();
@@ -34,6 +37,32 @@ export default function StudentMonitoring() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedStudent, setSelectedStudent] = useState<StudentOnboardingData | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedStudentTrackingCode, setSelectedStudentTrackingCode] = useState<TrackingCode | null>(null);
+  const [loadingTrackingCode, setLoadingTrackingCode] = useState(false);
+
+  // Load tracking code when a student is selected
+  useEffect(() => {
+    const loadTrackingCode = async () => {
+      if (selectedStudent && showDetailModal) {
+        setLoadingTrackingCode(true);
+        try {
+          const codes = await searchTrackingCodesByEmail(selectedStudent.email);
+          if (codes.length > 0) {
+            setSelectedStudentTrackingCode(codes[0]);
+          } else {
+            setSelectedStudentTrackingCode(null);
+          }
+        } catch (error) {
+          console.error('Failed to load tracking code:', error);
+          setSelectedStudentTrackingCode(null);
+        } finally {
+          setLoadingTrackingCode(false);
+        }
+      }
+    };
+
+    loadTrackingCode();
+  }, [selectedStudent, showDetailModal]);
 
   // Filter students based on search and status
   const filteredStudents = studentOnboardings.filter(student => {
@@ -65,16 +94,28 @@ export default function StudentMonitoring() {
       'approved': { bg: 'bg-green-100', text: 'text-green-700', icon: CheckCircle2, label: language === 'vi' ? 'Đã duyệt' : language === 'ko' ? '승인됨' : 'Approved' },
       'contacted': { bg: 'bg-purple-100', text: 'text-purple-700', icon: UserCheck, label: language === 'vi' ? 'Đã liên hệ' : language === 'ko' ? '연락함' : 'Contacted' }
     };
-    
+
     const badge = badges[status];
     const Icon = badge.icon;
-    
+
     return (
       <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${badge.bg} ${badge.text}`}>
         <Icon className="w-3 h-3" />
         {badge.label}
       </span>
     );
+  };
+
+  // Get status label text
+  const getStatusLabel = (status: string): string => {
+    const labels: Record<string, { vi: string; ko: string; en: string }> = {
+      'pending': { vi: 'Chờ xử lý', ko: '대기 중', en: 'Pending' },
+      'in-review': { vi: 'Đang xem xét', ko: '검토 중', en: 'In Review' },
+      'approved': { vi: 'Đã duyệt', ko: '승인됨', en: 'Approved' },
+      'contacted': { vi: 'Đã liên hệ', ko: '연락함', en: 'Contacted' }
+    };
+    const label = labels[status] || { vi: 'Không xác định', ko: '알 수 없음', en: 'Unknown' };
+    return language === 'vi' ? label.vi : language === 'ko' ? label.ko : label.en;
   };
 
   // Export to Excel
@@ -577,7 +618,50 @@ export default function StudentMonitoring() {
                 </div>
               </div>
 
-              {/* Notes */}
+              {/* Tracking Code */}
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 mb-4">
+                  {language === 'vi' ? 'Mã theo dõi' : language === 'ko' ? '추적 코드' : 'Tracking Code'}
+                </h3>
+                {loadingTrackingCode ? (
+                  <div className="p-4 bg-slate-50 rounded-lg text-center">
+                    <p className="text-slate-600 text-sm">
+                      {language === 'vi' ? 'Đang tải...' : language === 'ko' ? '로딩 중...' : 'Loading...'}
+                    </p>
+                  </div>
+                ) : selectedStudentTrackingCode ? (
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <Code className="w-5 h-5 text-blue-600" />
+                      <div className="flex-1">
+                        <p className="text-xs text-blue-700 font-semibold mb-1">
+                          {language === 'vi' ? 'Mã học sinh' : language === 'ko' ? '학생 코드' : 'Student Code'}
+                        </p>
+                        <code className="text-sm font-mono text-blue-900 font-bold">
+                          {selectedStudentTrackingCode.code}
+                        </code>
+                      </div>
+                    </div>
+                    <p className="text-xs text-blue-600 mt-3">
+                      {language === 'vi'
+                        ? 'Trạng thái: ' + getStatusLabel(selectedStudentTrackingCode.status)
+                        : language === 'ko'
+                        ? '상태: ' + getStatusLabel(selectedStudentTrackingCode.status)
+                        : 'Status: ' + getStatusLabel(selectedStudentTrackingCode.status)}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="p-4 bg-slate-50 rounded-lg">
+                    <p className="text-sm text-slate-600">
+                      {language === 'vi'
+                        ? 'Chưa tạo mã theo dõi'
+                        : language === 'ko'
+                        ? '생성된 추적 코드 없음'
+                        : 'No tracking code created yet'}
+                    </p>
+                  </div>
+                )}
+              </div>
               {selectedStudent.notes && (
                 <div>
                   <h3 className="text-lg font-bold text-slate-900 mb-4">
