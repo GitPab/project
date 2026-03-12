@@ -63,25 +63,25 @@ export default function StudentOnboarding() {
       if (visaSystem) {
         // Application fee
         if (visaSystem.applicationFee) {
-          total += convertAmount(visaSystem.applicationFee, 'USD', 'KRW');
+          total += convertAmount(visaSystem.applicationFee, 'VND', 'KRW');
         }
         
         // Tuition (estimate per term or range average)
         if (visaSystem.tuitionPerTerm) {
-          total += convertAmount(visaSystem.tuitionPerTerm, 'USD', 'KRW');
+          total += convertAmount(visaSystem.tuitionPerTerm, 'VND', 'KRW');
         } else if (visaSystem.tuitionRange) {
           const avgTuition = (visaSystem.tuitionRange.min + visaSystem.tuitionRange.max) / 2;
-          total += convertAmount(avgTuition, 'USD', 'KRW');
+          total += convertAmount(avgTuition, 'VND', 'KRW');
         }
         
         // Base yearly fee
         if (visaSystem.baseYearlyFee) {
-          total += convertAmount(visaSystem.baseYearlyFee, 'USD', 'KRW');
+          total += convertAmount(visaSystem.baseYearlyFee, 'VND', 'KRW');
         }
 
         // Enrollment fee
         if (visaSystem.enrollmentFee) {
-          total += convertAmount(visaSystem.enrollmentFee, 'USD', 'KRW');
+          total += convertAmount(visaSystem.enrollmentFee, 'VND', 'KRW');
         }
       }
     }

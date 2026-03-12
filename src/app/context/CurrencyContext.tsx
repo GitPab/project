@@ -10,9 +10,9 @@ interface CurrencyContextType {
   toggleCurrency: () => void;
   // Format WITHOUT converting (amount is already in currency units)
   format: (amount: number, currencyOverride?: Currency) => string;
-  // Convert then format (default assumes amount is USD)
+  // Convert then format (default assumes amount is VND)
   formatFrom: (amount: number, fromCurrency?: Currency, toCurrencyOverride?: Currency) => string;
-  // Back-compat: historically treated amount as USD and converted to current currency
+  // Back-compat: historically treated amount as VND and converted to current currency
   formatCurrency: (amount: number) => string;
   convertAmount: (amount: number, toCurrency: Currency, fromCurrency?: Currency) => number;
   formatMultipleCurrency: (amount: number, baseCurrency: Currency) => { usd: string; vnd: string; krw: string; jpy: string; cny: string };
@@ -56,7 +56,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
   // Convert any currency → any currency (via VND as base)
-  const convertAmount = (amount: number, toCurrency: Currency, fromCurrency: Currency = 'USD'): number => {
+  const convertAmount = (amount: number, toCurrency: Currency, fromCurrency: Currency = 'VND'): number => {
     // First convert to VND
     let amountInVND: number;
     switch (fromCurrency) {
@@ -102,7 +102,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
 
   // Format amount in all 5 currencies for side-by-side display
   // amount is in baseCurrency units
-  const formatMultipleCurrency = (amount: number, baseCurrency: Currency = 'USD') => {
+  const formatMultipleCurrency = (amount: number, baseCurrency: Currency = 'VND') => {
     const toVND = convertAmount(amount, 'VND', baseCurrency);
     return {
       usd: new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(convertAmount(amount, 'USD', baseCurrency)),
@@ -134,7 +134,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
         },
         format,
         formatFrom,
-        formatCurrency: (amount: number) => formatFrom(amount, 'USD'),
+        formatCurrency: (amount: number) => formatFrom(amount, 'VND'),
         convertAmount,
         formatMultipleCurrency,
         updateRates,

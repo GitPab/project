@@ -662,7 +662,7 @@ export default function UniversityForm({ university, onClose, onSave }: Universi
                   <input
                     type="number"
                     value={Math.round(
-                      convertAmount(formData.generalTuition, currency, 'USD')
+                      convertAmount(formData.generalTuition, currency, 'VND')
                     )}
                     onChange={(e) => {
                       setFormData({
@@ -693,7 +693,7 @@ export default function UniversityForm({ university, onClose, onSave }: Universi
                     </p>
                   )}
                   <p className="text-xs text-slate-500 mt-1">
-                    Stored internally in USD. Displayed in {currency}.
+                    Stored internally in VND. Displayed in {currency}.
                   </p>
                 </div>
 
@@ -703,11 +703,11 @@ export default function UniversityForm({ university, onClose, onSave }: Universi
                   </label>
                   <input
                     type="number"
-                    value={Math.round(convertAmount(formData.visaFee, currency, 'USD'))}
+                    value={Math.round(convertAmount(formData.visaFee, currency, 'VND'))}
                     onChange={(e) => {
                       setFormData({
                         ...formData,
-                        visaFee: convertAmount(Number(e.target.value), 'USD', currency),
+                        visaFee: convertAmount(Number(e.target.value), 'VND', currency),
                       });
                       // Clear error on change
                       setFieldErrors((prev) => ({ ...prev, visaFee: [] }));
@@ -737,7 +737,7 @@ export default function UniversityForm({ university, onClose, onSave }: Universi
                   <input
                     type="number"
                     value={Math.round(
-                      convertAmount(formData.accommodationFee, currency, 'USD')
+                      convertAmount(formData.accommodationFee, currency, 'VND')
                     )}
                     onChange={(e) => {
                       setFormData({
@@ -775,11 +775,11 @@ export default function UniversityForm({ university, onClose, onSave }: Universi
                   </label>
                   <input
                     type="number"
-                    value={Math.round(convertAmount(formData.insuranceFee, currency, 'USD'))}
+                    value={Math.round(convertAmount(formData.insuranceFee, currency, 'VND'))}
                     onChange={(e) => {
                       setFormData({
                         ...formData,
-                        insuranceFee: convertAmount(Number(e.target.value), 'USD', currency),
+                        insuranceFee: convertAmount(Number(e.target.value), 'VND', currency),
                       });
                       // Clear error on change
                       setFieldErrors((prev) => ({ ...prev, insuranceFee: [] }));
@@ -833,12 +833,12 @@ export default function UniversityForm({ university, onClose, onSave }: Universi
                     />
                     <input
                       type="number"
-                      value={Math.round(convertAmount(fee.amount, currency, 'USD'))}
+                      value={Math.round(convertAmount(fee.amount, currency, 'VND'))}
                       onChange={(e) =>
                         handleFeeChange(
                           index,
                           'amount',
-                          convertAmount(Number(e.target.value), 'USD', currency)
+                          convertAmount(Number(e.target.value), 'VND', currency)
                         )
                       }
                       placeholder="Amount"

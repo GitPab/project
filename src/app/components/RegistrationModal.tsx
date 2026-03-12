@@ -100,7 +100,7 @@ export default function RegistrationModal({
               </div>
               <div className="flex items-center gap-3">
                 <p className="text-lg font-bold text-blue-600">
-                  {formatFrom(university.generalTuition, 'USD')}
+                  {formatFrom(university.generalTuition, 'VND')}
                 </p>
                 <input
                   type="checkbox"
@@ -134,7 +134,7 @@ export default function RegistrationModal({
                 <p className={`text-lg font-bold ${
                   selectedFees.visa ? 'text-green-600' : 'text-slate-900'
                 }`}>
-                  {formatFrom(university.visaFee, 'USD')}
+                  {formatFrom(university.visaFee, 'VND')}
                 </p>
                 <input
                   type="checkbox"
@@ -171,7 +171,7 @@ export default function RegistrationModal({
                 <p className={`text-lg font-bold ${
                   selectedFees.accommodation ? 'text-green-600' : 'text-slate-900'
                 }`}>
-                  {formatFrom(university.accommodationFee, 'USD')}
+                  {formatFrom(university.accommodationFee, 'VND')}
                 </p>
                 <input
                   type="checkbox"
@@ -208,7 +208,7 @@ export default function RegistrationModal({
                 <p className={`text-lg font-bold ${
                   selectedFees.insurance ? 'text-green-600' : 'text-slate-900'
                 }`}>
-                  {formatFrom(university.insuranceFee, 'USD')}
+                  {formatFrom(university.insuranceFee, 'VND')}
                 </p>
                 <input
                   type="checkbox"
@@ -249,7 +249,7 @@ export default function RegistrationModal({
                   <p className={`text-lg font-bold ${
                     selectedFees.additional[index] ? 'text-green-600' : 'text-slate-900'
                   }`}>
-                    {formatFrom(fee.amount, 'USD')}
+                    {formatFrom(fee.amount, 'VND')}
                   </p>
                   <input
                     type="checkbox"
@@ -277,7 +277,7 @@ export default function RegistrationModal({
                 <p className="text-sm text-slate-600">Selected total cost</p>
               </div>
               <p className="text-3xl font-bold text-primary">
-                {formatFrom(calculateTotal(), 'USD')}
+                {formatFrom(calculateTotal(), 'VND')}
               </p>
             </div>
           </div>

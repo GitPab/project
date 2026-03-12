@@ -8,7 +8,7 @@ interface MultiCurrencyDisplayProps {
   className?: string;
 }
 
-export function MultiCurrencyDisplay({ amount, baseCurrency = 'USD', compact = false, className = '' }: MultiCurrencyDisplayProps) {
+export function MultiCurrencyDisplay({ amount, baseCurrency = 'VND', compact = false, className = '' }: MultiCurrencyDisplayProps) {
   const { formatMultipleCurrency } = useCurrency();
   
   const formatted = formatMultipleCurrency(amount, baseCurrency);
@@ -39,7 +39,7 @@ interface TotalWithConversionsProps {
   className?: string;
 }
 
-export function TotalWithConversions({ amount, baseCurrency = 'USD', label = 'Total', className = '' }: TotalWithConversionsProps) {
+export function TotalWithConversions({ amount, baseCurrency = 'VND', label = 'Total', className = '' }: TotalWithConversionsProps) {
   const { currency, formatCurrency, formatMultipleCurrency } = useCurrency();
   
   const formatted = formatMultipleCurrency(amount, baseCurrency);
