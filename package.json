@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint .",
-    "format": "prettier . --write"
+    "format": "prettier . --write",
+    "test": "node --loader ts-node/esm tests/validation.test.ts || node -r esbuild-register tests/validation.test.ts || node tests/validation.test.ts"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "1.2.3",
