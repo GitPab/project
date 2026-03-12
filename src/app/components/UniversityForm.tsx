@@ -523,10 +523,10 @@ export default function UniversityForm({ university, onClose, onSave }: Universi
                   <div className="flex items-center gap-3">
                     <span
                       className={`text-sm ${
-                        wordCount >= 100 && wordCount <= 250 ? 'text-green-600' : 'text-orange-600'
+                        wordCount <= 250 ? 'text-green-600' : 'text-red-600'
                       } font-medium`}
                     >
-                      {wordCount} words (required: 100–250)
+                      {wordCount} / 250 words
                     </span>
                   </div>
                 </div>
@@ -541,11 +541,11 @@ export default function UniversityForm({ university, onClose, onSave }: Universi
                   className={`w-full px-4 py-3 rounded-lg border transition-colors ${
                     fieldErrors.overview && fieldErrors.overview.length > 0
                       ? 'border-red-500 focus:border-red-500'
-                      : wordCount > 250 || (wordCount > 0 && wordCount < 100)
+                      : wordCount > 250
                       ? 'border-orange-400'
                       : 'border-slate-300'
                   } focus:outline-none focus:ring-2 focus:ring-primary/20 min-h-[150px]`}
-                  placeholder="Describe the university (100–250 words)..."
+                  placeholder="Describe the university (max 250 words)..."
                   disabled={isSubmitting}
                 />
                 {fieldErrors.overview && fieldErrors.overview.length > 0 && (

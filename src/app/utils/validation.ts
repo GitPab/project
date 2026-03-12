@@ -33,20 +33,16 @@ export const validateCost = (value: number | string): string[] => {
 
 /**
  * Validate word count in text
- * Checks if text meets min/max word requirements
+ * Checks if text meets max word requirements (no minimum)
  */
 export const validateWordCount = (
   text: string,
-  min: number = 100,
   max: number = 250
 ): { isValid: boolean; count: number; errors: string[] } => {
   const words = text.trim().split(/\s+/).filter((w) => w.length > 0);
   const count = words.length;
   const errors: string[] = [];
 
-  if (count < min) {
-    errors.push(`Mô tả phải có ít nhất ${min} từ (hiện tại: ${count} từ)`);
-  }
   if (count > max) {
     errors.push(`Mô tả không được vượt quá ${max} từ (hiện tại: ${count} từ)`);
   }
