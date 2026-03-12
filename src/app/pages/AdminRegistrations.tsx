@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useCurrency } from '../context/CurrencyContext';
+import { useLanguage } from '../context/LanguageContext';
 import { Calendar, School, User, RefreshCw, Code } from 'lucide-react';
 import { searchTrackingCodesByEmail } from '../services/trackingCodeService';
 import type { TrackingCode } from '@/types/tracking';
@@ -8,6 +9,7 @@ import type { TrackingCode } from '@/types/tracking';
 export default function AdminRegistrations() {
   const { registrations, universities, user: currentUser } = useApp();
   const { currency, toggleCurrency, formatCurrency } = useCurrency();
+  const { language } = useLanguage();
   const [trackingCodesByEmail, setTrackingCodesByEmail] = useState<Map<string, TrackingCode>>(new Map());
   const [loading, setLoading] = useState(true);
 
@@ -66,20 +68,30 @@ export default function AdminRegistrations() {
       </button>
 
       <div>
-        <h1 className="text-3xl font-bold text-slate-900">Student Registrations</h1>
-        <p className="text-slate-600 mt-1">View all student university registrations</p>
+        <h1 className="text-3xl font-bold text-slate-900">
+          {language === 'vi' ? 'Đăng ký học sinh' : language === 'ko' ? '학생 등록' : 'Student Registrations'}
+        </h1>
+        <p className="text-slate-600 mt-1">
+          {language === 'vi' ? 'Xem tất cả đăng ký đại học của học sinh' : language === 'ko' ? '모든 학생 대학 등록 보기' : 'View all student university registrations'}
+        </p>
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
         <div className="mb-4">
-          <h3 className="text-xl font-semibold text-slate-900">Total Registrations: {registrations.length}</h3>
+          <h3 className="text-xl font-semibold text-slate-900">
+            {language === 'vi' ? 'Tổng đăng ký' : language === 'ko' ? '총 등록' : 'Total Registrations'}: {registrations.length}
+          </h3>
         </div>
 
         {registrations.length === 0 ? (
           <div className="text-center py-12">
             <User className="w-12 h-12 text-slate-400 mx-auto mb-3" />
-            <p className="text-slate-600 font-medium">No registrations yet</p>
-            <p className="text-sm text-slate-500 mt-1">Students will appear here when they register for universities</p>
+            <p className="text-slate-600 font-medium">
+              {language === 'vi' ? 'Chưa có đăng ký nào' : language === 'ko' ? '등록 없음' : 'No registrations yet'}
+            </p>
+            <p className="text-sm text-slate-500 mt-1">
+              {language === 'vi' ? 'Học sinh sẽ xuất hiện ở đây khi đăng ký đại học' : language === 'ko' ? '학생이 대학교에 등록하면 여기에 표시됩니다' : 'Students will appear here when they register for universities'}
+            </p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -100,7 +112,9 @@ export default function AdminRegistrations() {
                       <h4 className="text-base font-semibold text-slate-900 mb-1">{university.name}</h4>
                       <p className="text-sm text-slate-600">{university.country}</p>
                       <p className="text-xs text-slate-500 mt-1">
-                        <span className="font-medium">Student:</span> {registration.studentEmail}
+                        <span className="font-medium">
+                          {language === 'vi' ? 'Học sinh' : language === 'ko' ? '학생' : 'Student'}:
+                        </span> {registration.studentEmail}
                       </p>
                       {trackingCodesByEmail.has(registration.studentEmail) && (
                         <div className="mt-2 flex items-center gap-2">
