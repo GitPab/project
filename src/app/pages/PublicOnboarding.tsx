@@ -494,7 +494,7 @@ export default function PublicOnboarding() {
                         </span>
                         <div className="text-right">
                           <div className="text-2xl font-bold text-emerald-700">
-                            {formatFrom(initialCost, 'USD')}
+                            {formatFrom(initialCost, 'VND')}
                           </div>
                           {currency !== 'VND' && (
                             <div className="text-xs text-emerald-600">
@@ -503,7 +503,7 @@ export default function PublicOnboarding() {
                                 currency: 'VND',
                                 minimumFractionDigits: 0,
                                 maximumFractionDigits: 0,
-                              }).format(convertAmount(initialCost, 'VND', 'USD'))}
+                              }).format(initialCost)}
                             </div>
                           )}
                         </div>
