@@ -21,6 +21,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
+type TopTier = 'Top1' | 'Top2' | 'Top3';
+
 // Visa system options
 const VISA_SYSTEMS = [
   { value: 'D4-1', label: 'D4-1 (Language Course)', labelVi: 'D4-1 (Khóa học tiếng Hàn)', labelKr: 'D4-1 (한국어 과정)' },
@@ -41,16 +43,6 @@ const TOPIK_LEVELS = [
   { value: 6, label: 'TOPIK 6 (50% scholarship)', labelVi: 'TOPIK 6 (Giảm 50% học phí)', labelKr: 'TOPIK 6 (50% 장학금)' },
 ];
 
-// Featured recommended universities
-const FEATURED_UNIVERSITIES = [
-  { id: 'kr-ajou-1', icon: '🏛️', strength: 'Engineering & IT', strengthVi: 'Kỹ thuật & CNTT', strengthKr: '공학 및 IT' },
-  { id: 'kr-kaist-1', icon: '🔬', strength: 'Science & Tech', strengthVi: 'Khoa học & Công nghệ', strengthKr: '과학 및 기술' },
-  { id: 'kr-snu-1', icon: '🎓', strength: 'Business & Law', strengthVi: 'Kinh doanh & Luật', strengthKr: '경영 및 법' },
-  { id: 'jp-tokyo-1', icon: '🗾', strength: 'Research Excellence', strengthVi: 'Nghiên cứu xuất sắc', strengthKr: '연구 우수성' },
-  { id: 'sg-nus-1', icon: '🌏', strength: 'International Hub', strengthVi: 'Trung tâm quốc tế', strengthKr: '국제 허브' },
-  { id: 'cn-tsinghua-1', icon: '🏯', strength: 'Innovation Leader', strengthVi: 'Tiên phong đổi mới', strengthKr: '혁신 리더' },
-];
-
 export default function PublicOnboarding() {
   const navigate = useNavigate();
   const { universities, addStudentOnboarding, login } = useApp();
@@ -62,17 +54,50 @@ export default function PublicOnboarding() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [selectedSystem, setSelectedSystem] = useState('D2-2');
   const [topikLevel, setTopikLevel] = useState(0);
-  const [desiredUniversity, setDesiredUniversity] = useState('kr-ajou-1');
+  const [desiredUniversity, setDesiredUniversity] = useState(() => {
+    // Find first Korean university to set as default
+    const firstKoreanUni = universities.find(u => u.country === 'South Korea' || u.koreanData?.isKoreanUniversity);
+    return firstKoreanUni?.id || universities[0]?.id || '';
+  });
   const [universitySearch, setUniversitySearch] = useState('');
   const [phoneError, setPhoneError] = useState('');
+  const [activeTier, setActiveTier] = useState<TopTier>('Top1');
 
-  // Filter universities for search
+  // Filter universities for search - Korean only
   const searchableUniversities = useMemo(() => {
-    return universities.filter(uni => 
-      uni.name.toLowerCase().includes(universitySearch.toLowerCase()) ||
-      uni.country.toLowerCase().includes(universitySearch.toLowerCase())
-    );
+    return universities.filter(uni => {
+      // Only show Korean universities
+      const isKorean = uni.country === 'South Korea' || uni.koreanData?.isKoreanUniversity === true;
+      if (!isKorean) return false;
+
+      // Filter by search term
+      return (
+        uni.name.toLowerCase().includes(universitySearch.toLowerCase()) ||
+        uni.country.toLowerCase().includes(universitySearch.toLowerCase()) ||
+        uni.koreanName?.toLowerCase().includes(universitySearch.toLowerCase())
+      );
+    });
   }, [universities, universitySearch]);
+
+  const topGroups = useMemo(() => {
+    const group: Record<TopTier, University[]> = { Top1: [], Top2: [], Top3: [] };
+    universities.forEach((uni) => {
+      const tier =
+        (uni.topTier as TopTier | undefined) ||
+        (uni.koreanData?.topTier as TopTier | undefined) ||
+        (uni.koreanData?.topVisa === 'Top 1'
+          ? 'Top1'
+          : uni.koreanData?.topVisa === 'Top 2'
+            ? 'Top2'
+            : uni.koreanData?.topVisa === 'Top 3'
+              ? 'Top3'
+              : undefined);
+      if (tier) {
+        group[tier].push(uni);
+      }
+    });
+    return group;
+  }, [universities]);
 
   // Get selected university
   const selectedUni = universities.find(u => u.id === desiredUniversity);
@@ -230,8 +255,12 @@ export default function PublicOnboarding() {
       return;
     }
 
-    // Auto-login the user as a student
-    login(generatedEmail, 'temp-password', 'student');
+    // Auto-login the user as a student with profile info
+    login(generatedEmail, 'temp-password', 'student', {
+      displayName: fullName,
+      phone: phoneNumber,
+      trackingCode: trackingCode
+    });
 
     toast.success(language === 'vi' ? 'Đăng ký tư vấn thành công!' : language === 'ko' ? '상담 신청 완료!' : 'Consultation request submitted!');
 
@@ -531,63 +560,66 @@ export default function PublicOnboarding() {
             </form>
           </div>
 
-          {/* Recommended Universities Section */}
+          {/* Top Tier Tabs */}
           <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-6 md:p-8">
-            <div className="text-center mb-8">
-              <h3 className="text-2xl font-bold text-slate-900 mb-2">
-                {language === 'vi' ? '🌟 Gợi Ý Trường Hàng Đầu' : language === 'ko' ? '🌟 추천 상위 대학' : '🌟 Recommended Top Universities'}
-              </h3>
-              <p className="text-slate-600">
-                {language === 'vi' ? 'Các trường đại học phổ biến được học viên Việt Nam lựa chọn' : language === 'ko' ? '베트남 학생들이 선택하는 인기 대학' : 'Popular universities chosen by Vietnamese students'}
-              </p>
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+              <div>
+                <h3 className="text-2xl font-bold text-slate-900">
+                  {language === 'vi' ? 'Tra cứu trường theo hạng Top' : language === 'ko' ? 'Top 등급별 대학 조회' : 'Browse Korean Top Lists'}
+                </h3>
+                <p className="text-slate-600">
+                  {language === 'vi'
+                    ? 'Dữ liệu 100% từ CSV: Top 1, Top 2, Top 3 (hạn chế visa). Nhấn để xem chi tiết trường.'
+                    : language === 'ko'
+                      ? 'CSV에서 불러온 Top1/Top2/Top3(비자 제한) 대학 목록입니다.'
+                      : 'Pulled directly from the Top 1 / Top 2 / Top 3 CSV lists.'}
+                </p>
+              </div>
+              <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1 shadow-inner">
+                {(['Top1', 'Top2', 'Top3'] as TopTier[]).map((tier) => (
+                  <button
+                    key={tier}
+                    onClick={() => setActiveTier(tier)}
+                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                      activeTier === tier
+                        ? 'bg-primary text-white shadow'
+                        : 'text-slate-700 hover:bg-white'
+                    }`}
+                  >
+                    {tier === 'Top1' ? 'Top 1' : tier === 'Top2' ? 'Top 2' : 'Top 3 (Hạn chế visa)'}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {FEATURED_UNIVERSITIES.map(featured => {
-                const uni = universities.find(u => u.id === featured.id);
-                if (!uni) return null;
-
-                return (
+            <div className="overflow-hidden border border-slate-200 rounded-xl">
+              <div className="grid grid-cols-[1.3fr,1fr,1fr] bg-blue-50 text-slate-900 font-semibold text-sm px-4 py-3">
+                <div>{language === 'vi' ? 'Tên trường' : language === 'ko' ? '대학명' : 'University'}</div>
+                <div>{language === 'vi' ? 'Tên tiếng Hàn' : language === 'ko' ? '한국어 명칭' : 'Korean Name'}</div>
+                <div>{language === 'vi' ? 'Khu vực' : language === 'ko' ? '지역' : 'Region'}</div>
+              </div>
+              <div className="divide-y divide-slate-200">
+                {topGroups[activeTier].length === 0 && (
+                  <div className="px-4 py-6 text-center text-slate-500">
+                    {language === 'vi' ? 'Chưa có dữ liệu cho hạng này.' : language === 'ko' ? '해당 등급 데이터가 없습니다.' : 'No data for this tier yet.'}
+                  </div>
+                )}
+                {topGroups[activeTier].map((uni) => (
                   <button
                     key={uni.id}
-                    onClick={() => {
-                      setDesiredUniversity(uni.id);
-                      document.getElementById('onboarding-form')?.scrollIntoView({ behavior: 'smooth' });
-                    }}
-                    className="text-left p-4 bg-gradient-to-br from-slate-50 to-blue-50 rounded-xl border-2 border-slate-200 hover:border-primary hover:shadow-lg transition-all group"
+                    onClick={() => navigate(`/student/university/${uni.id}`)}
+                    className="w-full text-left grid grid-cols-[1.3fr,1fr,1fr] px-4 py-3 hover:bg-blue-50/60 transition-colors"
                   >
-                    <div className="flex items-start gap-3 mb-3">
-                      <div className="text-3xl">{featured.icon}</div>
-                      <div className="flex-1">
-                        <h4 className="font-bold text-slate-900 group-hover:text-primary transition-colors line-clamp-2 text-sm">
-                          {uni.name}
-                        </h4>
-                        <p className="text-xs text-slate-600">{uni.country}</p>
-                      </div>
+                    <div className="flex flex-col">
+                      <span className="font-semibold text-slate-900">{uni.name}</span>
+                      <span className="text-xs text-slate-500">{uni.tagline}</span>
                     </div>
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="px-2 py-1 bg-primary/10 text-primary rounded-full font-semibold">
-                        {getLabel(featured, 'strength')}
-                      </span>
-                    </div>
-                    <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
-                      <span>🏆 {uni.ranking}</span>
-                      <ChevronRight className="w-4 h-4 text-primary group-hover:translate-x-1 transition-transform" />
-                    </div>
+                    <div className="text-slate-800">{uni.koreanName || uni.name}</div>
+                    <div className="text-slate-700">{uni.region || uni.koreanData?.address || '—'}</div>
                   </button>
-                );
-              })}
+                ))}
+              </div>
             </div>
-          </div>
-
-          {/* Admin Access Link */}
-          <div className="mt-8 text-center">
-            <button
-              onClick={() => navigate('/login')}
-              className="text-sm text-slate-500 hover:text-primary transition-colors underline"
-            >
-              {language === 'vi' ? '🔐 Truy cập quản trị viên / sinh viên' : language === 'ko' ? '🔐 관리자 / 학생 액세스' : '🔐 Admin / Student Access'}
-            </button>
           </div>
         </div>
       </div>

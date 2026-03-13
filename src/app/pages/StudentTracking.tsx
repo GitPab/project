@@ -123,6 +123,25 @@ export default function StudentTracking() {
           </div>
         ) : (
           <>
+            {/* Summary Header */}
+            <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-8 mb-6 flex flex-col gap-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+                {language === 'vi' ? 'Thông tin khái quát của bạn' : language === 'ko' ? '요약 정보' : 'Your Overview'}
+              </p>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h2 className="text-2xl font-bold text-slate-900">{trackingData.studentName}</h2>
+                    <p className="text-slate-700">{trackingData.studentPhone}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm text-slate-500 mb-1">{language === 'vi' ? 'Mã theo dõi' : language === 'ko' ? '추적 코드' : 'Tracking Code'}</p>
+                    <p className="font-mono font-semibold text-lg text-primary">{code}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Tracking Code Card */}
             <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-8 mb-6">
               <h2 className="text-sm font-semibold text-slate-600 uppercase tracking-wide mb-3">

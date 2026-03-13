@@ -3,17 +3,27 @@ import { useNavigate } from 'react-router';
 import { useApp, University } from '../context/AppContext';
 import { useCurrency, Currency } from '../context/CurrencyContext';
 import UniversityForm from '../components/UniversityForm';
+import ImportUniversitiesModal from '../components/ImportUniversitiesModal';
 import { Edit, Plus, Trash2, X, Lock, RefreshCw, Eye, Upload, ImageIcon, AlertCircle, Save, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { useDropzone } from 'react-dropzone';
 
 export default function UniversitiesList() {
   const navigate = useNavigate();
-  const { universities, updateUniversity, user } = useApp();
+  const { universities, updateUniversity, addUniversities, user } = useApp();
   const { currency, setCurrency, formatFrom } = useCurrency();
   const [editingUniversity, setEditingUniversity] = useState<University | null>(null);
+  const [createMode, setCreateMode] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [topFilter, setTopFilter] = useState<'all' | 'Top1' | 'Top2' | 'Top3'>('all');
   
   const isAdmin = user?.role === 'admin';
+
+  const filteredUniversities = universities.filter((uni) => {
+    if (topFilter === 'all') return true;
+    const tier = (uni.topTier as any) || uni.koreanData?.topTier || uni.koreanData?.topVisa;
+    return tier === topFilter;
+  });
 
   const calculateTotal = (uni: University) => {
     return uni.generalTuition + uni.visaFee + uni.accommodationFee + uni.insuranceFee +
@@ -58,6 +68,44 @@ export default function UniversitiesList() {
         </p>
       </div>
 
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
+          {(['all', 'Top1', 'Top2', 'Top3'] as Array<'all' | 'Top1' | 'Top2' | 'Top3'>).map((tier) => (
+            <button
+              key={tier}
+              onClick={() => setTopFilter(tier)}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                topFilter === tier ? 'bg-primary text-white shadow' : 'text-slate-700 hover:bg-white'
+              }`}
+            >
+              {tier === 'all' ? 'Tất cả' : tier === 'Top3' ? 'Top 3 (Hạn chế visa)' : tier.replace('Top', 'Top ')}
+            </button>
+          ))}
+        </div>
+
+        {isAdmin && (
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => {
+                setCreateMode(true);
+                setEditingUniversity(null);
+              }}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Thêm trường
+            </button>
+            <button
+              onClick={() => setImportOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-100 transition-colors"
+            >
+              <Upload className="w-4 h-4" />
+              Import CSV
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* Desktop Table */}
       <div className="hidden lg:block bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
@@ -91,10 +139,10 @@ export default function UniversitiesList() {
               </tr>
             </thead>
             <tbody>
-              {universities.map((uni) => (
+              {filteredUniversities.map((uni) => (
                 <tr key={uni.id} className="border-b border-slate-200 last:border-0 hover:bg-slate-50">
                   <td className="px-6 py-4 font-medium text-slate-900">{uni.name}</td>
-                  <td className="px-6 py-4 text-slate-700">{uni.country}</td>
+                  <td className="px-6 py-4 text-slate-700">{uni.koreanName || uni.country}</td>
                   <td className="px-6 py-4 text-right text-slate-900">{formatFrom(uni.generalTuition, 'USD')}</td>
                   <td className="px-6 py-4 text-right text-slate-900">{formatFrom(uni.visaFee, 'USD')}</td>
                   <td className="px-6 py-4 text-right text-slate-900">{formatFrom(uni.accommodationFee, 'USD')}</td>
@@ -129,7 +177,7 @@ export default function UniversitiesList() {
 
       {/* Mobile Cards */}
       <div className="lg:hidden space-y-4">
-        {universities.map((uni) => (
+        {filteredUniversities.map((uni) => (
           <div key={uni.id} className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
             {/* Thumbnail Image */}
             <div className="relative h-40 overflow-hidden">
@@ -191,18 +239,64 @@ export default function UniversitiesList() {
         ))}
       </div>
 
-      {/* Edit Modal - Admin Only */}
-      {isAdmin && editingUniversity && (
+      {/* Edit / Add Modal - Admin Only */}
+      {isAdmin && (createMode || editingUniversity) && (
         <UniversityForm
-          university={editingUniversity}
-          onClose={() => setEditingUniversity(null)}
-          onSave={() => {
-            setEditingUniversity(null)
-            toast.success('Đã cập nhật thông tin trường thành công!');
+          university={createMode ? undefined : editingUniversity || undefined}
+          onClose={() => {
+            setCreateMode(false);
+            setEditingUniversity(null);
+          }}
+          onSave={(data) => {
+            if (createMode) {
+              const newUni: University = {
+                id: data.id || `custom-${Date.now()}`,
+                name: data.name || 'New University',
+                koreanName: data.koreanName,
+                region: data.region,
+                topTier: (data.topTier as any) || 'Top2',
+                country: data.country || 'South Korea',
+                countryCode: '🇰🇷',
+                tagline: data.tagline || 'Trường mới thêm',
+                thumbnail: data.thumbnail || 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=1200&auto=format&fit=crop',
+                heroImage: data.heroImage || 'https://images.unsplash.com/photo-1460518451285-97b6aa326961?w=1600&auto=format&fit=crop',
+                overview: data.overview || '',
+                academicPrograms: data.academicPrograms || [],
+                galleryImages: data.galleryImages || [],
+                ranking: data.ranking || '',
+                worldRanking: data.worldRanking || 0,
+                generalTuition: data.generalTuition || 0,
+                visaFee: data.visaFee || 0,
+                accommodationFee: data.accommodationFee || 0,
+                insuranceFee: data.insuranceFee || 0,
+                additionalFees: data.additionalFees || [],
+                koreanData: data.koreanData || { isKoreanUniversity: true, topTier: (data.topTier as any) || 'Top2', address: data.region },
+                fixedCosts: data.fixedCosts || [],
+                optionalAddons: data.optionalAddons || [],
+                majors: data.majors || [],
+              };
+              addUniversities([newUni]);
+            } else if (editingUniversity) {
+              updateUniversity(editingUniversity.id, data);
+            }
+            setCreateMode(false);
+            setEditingUniversity(null);
+            toast.success('Đã lưu thông tin trường');
+          }}
+        />
+      )}
+
+      {isAdmin && importOpen && (
+        <ImportUniversitiesModal
+          isOpen={importOpen}
+          onClose={() => setImportOpen(false)}
+          onImport={(items) => {
+            addUniversities(items);
+            setImportOpen(false);
+            toast.success(`Đã import ${items.length} trường từ CSV`);
           }}
         />
       )}
     </div>
   );
 }
-

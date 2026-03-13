@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { koreanUniversities } from '../data/korean-universities';
-import { asianUniversities } from '../data/asian-universities';
+import { topUniversities } from '../data/top-universities';
 import {
   University,
   User,
@@ -28,7 +27,7 @@ export type {
 
 interface AppContextType {
   user: User | null;
-  login: (email: string, password: string, role: 'admin' | 'student') => void;
+  login: (email: string, password: string, role: 'admin' | 'student', studentInfo?: { displayName?: string; phone?: string; trackingCode?: string }) => void;
   logout: () => void;
   universities: University[];
   updateUniversity: (id: string, updates: Partial<University>) => void;
@@ -58,11 +57,8 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-// Combine Asian universities only (~50 universities)
-const allUniversitiesData = [
-  ...koreanUniversities, // Ajou and other Korean universities
-  ...asianUniversities // All Asian universities (Korea, China, Japan, Singapore, Vietnam, India, Thailand, Malaysia)
-];
+// Use only Korean universities from the provided CSV Top1/Top2/Top3 lists
+const allUniversitiesData = topUniversities;
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -72,14 +68,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [studentProfiles, setStudentProfiles] = useState<StudentProfile[]>([]);
   const [studentOnboardings, setStudentOnboardings] = useState<StudentOnboardingData[]>([]);
 
-  const login = (email: string, password: string, role: 'admin' | 'student') => {
+  const login = (email: string, password: string, role: 'admin' | 'student', studentInfo?: { displayName?: string; phone?: string; trackingCode?: string }) => {
     // Login creates a user session
     const userName = email.split('@')[0];
 
     setUser({
       email,
       role,
-      name: userName
+      name: userName,
+      displayName: studentInfo?.displayName,
+      phone: studentInfo?.phone,
+      trackingCode: studentInfo?.trackingCode
     });
   };
 

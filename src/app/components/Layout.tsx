@@ -18,6 +18,8 @@ import {
   DollarSign,
   Globe,
   ChevronDown,
+  ChevronsLeft,
+  ChevronsRight,
   CheckCircle,
   RefreshCw
 } from 'lucide-react';
@@ -169,6 +171,7 @@ export default function Layout() {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
 
   const handleLogout = () => {
     logout();
@@ -198,57 +201,69 @@ export default function Layout() {
   return (
     <div className="flex h-screen bg-blue-50">
       {/* Sidebar for desktop */}
-      <aside className="hidden md:flex md:flex-col md:w-64 bg-white border-r border-slate-200 shadow-sm">
-        {/* Logo */}
-        <div className="h-16 flex items-center px-6 border-b border-slate-200">
-          <h1 className="text-xl font-bold text-primary">Du Học Cost</h1>
+      <aside
+        className="hidden md:flex md:flex-col bg-white border-r border-slate-200 shadow-sm"
+        style={{ width: sidebarCollapsed ? '88px' : '256px' }}
+      >
+        {/* Logo + Collapse */}
+        <div className="h-16 flex items-center justify-between px-4 border-b border-slate-200">
+          {!sidebarCollapsed && <h1 className="text-xl font-bold text-primary">Du Học Cost</h1>}
+          <button
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            className="p-2 rounded-lg hover:bg-slate-100 text-slate-600"
+            aria-label="Toggle sidebar"
+          >
+            {sidebarCollapsed ? <ChevronsRight className="w-5 h-5" /> : <ChevronsLeft className="w-5 h-5" />}
+          </button>
         </div>
 
         {/* Role Badge */}
-        <div className="p-4 border-b border-slate-200">
-          <div className={`flex items-center gap-3 px-4 py-3 rounded-lg ${
-            isAdmin 
-              ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white' 
-              : 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white'
-          }`}>
-            {isAdmin ? (
-              <>
-                <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-                  <Shield className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-xs font-medium opacity-90">{t('common.loggedInAs')}</p>
-                  <p className="font-bold flex items-center gap-2">
-                    {t('common.admin')}
-                    <Edit3 className="w-4 h-4" />
-                  </p>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-                  <UserCircle className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-xs font-medium opacity-90">{t('common.loggedInAs')}</p>
-                  <p className="font-bold flex items-center gap-2">
-                    {t('common.student')}
-                    <Lock className="w-4 h-4" />
-                  </p>
-                </div>
-              </>
-            )}
+        {!sidebarCollapsed && (
+          <div className="p-4 border-b border-slate-200">
+            <div className={`flex items-center gap-3 px-4 py-3 rounded-lg ${
+              isAdmin 
+                ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white' 
+                : 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white'
+            }`}>
+              {isAdmin ? (
+                <>
+                  <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+                    <Shield className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium opacity-90">{t('common.loggedInAs')}</p>
+                    <p className="font-bold flex items-center gap-2">
+                      {t('common.admin')}
+                      <Edit3 className="w-4 h-4" />
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+                    <UserCircle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium opacity-90">{t('common.loggedInAs')}</p>
+                    <p className="font-bold flex items-center gap-2">
+                      {t('common.student')}
+                      <Lock className="w-4 h-4" />
+                    </p>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Menu */}
-        <nav className="flex-1 p-4 space-y-1">
+        <nav className={`flex-1 ${sidebarCollapsed ? 'p-2' : 'p-4'} space-y-1`}>
           {menuItems.map((item) => (
             <NavLink
               key={item.path}
               to={item.path}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                `flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-lg transition-colors ${
                   isActive
                     ? 'bg-primary text-white'
                     : 'text-slate-700 hover:bg-slate-100'
@@ -256,27 +271,28 @@ export default function Layout() {
               }
             >
               <item.icon className="w-5 h-5" />
-              <span className="font-medium">{item.label}</span>
+              {!sidebarCollapsed && <span className="font-medium">{item.label}</span>}
             </NavLink>
           ))}
         </nav>
 
         {/* Role Indicator + Logout button */}
-        <div className="p-4 border-t border-slate-200 space-y-2">
-          {/* Access Level Info */}
-          <div className="px-3 py-2 bg-slate-50 rounded-lg mb-2">
-            <p className="text-xs text-slate-600 mb-1">{t('common.accessLevel')}</p>
-            <p className="text-sm font-semibold text-slate-900">
-              {isAdmin ? t('common.fullEditAccess') : t('common.viewOnly')}
-            </p>
-          </div>
+        <div className={`${sidebarCollapsed ? 'p-2' : 'p-4'} border-t border-slate-200 space-y-2`}>
+          {!sidebarCollapsed && (
+            <div className="px-3 py-2 bg-slate-50 rounded-lg mb-2">
+              <p className="text-xs text-slate-600 mb-1">{t('common.accessLevel')}</p>
+              <p className="text-sm font-semibold text-slate-900">
+                {isAdmin ? t('common.fullEditAccess') : t('common.viewOnly')}
+              </p>
+            </div>
+          )}
           
           <button
             onClick={handleLogout}
-            className="flex items-center gap-3 px-4 py-3 w-full rounded-lg text-slate-700 hover:bg-slate-100 transition-colors"
+            className={`flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 w-full rounded-lg text-slate-700 hover:bg-slate-100 transition-colors`}
           >
             <LogOut className="w-5 h-5" />
-            <span className="font-medium">{t('common.logout')}</span>
+            {!sidebarCollapsed && <span className="font-medium">{t('common.logout')}</span>}
           </button>
         </div>
       </aside>
@@ -392,14 +408,28 @@ export default function Layout() {
 
           {/* Role Badge */}
           {isAdmin ? (
-            <div className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium">
+            <div className="flex items-center gap-3 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium">
               <Shield className="w-4 h-4" />
-              {t('common.admin')}
+              <div className="flex flex-col leading-tight">
+                <span>Quản trị viên</span>
+                <span className="text-xs opacity-90">{user?.name}</span>
+              </div>
             </div>
           ) : (
-            <div className="flex items-center gap-2 px-3 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium">
+            <div className="flex items-center gap-3 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium">
               <Lock className="w-4 h-4" />
-              {t('common.student')}
+              <div className="flex flex-col leading-tight">
+                <span>{t('common.student')}</span>
+                <span className="text-xs opacity-90">
+                  {user?.displayName || user?.name}
+                  {user?.phone && ` • ☎️ ${user.phone.slice(-4)}`}
+                </span>
+                {user?.trackingCode && (
+                  <span className="text-xs opacity-75 font-mono">
+                    {user.trackingCode.substring(0, 6)}...
+                  </span>
+                )}
+              </div>
             </div>
           )}
         </header>

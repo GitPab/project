@@ -6,6 +6,10 @@ export interface User {
   email: string;
   role: 'admin' | 'student';
   name: string;
+  // Student-specific fields (optional, set after onboarding)
+  displayName?: string;  // Full name to display (e.g., "Nguyễn Văn A")
+  phone?: string;         // Student phone number
+  trackingCode?: string;  // Tracking code (e.g., "SACMA-20260313-ABC123")
 }
 
 export interface PaymentHistory {

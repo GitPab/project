@@ -47,6 +47,9 @@ export default function UniversityForm({ university, onClose, onSave }: Universi
   // Form State
   const [formData, setFormData] = useState({
     name: university?.name || '',
+    koreanName: university?.koreanName || '',
+    region: university?.region || university?.koreanData?.address || '',
+    topTier: (university?.topTier as any) || university?.koreanData?.topTier || 'Top2',
     country: university?.country || '',
     overview: university?.overview || '',
     generalTuition: university?.generalTuition || 0,
@@ -367,12 +370,21 @@ export default function UniversityForm({ university, onClose, onSave }: Universi
       // Prepare data for save
       const dataToSave: Partial<University> = {
         name: formData.name,
+        koreanName: formData.koreanName,
+        region: formData.region,
+        topTier: formData.topTier as any,
         country: formData.country,
         generalTuition: formData.generalTuition,
         visaFee: formData.visaFee,
         accommodationFee: formData.accommodationFee,
         insuranceFee: formData.insuranceFee,
         additionalFees: formData.additionalFees,
+        koreanData: {
+          ...(university?.koreanData || { isKoreanUniversity: true }),
+          topTier: formData.topTier as any,
+          topVisa: formData.topTier === 'Top3' ? 'Top 3' : formData.topTier === 'Top2' ? 'Top 2' : 'Top 1',
+          address: formData.region || university?.koreanData?.address,
+        },
       };
 
       // Include edit-mode specific data
@@ -449,7 +461,7 @@ export default function UniversityForm({ university, onClose, onSave }: Universi
             {/* Basic Info Section */}
             <div>
               <h3 className="text-lg font-semibold text-slate-900 mb-4">Basic Information</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">
                     University Name <span className="text-red-500">*</span>
@@ -472,12 +484,59 @@ export default function UniversityForm({ university, onClose, onSave }: Universi
                     required
                     disabled={isSubmitting}
                   />
-                  {fieldErrors.name && fieldErrors.name.length > 0 && (
-                    <p className="text-sm text-red-600 mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3" />
-                      {fieldErrors.name[0]}
-                    </p>
-                  )}
+                    {fieldErrors.name && fieldErrors.name.length > 0 && (
+                      <p className="text-sm text-red-600 mt-1 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" />
+                        {fieldErrors.name[0]}
+                      </p>
+                    )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Korean Name
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.koreanName}
+                    onChange={(e) => {
+                      setFormData({ ...formData, koreanName: e.target.value });
+                    }}
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 transition-colors ${
+                      'border-slate-300 focus:border-primary'
+                    }`}
+                    placeholder="Tên tiếng Hàn"
+                    disabled={isSubmitting}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Khu vực
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.region}
+                    onChange={(e) => setFormData({ ...formData, region: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 border-slate-300 focus:border-primary"
+                    placeholder="Seoul, Busan, Gyeonggi..."
+                    disabled={isSubmitting}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Top Tier
+                  </label>
+                  <select
+                    value={formData.topTier}
+                    onChange={(e) => setFormData({ ...formData, topTier: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 border-slate-300 focus:border-primary"
+                  >
+                    <option value="Top1">Top 1</option>
+                    <option value="Top2">Top 2</option>
+                    <option value="Top3">Top 3 (Hạn chế visa)</option>
+                  </select>
                 </div>
 
                 <div>
@@ -489,7 +548,6 @@ export default function UniversityForm({ university, onClose, onSave }: Universi
                     value={formData.country}
                     onChange={(e) => {
                       setFormData({ ...formData, country: e.target.value });
-                      // Clear error on change
                       setFieldErrors((prev) => ({ ...prev, country: [] }));
                     }}
                     onBlur={() => validateFieldCountry(formData.country)}

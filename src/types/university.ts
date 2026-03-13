@@ -40,6 +40,7 @@ export interface KoreanUniversityData {
   isKoreanUniversity: boolean;
   address?: string;
   topVisa?: string;
+  topTier?: 'Top1' | 'Top2' | 'Top3';
   koreanRanking?: string; // e.g., "15/200 trường đại học tại Hàn Quốc"
   visaSystems?: VisaSystemCost[];
   majors?: string[];
@@ -62,6 +63,9 @@ export interface AcademicProgram {
 export interface University {
   id: string;
   name: string;
+  koreanName?: string;
+  region?: string;
+  topTier?: 'Top1' | 'Top2' | 'Top3';
   country: string;
   countryCode: string;
   tagline: string;
