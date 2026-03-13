@@ -621,6 +621,26 @@ export default function PublicOnboarding() {
               </div>
             </div>
           </div>
+
+          {/* Footer Links */}
+          <div className="mt-8 text-center space-y-2">
+            <button
+              onClick={() => navigate('/student/lookup')}
+              className="block text-sm text-primary hover:text-blue-700 transition-colors underline mx-auto"
+            >
+              {language === 'vi' ? '📊 Tra Cứu Trạng Thái Hồ Sơ' :
+               language === 'ko' ? '📊 신청 현황 조회' :
+               '📊 Check Application Status'}
+            </button>
+            <button
+              onClick={() => navigate('/login')}
+              className="block text-sm text-slate-600 hover:text-primary transition-colors underline mx-auto"
+            >
+              {language === 'vi' ? '🔐 Đăng Nhập Quản Trị Viên / Học Viên' :
+               language === 'ko' ? '🔐 관리자 / 학생 로그인' :
+               '🔐 Admin / Student Login'}
+            </button>
+          </div>
         </div>
       </div>
     </div>

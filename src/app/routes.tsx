@@ -13,6 +13,7 @@ import ProgressTracker from './pages/ProgressTracker';
 import StudentOnboarding from './pages/StudentOnboarding';
 import PublicOnboarding from './pages/PublicOnboarding';
 import StudentTracking from './pages/StudentTracking';
+import StudentLookup from './pages/StudentLookup';
 
 export const router = createHashRouter([
   {
@@ -22,6 +23,10 @@ export const router = createHashRouter([
   {
     path: '/login',
     Component: Login
+  },
+  {
+    path: '/student/lookup',
+    Component: StudentLookup
   },
   {
     path: '/student/tracking/:code',
