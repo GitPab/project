@@ -109,45 +109,53 @@ export default function UniversitiesList() {
       {/* Desktop Table */}
       <div className="hidden lg:block bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="text-left px-6 py-4 text-sm font-semibold text-slate-900">
+                <th className="text-left px-4 py-3 font-semibold text-slate-900">
                   {isAdmin ? 'University Name' : 'Tên trường'}
                 </th>
-                <th className="text-left px-6 py-4 text-sm font-semibold text-slate-900">
+                <th className="text-left px-4 py-3 font-semibold text-slate-900">
+                  {isAdmin ? 'Korean Name' : 'Tên tiếng Hàn'}
+                </th>
+                <th className="text-left px-4 py-3 font-semibold text-slate-900">
                   {isAdmin ? 'Country' : 'Quốc gia'}
                 </th>
-                <th className="text-right px-6 py-4 text-sm font-semibold text-slate-900">
-                  {isAdmin ? 'General Tuition' : 'Học phí'}
+                <th className="text-left px-4 py-3 font-semibold text-slate-900">
+                  {isAdmin ? 'Region' : 'Khu vực'}
                 </th>
-                <th className="text-right px-6 py-4 text-sm font-semibold text-slate-900">
-                  {isAdmin ? 'Visa Fee' : 'Phí visa'}
+                <th className="text-right px-4 py-3 font-semibold text-slate-900">
+                  {isAdmin ? 'Tuition' : 'Học phí'}
                 </th>
-                <th className="text-right px-6 py-4 text-sm font-semibold text-slate-900">
+                <th className="text-right px-4 py-3 font-semibold text-slate-900">
+                  {isAdmin ? 'Visa' : 'Visa'}
+                </th>
+                <th className="text-right px-4 py-3 font-semibold text-slate-900">
                   {isAdmin ? 'Accommodation' : 'Lưu trú'}
                 </th>
-                <th className="text-right px-6 py-4 text-sm font-semibold text-slate-900">
+                <th className="text-right px-4 py-3 font-semibold text-slate-900">
                   {isAdmin ? 'Insurance' : 'Bảo hiểm'}
                 </th>
-                <th className="text-right px-6 py-4 text-sm font-semibold text-slate-900">
-                  {isAdmin ? 'Total Estimated' : 'Tổng ước tính'}
+                <th className="text-right px-4 py-3 font-semibold text-slate-900">
+                  {isAdmin ? 'Total' : 'Tổng'}
                 </th>
                 {isAdmin && (
-                  <th className="text-center px-6 py-4 text-sm font-semibold text-slate-900">Actions</th>
+                  <th className="text-center px-4 py-3 font-semibold text-slate-900">Actions</th>
                 )}
               </tr>
             </thead>
             <tbody>
               {filteredUniversities.map((uni) => (
                 <tr key={uni.id} className="border-b border-slate-200 last:border-0 hover:bg-slate-50">
-                  <td className="px-6 py-4 font-medium text-slate-900">{uni.name}</td>
-                  <td className="px-6 py-4 text-slate-700">{uni.koreanName || uni.country}</td>
-                  <td className="px-6 py-4 text-right text-slate-900">{formatFrom(uni.generalTuition, 'USD')}</td>
-                  <td className="px-6 py-4 text-right text-slate-900">{formatFrom(uni.visaFee, 'USD')}</td>
-                  <td className="px-6 py-4 text-right text-slate-900">{formatFrom(uni.accommodationFee, 'USD')}</td>
-                  <td className="px-6 py-4 text-right text-slate-900">{formatFrom(uni.insuranceFee, 'USD')}</td>
-                  <td className="px-6 py-4 text-right font-semibold text-primary">{formatFrom(calculateTotal(uni), 'USD')}</td>
+                  <td className="px-4 py-3 font-medium text-slate-900 whitespace-nowrap">{uni.name}</td>
+                  <td className="px-4 py-3 text-slate-700 whitespace-nowrap">{uni.koreanName || '—'}</td>
+                  <td className="px-4 py-3 text-slate-700 whitespace-nowrap">{uni.country}</td>
+                  <td className="px-4 py-3 text-slate-700 whitespace-nowrap">{uni.region || uni.koreanData?.address || '—'}</td>
+                  <td className="px-4 py-3 text-right text-slate-900 font-medium">{formatFrom(uni.generalTuition, 'VND')}</td>
+                  <td className="px-4 py-3 text-right text-slate-900 font-medium">{formatFrom(uni.visaFee, 'VND')}</td>
+                  <td className="px-4 py-3 text-right text-slate-900 font-medium">{formatFrom(uni.accommodationFee, 'VND')}</td>
+                  <td className="px-4 py-3 text-right text-slate-900 font-medium">{formatFrom(uni.insuranceFee, 'VND')}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-primary">{formatFrom(calculateTotal(uni), 'VND')}</td>
                   {isAdmin && (
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2 justify-center">
@@ -207,23 +215,23 @@ export default function UniversitiesList() {
               <div className="space-y-2 text-sm mb-4">
                 <div className="flex justify-between">
                   <span className="text-slate-600">{isAdmin ? 'Tuition:' : 'Học phí:'}</span>
-                  <span className="font-medium text-slate-900">{formatFrom(uni.generalTuition, 'USD')}</span>
+                  <span className="font-medium text-slate-900">{formatFrom(uni.generalTuition, 'VND')}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-600">{isAdmin ? 'Visa:' : 'Visa:'}</span>
-                  <span className="font-medium text-slate-900">{formatFrom(uni.visaFee, 'USD')}</span>
+                  <span className="font-medium text-slate-900">{formatFrom(uni.visaFee, 'VND')}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-600">{isAdmin ? 'Accommodation:' : 'Lưu trú:'}</span>
-                  <span className="font-medium text-slate-900">{formatFrom(uni.accommodationFee, 'USD')}</span>
+                  <span className="font-medium text-slate-900">{formatFrom(uni.accommodationFee, 'VND')}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-600">{isAdmin ? 'Insurance:' : 'Bảo hiểm:'}</span>
-                  <span className="font-medium text-slate-900">{formatFrom(uni.insuranceFee, 'USD')}</span>
+                  <span className="font-medium text-slate-900">{formatFrom(uni.insuranceFee, 'VND')}</span>
                 </div>
                 <div className="flex justify-between pt-2 border-t border-slate-200">
                   <span className="font-semibold text-slate-900">{isAdmin ? 'Total:' : 'Tổng:'}</span>
-                  <span className="font-semibold text-primary">{formatFrom(calculateTotal(uni), 'USD')}</span>
+                  <span className="font-semibold text-primary">{formatFrom(calculateTotal(uni), 'VND')}</span>
                 </div>
               </div>
               

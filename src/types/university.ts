@@ -11,13 +11,14 @@ export interface AdditionalFee {
 }
 
 export interface VisaSystemCost {
-  visaType: 'D4-1' | 'D2-2' | 'D2-3'; // Korean visa types
+  visaType: 'D4-1' | 'D2-1' | 'D2-2' | 'D2-3' | 'D2-6'; // Extended Korean visa types
   tuitionPerTerm?: number;
   tuitionRange?: { min: number; max: number };
   applicationFee?: number;
   enrollmentFee?: number;
   baseYearlyFee?: number;
   description?: string;
+  visaName?: string; // e.g., "Korean Language Program", "University Prep"
 }
 
 export interface OptionalAddon {
@@ -32,11 +33,20 @@ export interface OptionalAddon {
   percentage?: number; // For scholarships
   selectable: boolean;
   requiresInput?: boolean; // If user needs to select months/type/etc
-  options?: Array<{ label: string; value: number }>;
+  options?: Array<{ label: string; value: number }>; // For room types, savings options, etc.
   conditional?: string; // Conditions for eligibility
+  dormRoomType?: string; // e.g., "4-person", "2-person", "international" for KTX Hàn
+  monthsSelected?: number; // For tracking months picked by user
 }
 
-export interface KoreanUniversityData {
+export interface TopikScholarship {
+  level: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  discountPercentage: number;
+  visaType?: string; // Optional: scholarship may apply to specific visa types
+  description?: string;
+}
+
+
   isKoreanUniversity: boolean;
   address?: string;
   topVisa?: string;

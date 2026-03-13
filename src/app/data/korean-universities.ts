@@ -91,21 +91,42 @@ export const koreanUniversities: University[] = [
           tuitionPerTerm: 1450000,
           applicationFee: 100000,
           baseYearlyFee: 5800000,
-          description: 'Chương trình tiếng Hàn (Korean Language Program)'
+          description: 'Chương trình tiếng Hàn (Korean Language Program)',
+          visaName: 'D4-1 (Tiếng Hàn)'
+        },
+        {
+          visaType: 'D2-1',
+          tuitionPerTerm: 1350000,
+          tuitionRange: { min: 1200000, max: 1500000 },
+          applicationFee: 150000,
+          enrollmentFee: 850000,
+          baseYearlyFee: 5800000,
+          description: 'Chương trình chuẩn bị đại học (University Preparation Program)',
+          visaName: 'D2-1 (Chuẩn bị đại học)'
         },
         {
           visaType: 'D2-2',
           tuitionRange: { min: 3736000, max: 4845000 },
           applicationFee: 150000,
           baseYearlyFee: 5800000,
-          description: 'Chương trình đại học (Undergraduate Program)'
+          description: 'Chương trình đại học (Undergraduate Program)',
+          visaName: 'D2-2 (Đại học)'
         },
         {
           visaType: 'D2-3',
           tuitionRange: { min: 2600000, max: 4038000 },
           enrollmentFee: 900000,
           baseYearlyFee: 5800000,
-          description: 'Chương trình sau đại học (Graduate Program)'
+          description: 'Chương trình sau đại học (Graduate Program)',
+          visaName: 'D2-3 (Sau đại học)'
+        },
+        {
+          visaType: 'D2-6',
+          tuitionRange: { min: 2800000, max: 3500000 },
+          enrollmentFee: 1100000,
+          baseYearlyFee: 5800000,
+          description: 'Chương trình nâng cao sau đại học (Advanced Graduate Program)',
+          visaName: 'D2-6 (Nâng cao sau đại học)'
         }
       ],
       
@@ -124,22 +145,28 @@ export const koreanUniversities: University[] = [
       // Scholarships
       scholarships: [
         { visaType: 'D4-1', description: 'Giảm 50-100% học phí cho SV xuất sắc hoặc gia đình Ajou' },
+        { visaType: 'D2-1', description: 'Giảm 30-50% dựa trên TOPIK (4-6)' },
         { visaType: 'D2-2', description: 'Giảm 30-100% dựa trên TOPIK (3-6) hoặc IELTS (5.5-8.5)' },
-        { visaType: 'D2-3', description: 'Giảm 40% (Thạc sĩ), 80% (Tiến sĩ) nếu có TOPIK 5+' }
+        { visaType: 'D2-3', description: 'Giảm 40% (Thạc sĩ), 80% (Tiến sĩ) nếu có TOPIK 5+' },
+        { visaType: 'D2-6', description: 'Giảm 40-80% nếu có TOPIK 5+ (cho những công trình nghiên cứu tốt)' }
       ],
       
       // Admission requirements
       admissionRequirements: [
         { visaType: 'D4-1', requirement: 'GPA ≥ 7.0, trống < 2 năm' },
+        { visaType: 'D2-1', requirement: 'GPA ≥ 6.5, bằng cấp tương đương' },
         { visaType: 'D2-2', requirement: 'GPA ≥ 6.5, không giới hạn năm trống' },
-        { visaType: 'D2-3', requirement: 'GPA ≥ 6.5, không giới hạn năm trống' }
+        { visaType: 'D2-3', requirement: 'GPA ≥ 6.5, không giới hạn năm trống' },
+        { visaType: 'D2-6', requirement: 'Bằng thạc sĩ hoặc tương đương, GPA ≥ 6.0' }
       ],
       
       // Financial requirements
       financialRequirements: [
         { visaType: 'D4-1', requirement: 'Sổ 10,000 USD lùi 6 tháng' },
+        { visaType: 'D2-1', requirement: 'Sổ 15,000,000 KRW lùi 3 tháng' },
         { visaType: 'D2-2', requirement: 'Sổ 20,000,000 KRW lùi 3 tháng' },
-        { visaType: 'D2-3', requirement: 'Sổ 20,000,000 KRW lùi 3 tháng' }
+        { visaType: 'D2-3', requirement: 'Sổ 20,000,000 KRW lùi 3 tháng' },
+        { visaType: 'D2-6', requirement: 'Sổ 25,000,000 KRW lùi 3 tháng' }
       ],
       
       // Dorm options in Korea

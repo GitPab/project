@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useCurrency } from '../context/CurrencyContext';
 import type { University, AdditionalFee } from '../context/AppContext';
+import PriceInput from './PriceInput';
 import {
   X,
   Plus,
@@ -711,161 +712,70 @@ export default function UniversityForm({ university, onClose, onSave }: Universi
 
             {/* Cost Information Section */}
             <div className="border-t pt-6">
-              <h3 className="font-semibold text-slate-900 mb-4">Cost Information</h3>
+              <h3 className="font-semibold text-slate-900 mb-4">Cost Information ({currency})</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block mb-2 font-medium text-slate-700">
-                    General Tuition ({currency}) <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    value={Math.round(
-                      convertAmount(formData.generalTuition, currency, 'VND')
-                    )}
-                    onChange={(e) => {
-                      setFormData({
-                        ...formData,
-                        generalTuition: convertAmount(
-                          Number(e.target.value),
-                          'USD',
-                          currency
-                        ),
-                      });
-                      // Clear error on change
-                      setFieldErrors((prev) => ({ ...prev, generalTuition: [] }));
-                    }}
-                    onBlur={() => validateFieldCost('generalTuition', formData.generalTuition)}
-                    className={`w-full px-4 py-2 bg-white rounded-lg border focus:outline-none focus:ring-2 focus:ring-primary/20 transition-colors ${
-                      fieldErrors.generalTuition && fieldErrors.generalTuition.length > 0
-                        ? 'border-red-500 focus:border-red-500'
-                        : 'border-slate-300 focus:border-primary'
-                    }`}
-                    required
-                    disabled={isSubmitting}
-                    min="0"
-                  />
-                  {fieldErrors.generalTuition && fieldErrors.generalTuition.length > 0 && (
-                    <p className="text-sm text-red-600 mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3" />
-                      {fieldErrors.generalTuition[0]}
-                    </p>
-                  )}
-                  <p className="text-xs text-slate-500 mt-1">
-                    Stored internally in VND. Displayed in {currency}.
-                  </p>
-                </div>
+                <PriceInput
+                  label="General Tuition"
+                  value={formData.generalTuition}
+                  onChange={(vnd) => {
+                    setFormData({ ...formData, generalTuition: vnd });
+                    setFieldErrors((prev) => ({ ...prev, generalTuition: [] }));
+                  }}
+                  onBlur={() => validateFieldCost('generalTuition', formData.generalTuition)}
+                  error={fieldErrors.generalTuition}
+                  required
+                  disabled={isSubmitting}
+                  placeholder="0"
+                />
 
-                <div>
-                  <label className="block mb-2 font-medium text-slate-700">
-                    Visa Fee ({currency}) <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    value={Math.round(convertAmount(formData.visaFee, currency, 'VND'))}
-                    onChange={(e) => {
-                      setFormData({
-                        ...formData,
-                        visaFee: convertAmount(Number(e.target.value), 'VND', currency),
-                      });
-                      // Clear error on change
-                      setFieldErrors((prev) => ({ ...prev, visaFee: [] }));
-                    }}
-                    onBlur={() => validateFieldCost('visaFee', formData.visaFee)}
-                    className={`w-full px-4 py-2 bg-white rounded-lg border focus:outline-none focus:ring-2 focus:ring-primary/20 transition-colors ${
-                      fieldErrors.visaFee && fieldErrors.visaFee.length > 0
-                        ? 'border-red-500 focus:border-red-500'
-                        : 'border-slate-300 focus:border-primary'
-                    }`}
-                    required
-                    disabled={isSubmitting}
-                    min="0"
-                  />
-                  {fieldErrors.visaFee && fieldErrors.visaFee.length > 0 && (
-                    <p className="text-sm text-red-600 mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3" />
-                      {fieldErrors.visaFee[0]}
-                    </p>
-                  )}
-                </div>
+                <PriceInput
+                  label="Visa Fee"
+                  value={formData.visaFee}
+                  onChange={(vnd) => {
+                    setFormData({ ...formData, visaFee: vnd });
+                    setFieldErrors((prev) => ({ ...prev, visaFee: [] }));
+                  }}
+                  onBlur={() => validateFieldCost('visaFee', formData.visaFee)}
+                  error={fieldErrors.visaFee}
+                  required
+                  disabled={isSubmitting}
+                  placeholder="0"
+                />
 
-                <div>
-                  <label className="block mb-2 font-medium text-slate-700">
-                    Accommodation Fee ({currency}) <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    value={Math.round(
-                      convertAmount(formData.accommodationFee, currency, 'VND')
-                    )}
-                    onChange={(e) => {
-                      setFormData({
-                        ...formData,
-                        accommodationFee: convertAmount(
-                          Number(e.target.value),
-                          'USD',
-                          currency
-                        ),
-                      });
-                      // Clear error on change
-                      setFieldErrors((prev) => ({ ...prev, accommodationFee: [] }));
-                    }}
-                    onBlur={() => validateFieldCost('accommodationFee', formData.accommodationFee)}
-                    className={`w-full px-4 py-2 bg-white rounded-lg border focus:outline-none focus:ring-2 focus:ring-primary/20 transition-colors ${
-                      fieldErrors.accommodationFee && fieldErrors.accommodationFee.length > 0
-                        ? 'border-red-500 focus:border-red-500'
-                        : 'border-slate-300 focus:border-primary'
-                    }`}
-                    required
-                    disabled={isSubmitting}
-                    min="0"
-                  />
-                  {fieldErrors.accommodationFee && fieldErrors.accommodationFee.length > 0 && (
-                    <p className="text-sm text-red-600 mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3" />
-                      {fieldErrors.accommodationFee[0]}
-                    </p>
-                  )}
-                </div>
+                <PriceInput
+                  label="Accommodation Fee"
+                  value={formData.accommodationFee}
+                  onChange={(vnd) => {
+                    setFormData({ ...formData, accommodationFee: vnd });
+                    setFieldErrors((prev) => ({ ...prev, accommodationFee: [] }));
+                  }}
+                  onBlur={() => validateFieldCost('accommodationFee', formData.accommodationFee)}
+                  error={fieldErrors.accommodationFee}
+                  required
+                  disabled={isSubmitting}
+                  placeholder="0"
+                />
 
-                <div>
-                  <label className="block mb-2 font-medium text-slate-700">
-                    Insurance Fee ({currency}) <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    value={Math.round(convertAmount(formData.insuranceFee, currency, 'VND'))}
-                    onChange={(e) => {
-                      setFormData({
-                        ...formData,
-                        insuranceFee: convertAmount(Number(e.target.value), 'VND', currency),
-                      });
-                      // Clear error on change
-                      setFieldErrors((prev) => ({ ...prev, insuranceFee: [] }));
-                    }}
-                    onBlur={() => validateFieldCost('insuranceFee', formData.insuranceFee)}
-                    className={`w-full px-4 py-2 bg-white rounded-lg border focus:outline-none focus:ring-2 focus:ring-primary/20 transition-colors ${
-                      fieldErrors.insuranceFee && fieldErrors.insuranceFee.length > 0
-                        ? 'border-red-500 focus:border-red-500'
-                        : 'border-slate-300 focus:border-primary'
-                    }`}
-                    required
-                    disabled={isSubmitting}
-                    min="0"
-                  />
-                  {fieldErrors.insuranceFee && fieldErrors.insuranceFee.length > 0 && (
-                    <p className="text-sm text-red-600 mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3" />
-                      {fieldErrors.insuranceFee[0]}
-                    </p>
-                  )}
-                </div>
+                <PriceInput
+                  label="Insurance Fee"
+                  value={formData.insuranceFee}
+                  onChange={(vnd) => {
+                    setFormData({ ...formData, insuranceFee: vnd });
+                    setFieldErrors((prev) => ({ ...prev, insuranceFee: [] }));
+                  }}
+                  onBlur={() => validateFieldCost('insuranceFee', formData.insuranceFee)}
+                  error={fieldErrors.insuranceFee}
+                  required
+                  disabled={isSubmitting}
+                  placeholder="0"
+                />
               </div>
             </div>
 
             {/* Additional Fees Section */}
             <div>
               <div className="flex items-center justify-between mb-3">
-                <label className="font-medium text-slate-700">Additional Fees</label>
+                <label className="font-medium text-slate-700">Additional Fees ({currency})</label>
                 <button
                   type="button"
                   onClick={addFee}
@@ -889,21 +799,26 @@ export default function UniversityForm({ university, onClose, onSave }: Universi
                       className="flex-1 px-4 py-2 bg-white rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-primary/20"
                       disabled={isSubmitting}
                     />
-                    <input
-                      type="number"
-                      value={Math.round(convertAmount(fee.amount, currency, 'VND'))}
-                      onChange={(e) =>
-                        handleFeeChange(
-                          index,
-                          'amount',
-                          convertAmount(Number(e.target.value), 'VND', currency)
-                        )
-                      }
-                      placeholder="Amount"
-                      className="w-32 px-4 py-2 bg-white rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                      disabled={isSubmitting}
-                      min="0"
-                    />
+                    <div className="relative flex-1">
+                      <input
+                        type="number"
+                        value={Math.round(convertAmount(fee.amount, 'VND', currency))}
+                        onChange={(e) =>
+                          handleFeeChange(
+                            index,
+                            'amount',
+                            convertAmount(Number(e.target.value), currency, 'VND')
+                          )
+                        }
+                        placeholder="0"
+                        className="w-full px-4 py-2 bg-white rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        disabled={isSubmitting}
+                        min="0"
+                      />
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-slate-500 font-medium">
+                        {currency}
+                      </span>
+                    </div>
                     <button
                       type="button"
                       onClick={() => removeFee(index)}
@@ -916,34 +831,12 @@ export default function UniversityForm({ university, onClose, onSave }: Universi
                 ))}
               </div>
 
-              {/* New Fee Input */}
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Fee type"
-                  value={newFeeType}
-                  onChange={(e) => setNewFeeType(e.target.value)}
-                  className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                  disabled={isSubmitting}
-                />
-                <input
-                  type="number"
-                  placeholder="Amount"
-                  min="0"
-                  value={newFeeAmount}
-                  onChange={(e) => setNewFeeAmount(e.target.value)}
-                  className="w-32 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                  disabled={isSubmitting}
-                />
-                <button
-                  type="button"
-                  onClick={addFee}
-                  className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors disabled:opacity-50 font-medium"
-                  disabled={isSubmitting || !newFeeType || !newFeeAmount}
-                >
-                  Add
-                </button>
-              </div>
+              {/* Empty State */}
+              {formData.additionalFees.length === 0 && (
+                <div className="p-4 bg-slate-50 rounded-lg border border-dashed border-slate-300 text-center text-slate-600 text-sm">
+                  {isAdmin ? 'No additional fees added yet' : 'Chưa có phí bổ sung'}
+                </div>
+              )}
             </div>
           </form>
         </div>

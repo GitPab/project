@@ -170,8 +170,11 @@ export default function ProgressTracker() {
   const [notifications, setNotifications] = useState<string[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
 
-  // Get progress for current user
-  const userProgress = studentProgress.find(p => p.studentEmail === user?.email);
+  // Get progress for current user - support both email and tracking code matching
+  const userProgress = studentProgress.find(p =>
+    p.studentEmail === user?.email ||
+    (user?.trackingCode && p.trackingCode === user.trackingCode)
+  );
 
   // Calculate estimated completion date
   const calculateEstimatedCompletion = () => {

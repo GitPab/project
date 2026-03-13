@@ -26,9 +26,11 @@ export default function UniversityDetail() {
   const { currency, formatFrom, convertAmount } = useCurrency();
   
   // Korean university specific state
-  const [selectedVisaType, setSelectedVisaType] = useState<'D4-1' | 'D2-2' | 'D2-3' | null>(null);
+  const [selectedVisaType, setSelectedVisaType] = useState<string | null>(null);
   const [selectedAddons, setSelectedAddons] = useState<Record<string, boolean>>({});
   const [addonValues, setAddonValues] = useState<Record<string, number>>({});
+  const [topikLevel, setTopikLevel] = useState<number | null>(null);
+  const [dormMonths, setDormMonths] = useState<Record<string, number>>({});
 
   const university = universities.find(uni => uni.id === id);
   const isRegistered = registrations.some(r => r.universityId === id && r.studentEmail === user?.email);
@@ -66,7 +68,7 @@ export default function UniversityDetail() {
 
     if (isKorean && selectedVisaType) {
       // Korean university calculation
-      
+
       // Add fixed costs
       if (university.fixedCosts) {
         university.fixedCosts.forEach(cost => {
@@ -105,6 +107,11 @@ export default function UniversityDetail() {
               const tuitionCost = visaSystem?.tuitionRange?.max || visaSystem?.tuitionPerTerm || 0;
               const discount = (tuitionCost * percentage) / 100;
               total -= convertAmount(discount, currency, 'KRW');
+            } else if (addon.type === 'dorm-vn') {
+              // Dorm VN: multiply by months
+              const monthsSelected = dormMonths[addonId] || 6;
+              const totalAmount = (addon.amount || 0) * monthsSelected;
+              total += convertAmount(totalAmount, currency, 'VND');
             } else {
               const value = addonValues[addonId] || addon.amount || 0;
               const addonCurrency = addon.type === 'dorm-vn' || addon.type === 'flight' ? 'VND' : 'KRW';
@@ -113,13 +120,34 @@ export default function UniversityDetail() {
           }
         }
       });
+
+      // Apply TOPIK scholarship if selected
+      if (topikLevel !== null && selectedVisaType) {
+        const visaSystem = university.koreanData?.visaSystems?.find(v => v.visaType === selectedVisaType);
+        if (visaSystem) {
+          // TOPIK scholarship percentages (from Ajou data as reference)
+          const topikDiscounts: Record<number, number> = {
+            0: 0,
+            1: 10,
+            2: 15,
+            3: 25,
+            4: 40,
+            5: 60,
+            6: 80,
+          };
+          const discountPercent = topikDiscounts[topikLevel] || 0;
+          const tuitionCost = visaSystem.tuitionRange?.max || visaSystem.tuitionPerTerm || 0;
+          const discount = (tuitionCost * discountPercent) / 100;
+          total -= convertAmount(discount, currency, 'KRW');
+        }
+      }
     } else {
       // Traditional university calculation
       total += convertAmount(university.generalTuition, currency);
       total += convertAmount(university.visaFee, currency);
       total += convertAmount(university.accommodationFee, currency);
       total += convertAmount(university.insuranceFee, currency);
-      
+
       if (university.additionalFees) {
         university.additionalFees.forEach(fee => {
           if (fee.selected !== false) {
@@ -130,7 +158,7 @@ export default function UniversityDetail() {
     }
 
     return total;
-  }, [isKorean, selectedVisaType, selectedAddons, addonValues, currency, university, convertAmount]);
+  }, [isKorean, selectedVisaType, selectedAddons, addonValues, dormMonths, topikLevel, currency, university, convertAmount]);
 
   const handleRegister = () => {
     registerForUniversity(university.id);
@@ -243,20 +271,22 @@ export default function UniversityDetail() {
           <>
             {/* Visa System Selection */}
             <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-              <h2 className="text-2xl font-bold text-slate-900 mb-4">Chọn hệ thống (Visa System)</h2>
-              <div className="grid md:grid-cols-3 gap-4">
+              <h2 className="text-2xl font-bold text-slate-900 mb-4">Bạn muốn theo học hệ nào?</h2>
+              <div className="grid md:grid-cols-5 gap-3">
                 {university.koreanData.visaSystems?.map((system) => (
                   <button
                     key={system.visaType}
                     onClick={() => setSelectedVisaType(system.visaType)}
                     className={`p-4 rounded-lg border-2 transition-all ${
                       selectedVisaType === system.visaType
-                        ? 'border-primary bg-blue-50'
-                        : 'border-slate-200 hover:border-slate-300'
+                        ? 'border-primary bg-blue-50 shadow-md'
+                        : 'border-slate-200 hover:border-primary/50 hover:bg-slate-50'
                     }`}
                   >
-                    <div className="font-semibold text-lg mb-1">{system.visaType}</div>
-                    <div className="text-sm text-slate-600">{system.description}</div>
+                    <div className="font-bold text-lg text-slate-900">{system.visaType}</div>
+                    <div className="text-xs text-slate-600 mt-1 line-clamp-2">
+                      {system.visaName || system.description}
+                    </div>
                   </button>
                 ))}
               </div>
@@ -375,64 +405,152 @@ export default function UniversityDetail() {
                       </div>
                     </div>
                   </AccordionTrigger>
-                  <AccordionContent className="px-6 pb-4">
-                    <div className="space-y-3">
-                      {university.optionalAddons.map((addon) => (
-                        <div key={addon.id} className="border border-slate-200 rounded-lg p-4">
-                          <div className="flex items-start gap-3">
-                            <input
-                              type="checkbox"
-                              id={addon.id}
-                              checked={selectedAddons[addon.id] || false}
-                              onChange={() => toggleAddon(addon.id, addon)}
-                              className="mt-1 w-5 h-5 text-primary rounded focus:ring-primary"
-                            />
-                            <div className="flex-1">
-                              <label htmlFor={addon.id} className="font-medium text-slate-800 cursor-pointer">
-                                {addon.nameVi || addon.name}
-                              </label>
-                              
-                              {addon.requiresInput && addon.options && selectedAddons[addon.id] && (
+                  <AccordionContent className="px-6 pb-4 space-y-4">
+                    {/* Scholarship Section */}
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                      <div className="flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          id="scholarship-toggle"
+                          checked={topikLevel !== null}
+                          onChange={(e) => setTopikLevel(e.target.checked ? 0 : null)}
+                          className="mt-1 w-5 h-5 text-primary rounded focus:ring-primary"
+                        />
+                        <div className="flex-1">
+                          <label htmlFor="scholarship-toggle" className="font-semibold text-slate-900 cursor-pointer block mb-2">
+                            🎓 Bạn có học bổng TOPIK?
+                          </label>
+                          {topikLevel !== null && (
+                            <div className="space-y-3">
+                              <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                  Mức TOPIK (0-6)
+                                </label>
                                 <select
-                                  value={addonValues[addon.id] || addon.options[0].value}
-                                  onChange={(e) => setAddonValues(prev => ({ ...prev, [addon.id]: parseInt(e.target.value) }))}
-                                  className="mt-2 w-full p-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                  value={topikLevel}
+                                  onChange={(e) => setTopikLevel(Number(e.target.value))}
+                                  className="w-full p-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
                                 >
-                                  {addon.options.map((option) => (
-                                    <option key={option.value} value={option.value}>
-                                      {option.label}
-                                    </option>
-                                  ))}
+                                  <option value={0}>0 - Không có chứng chỉ</option>
+                                  <option value={1}>1 - Sơ cấp</option>
+                                  <option value={2}>2 - Sơ cấp nâng cao</option>
+                                  <option value={3}>3 - Trung cấp</option>
+                                  <option value={4}>4 - Trung cấp nâng cao</option>
+                                  <option value={5}>5 - Cao cấp</option>
+                                  <option value={6}>6 - Cao cấp nâng cao</option>
                                 </select>
-                              )}
-
-                              {addon.conditional && (
-                                <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
-                                  <Info className="w-3 h-3" />
-                                  {addon.conditional}
-                                </p>
-                              )}
+                              </div>
                             </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
 
-                            {selectedAddons[addon.id] && (
-                              <div className="text-right">
-                                {addon.type === 'scholarship' ? (
-                                  <span className="text-sm font-semibold text-green-600">
-                                    -{addonValues[addon.id] || addon.percentage}% giảm
-                                  </span>
-                                ) : (
-                                  <span className="text-sm font-semibold text-slate-900">
-                                    {formatFrom(
-                                      addonValues[addon.id] || addon.amount || 0,
-                                      addon.type === 'dorm-vn' || addon.type === 'flight' ? 'VND' : 'KRW',
-                                    )}
-                                  </span>
+                    {/* Other Add-ons */}
+                    <div className="space-y-3">
+                      {university.optionalAddons.map((addon) => {
+                        // Skip scholarship add-ons as we handle them separately
+                        if (addon.type === 'scholarship') return null;
+
+                        return (
+                          <div key={addon.id} className="border border-slate-200 rounded-lg p-4">
+                            <div className="flex items-start gap-3">
+                              <input
+                                type="checkbox"
+                                id={addon.id}
+                                checked={selectedAddons[addon.id] || false}
+                                onChange={() => toggleAddon(addon.id, addon)}
+                                className="mt-1 w-5 h-5 text-primary rounded focus:ring-primary"
+                              />
+                              <div className="flex-1">
+                                <label htmlFor={addon.id} className="font-medium text-slate-800 cursor-pointer block mb-2">
+                                  {addon.nameVi || addon.name}
+                                </label>
+
+                                {/* Dorm with month slider */}
+                                {selectedAddons[addon.id] && addon.type === 'dorm-vn' && (
+                                  <div className="space-y-3 mt-3 p-3 bg-slate-50 rounded-lg">
+                                    <div>
+                                      <label className="text-sm font-medium text-slate-700 block mb-2">
+                                        Số tháng: <span className="font-bold text-primary">{dormMonths[addon.id] || 6}</span>
+                                      </label>
+                                      <input
+                                        type="range"
+                                        min="1"
+                                        max="12"
+                                        value={dormMonths[addon.id] || 6}
+                                        onChange={(e) => setDormMonths(prev => ({ ...prev, [addon.id]: Number(e.target.value) }))}
+                                        className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-primary"
+                                      />
+                                      <div className="flex justify-between text-xs text-slate-500 mt-1">
+                                        <span>1</span>
+                                        <span>6</span>
+                                        <span>12</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Dorm room type selector for KTX Hàn */}
+                                {selectedAddons[addon.id] && addon.type === 'dorm-kr' && addon.options && (
+                                  <select
+                                    value={addonValues[addon.id] || addon.options[0]?.value || 0}
+                                    onChange={(e) => setAddonValues(prev => ({ ...prev, [addon.id]: parseInt(e.target.value) }))}
+                                    className="mt-2 w-full p-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                  >
+                                    {addon.options.map((option) => (
+                                      <option key={option.value} value={option.value}>
+                                        {option.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                )}
+
+                                {/* Generic options selector */}
+                                {selectedAddons[addon.id] && addon.requiresInput && addon.options && addon.type !== 'dorm-kr' && addon.type !== 'dorm-vn' && (
+                                  <select
+                                    value={addonValues[addon.id] || addon.options[0]?.value || 0}
+                                    onChange={(e) => setAddonValues(prev => ({ ...prev, [addon.id]: parseInt(e.target.value) }))}
+                                    className="mt-2 w-full p-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                  >
+                                    {addon.options.map((option) => (
+                                      <option key={option.value} value={option.value}>
+                                        {option.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                )}
+
+                                {addon.conditional && (
+                                  <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                                    <Info className="w-3 h-3" />
+                                    {addon.conditional}
+                                  </p>
                                 )}
                               </div>
-                            )}
+
+                              {selectedAddons[addon.id] && (
+                                <div className="text-right whitespace-nowrap">
+                                  <span className="text-sm font-semibold text-slate-900">
+                                    {addon.type === 'dorm-vn'
+                                      ? formatFrom((addonValues[addon.id] || addon.amount || 0) * (dormMonths[addon.id] || 6), 'VND')
+                                      : formatFrom(
+                                          addonValues[addon.id] || addon.amount || 0,
+                                          addon.type === 'dorm-vn' || addon.type === 'flight' ? 'VND' : 'KRW',
+                                        )
+                                    }
+                                  </span>
+                                  {addon.type === 'dorm-vn' && (
+                                    <div className="text-xs text-slate-500">
+                                      {formatFrom(addon.amount || 0, 'VND')}/tháng
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </AccordionContent>
                 </AccordionItem>
