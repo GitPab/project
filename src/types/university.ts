@@ -37,6 +37,8 @@ export interface OptionalAddon {
   conditional?: string; // Conditions for eligibility
   dormRoomType?: string; // e.g., "4-person", "2-person", "international" for KTX Hàn
   monthsSelected?: number; // For tracking months picked by user
+  visaType?: string[]; // For visa-specific addons - only show for certain visa types
+  displayOrder?: number; // For consistent ordering of addons
 }
 
 export interface TopikScholarship {

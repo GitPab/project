@@ -246,14 +246,21 @@ export default function EditUniversityModal({
     toast.success(isEditMode ? 'Đã cập nhật trường' : 'Đã thêm trường');
   });
 
-  // Visa system buttons for Korean universities
-  const visaSystemButtons = [
-    { type: 'D4-1', label: 'D4-1', name: '(Tiếng Hàn)' },
-    { type: 'D2-1', label: 'D2-1', name: '(Chuẩn bị)' },
-    { type: 'D2-2', label: 'D2-2', name: '(Đại học)' },
-    { type: 'D2-3', label: 'D2-3', name: '(Sau đại học)' },
-    { type: 'D2-6', label: 'D2-6', name: '(Nâng cao)' },
-  ];
+  // Visa system buttons - ONLY show available systems from currentVisaSystems
+  const allVisaLabels: Record<string, { label: string; name: string }> = {
+    'D4-1': { label: 'D4-1', name: '(Tiếng Hàn)' },
+    'D2-1': { label: 'D2-1', name: '(Chuẩn bị)' },
+    'D2-2': { label: 'D2-2', name: '(Đại học)' },
+    'D2-3': { label: 'D2-3', name: '(Sau đại học)' },
+    'D2-6': { label: 'D2-6', name: '(Nâng cao)' },
+  };
+
+  const visaSystemButtons = currentVisaSystems
+    .map(vs => ({
+      type: vs.visaType,
+      ...allVisaLabels[vs.visaType] || { label: vs.visaType, name: '' }
+    }))
+    .sort((a, b) => ['D4-1', 'D2-1', 'D2-2', 'D2-3', 'D2-6'].indexOf(a.type) - ['D4-1', 'D2-1', 'D2-2', 'D2-3', 'D2-6'].indexOf(b.type));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

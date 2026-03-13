@@ -32,6 +32,12 @@ export default function UniversityDetail() {
   const [topikLevel, setTopikLevel] = useState<number | null>(null);
   const [dormMonths, setDormMonths] = useState<Record<string, number>>({});
 
+  // Initialize with only available visa systems
+  const availableVisaSystems = useMemo(() =>
+    university?.koreanData?.visaSystems?.filter(v => v.selectable !== false) || [],
+    [university]
+  );
+
   const university = universities.find(uni => uni.id === id);
   const isRegistered = registrations.some(r => r.universityId === id && r.studentEmail === user?.email);
   const isKorean = university?.koreanData?.isKoreanUniversity;
@@ -52,12 +58,12 @@ export default function UniversityDetail() {
     );
   }
 
-  // Initialize visa type on first render for Korean universities
+  // Initialize visa type on first render for Korean universities - use first AVAILABLE system
   React.useEffect(() => {
-    if (isKorean && !selectedVisaType && university.koreanData?.visaSystems?.[0]) {
-      setSelectedVisaType(university.koreanData.visaSystems[0].visaType);
+    if (isKorean && !selectedVisaType && availableVisaSystems.length > 0) {
+      setSelectedVisaType(availableVisaSystems[0].visaType);
     }
-  }, [isKorean, selectedVisaType, university]);
+  }, [isKorean, selectedVisaType, availableVisaSystems]);
 
   // NOTE: All base costs in `University` are stored in USD,
   // except Korean-specific fields that are explicitly KRW/VND in the dataset.
@@ -269,11 +275,11 @@ export default function UniversityDetail() {
         {/* Cost Section - Ajou Style */}
         {isKorean && university.koreanData ? (
           <>
-            {/* Visa System Selection */}
+            {/* Visa System Selection - only show available systems */}
             <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
               <h2 className="text-2xl font-bold text-slate-900 mb-4">Bạn muốn theo học hệ nào?</h2>
               <div className="grid md:grid-cols-5 gap-3">
-                {university.koreanData.visaSystems?.map((system) => (
+                {availableVisaSystems.map((system) => (
                   <button
                     key={system.visaType}
                     onClick={() => setSelectedVisaType(system.visaType)}
