@@ -1,9 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { useApp, University } from '../context/AppContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useLanguage } from '../context/LanguageContext';
 import { generateUniqueTrackingCode, saveTrackingCode } from '../services/trackingCodeService';
+import RecommendedSchools from '../components/RecommendedSchools';
 import {
   GraduationCap,
   Phone,
@@ -20,8 +21,6 @@ import {
   Mail
 } from 'lucide-react';
 import { toast } from 'sonner';
-
-type TopTier = 'Top1' | 'Top2' | 'Top3';
 
 // Visa system options
 const VISA_SYSTEMS = [
@@ -55,13 +54,32 @@ export default function PublicOnboarding() {
   const [selectedSystem, setSelectedSystem] = useState('D2-2');
   const [topikLevel, setTopikLevel] = useState(0);
   const [desiredUniversity, setDesiredUniversity] = useState(() => {
+    // Check URL parameter first
+    const params = new URLSearchParams(window.location.search);
+    const uniId = params.get('uni');
+
+    if (uniId && universities.length > 0) {
+      const found = universities.find(u => u.id === uniId);
+      if (found) return uniId;
+    }
+
     // Find first Korean university to set as default
     const firstKoreanUni = universities.find(u => u.country === 'South Korea' || u.koreanData?.isKoreanUniversity);
     return firstKoreanUni?.id || universities[0]?.id || '';
   });
   const [universitySearch, setUniversitySearch] = useState('');
   const [phoneError, setPhoneError] = useState('');
-  const [activeTier, setActiveTier] = useState<TopTier>('Top1');
+
+  // Handle URL-based university pre-selection
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('uni')) {
+      // Scroll to onboarding form if university is pre-selected via URL
+      setTimeout(() => {
+        document.getElementById('onboarding-form')?.scrollIntoView({ behavior: 'smooth' });
+      }, 300);
+    }
+  }, []);
 
   // Filter universities for search - Korean only
   const searchableUniversities = useMemo(() => {
@@ -78,26 +96,6 @@ export default function PublicOnboarding() {
       );
     });
   }, [universities, universitySearch]);
-
-  const topGroups = useMemo(() => {
-    const group: Record<TopTier, University[]> = { Top1: [], Top2: [], Top3: [] };
-    universities.forEach((uni) => {
-      const tier =
-        (uni.topTier as TopTier | undefined) ||
-        (uni.koreanData?.topTier as TopTier | undefined) ||
-        (uni.koreanData?.topVisa === 'Top 1'
-          ? 'Top1'
-          : uni.koreanData?.topVisa === 'Top 2'
-            ? 'Top2'
-            : uni.koreanData?.topVisa === 'Top 3'
-              ? 'Top3'
-              : undefined);
-      if (tier) {
-        group[tier].push(uni);
-      }
-    });
-    return group;
-  }, [universities]);
 
   // Get selected university
   const selectedUni = universities.find(u => u.id === desiredUniversity);
@@ -560,67 +558,14 @@ export default function PublicOnboarding() {
             </form>
           </div>
 
-          {/* Top Tier Tabs */}
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-6 md:p-8">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-              <div>
-                <h3 className="text-2xl font-bold text-slate-900">
-                  {language === 'vi' ? 'Tra cứu trường theo hạng Top' : language === 'ko' ? 'Top 등급별 대학 조회' : 'Browse Korean Top Lists'}
-                </h3>
-                <p className="text-slate-600">
-                  {language === 'vi'
-                    ? 'Dữ liệu 100% từ CSV: Top 1, Top 2, Top 3 (hạn chế visa). Nhấn để xem chi tiết trường.'
-                    : language === 'ko'
-                      ? 'CSV에서 불러온 Top1/Top2/Top3(비자 제한) 대학 목록입니다.'
-                      : 'Pulled directly from the Top 1 / Top 2 / Top 3 CSV lists.'}
-                </p>
-              </div>
-              <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1 shadow-inner">
-                {(['Top1', 'Top2', 'Top3'] as TopTier[]).map((tier) => (
-                  <button
-                    key={tier}
-                    onClick={() => setActiveTier(tier)}
-                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                      activeTier === tier
-                        ? 'bg-primary text-white shadow'
-                        : 'text-slate-700 hover:bg-white'
-                    }`}
-                  >
-                    {tier === 'Top1' ? 'Top 1' : tier === 'Top2' ? 'Top 2' : 'Top 3 (Hạn chế visa)'}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="overflow-hidden border border-slate-200 rounded-xl">
-              <div className="grid grid-cols-[1.3fr,1fr,1fr] bg-blue-50 text-slate-900 font-semibold text-sm px-4 py-3">
-                <div>{language === 'vi' ? 'Tên trường' : language === 'ko' ? '대학명' : 'University'}</div>
-                <div>{language === 'vi' ? 'Tên tiếng Hàn' : language === 'ko' ? '한국어 명칭' : 'Korean Name'}</div>
-                <div>{language === 'vi' ? 'Khu vực' : language === 'ko' ? '지역' : 'Region'}</div>
-              </div>
-              <div className="divide-y divide-slate-200">
-                {topGroups[activeTier].length === 0 && (
-                  <div className="px-4 py-6 text-center text-slate-500">
-                    {language === 'vi' ? 'Chưa có dữ liệu cho hạng này.' : language === 'ko' ? '해당 등급 데이터가 없습니다.' : 'No data for this tier yet.'}
-                  </div>
-                )}
-                {topGroups[activeTier].map((uni) => (
-                  <button
-                    key={uni.id}
-                    onClick={() => navigate(`/student/university/${uni.id}`)}
-                    className="w-full text-left grid grid-cols-[1.3fr,1fr,1fr] px-4 py-3 hover:bg-blue-50/60 transition-colors"
-                  >
-                    <div className="flex flex-col">
-                      <span className="font-semibold text-slate-900">{uni.name}</span>
-                      <span className="text-xs text-slate-500">{uni.tagline}</span>
-                    </div>
-                    <div className="text-slate-800">{uni.koreanName || uni.name}</div>
-                    <div className="text-slate-700">{uni.region || uni.koreanData?.address || '—'}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
+          {/* Recommended Schools - NEW CARD GRID COMPONENT */}
+          <RecommendedSchools
+            onUniversitySelect={(uniId) => {
+              setDesiredUniversity(uniId);
+              // Scroll back to the form
+              document.getElementById('onboarding-form')?.scrollIntoView({ behavior: 'smooth' });
+            }}
+          />
 
           {/* Footer Links */}
           <div className="mt-8 text-center space-y-2">
