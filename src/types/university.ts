@@ -26,7 +26,7 @@ export interface OptionalAddon {
   name: string;
   nameKr?: string;
   nameVi?: string;
-  type: 'dorm-vn' | 'dorm-kr' | 'savings' | 'flight' | 'scholarship' | 'other';
+  type: 'dorm-vn' | 'dorm-kr' | 'savings' | 'flight' | 'scholarship' | 'group' | 'other';
   amount?: number;
   amountRange?: { min: number; max: number };
   perMonth?: boolean; // For dorm fees
@@ -39,16 +39,17 @@ export interface OptionalAddon {
   monthsSelected?: number; // For tracking months picked by user
   visaType?: string[]; // For visa-specific addons - only show for certain visa types
   displayOrder?: number; // For consistent ordering of addons
+
+  // 2-level hierarchy support
+  groupName?: string; // Level 1: Group label (e.g., "Ký túc xá", "Vé máy bay", "Học bổng")
+  subItems?: Array<{
+    label: string; // e.g., "Phòng 4-người 747k", "TOPIK 5 → 70%", "5M VND"
+    value: number; // The actual cost or percentage
+    visaTypes?: string[]; // Applicable to specific visa types
+  }>;
 }
 
-export interface TopikScholarship {
-  level: 0 | 1 | 2 | 3 | 4 | 5 | 6;
-  discountPercentage: number;
-  visaType?: string; // Optional: scholarship may apply to specific visa types
-  description?: string;
-}
-
-
+export interface KoreanUniversityData {
   isKoreanUniversity: boolean;
   address?: string;
   topVisa?: string;
@@ -64,6 +65,13 @@ export interface TopikScholarship {
   languageCourse?: { available: boolean; priceVND?: number };
   studentSupport?: string[];
   jobOpportunities?: string;
+};
+
+export interface TopikScholarship {
+  level: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  discountPercentage: number;
+  visaType?: string; // Optional: scholarship may apply to specific visa types
+  description?: string;
 }
 
 export interface AcademicProgram {

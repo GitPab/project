@@ -33,27 +33,53 @@ const normalizeTier = (tier?: string): NormalizedTier => {
   return undefined;
 };
 
-const calculateTotal = (uni: University) =>
-  uni.generalTuition +
-  uni.visaFee +
-  uni.accommodationFee +
-  uni.insuranceFee +
-  uni.additionalFees.reduce((sum, fee) => sum + fee.amount, 0);
+// Get all unique fixed cost types from a university
+const getFixedCostTypes = (uni: University): Array<{ type: string; amount: number; currency?: Currency }> => {
+  return (uni.fixedCosts || []).map(cost => ({
+    type: cost.type,
+    amount: cost.amount || 0,
+    currency: cost.currency,
+  }));
+};
 
-const calculateFixedCosts = (uni: University) =>
-  uni.fixedCosts?.reduce((sum, cost) => sum + (cost.amount || 0), 0) || 0;
+// Get all unique fixed cost types across filtered universities
+const getAllFixedCostTypes = (universities: University[]): string[] => {
+  const typesSet = new Set<string>();
+  universities.forEach(uni => {
+    uni.fixedCosts?.forEach(cost => {
+      typesSet.add(cost.type);
+    });
+  });
+  return Array.from(typesSet);
+};
 
 export default function UniversitiesList() {
   const navigate = useNavigate();
   const { universities, updateUniversity, addUniversities } = useApp();
   const { isAdmin } = useAuth();
-  const { currency, setCurrency, formatFrom } = useCurrency();
+  const { currency, setCurrency, formatFrom, convertAmount } = useCurrency();
 
   const [topFilter, setTopFilter] = useState<TopFilter>('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [createMode, setCreateMode] = useState(false);
   const [activeUniversity, setActiveUniversity] = useState<University | undefined>(undefined);
   const [importOpen, setImportOpen] = useState(false);
+
+  const calculateTotal = (uni: University) => {
+    const fixedCostsTotal = (uni.fixedCosts || []).reduce((sum, cost) => {
+      const baseCurrency = (cost.currency as Currency) || 'VND';
+      return sum + convertAmount(cost.amount || 0, 'VND', baseCurrency);
+    }, 0);
+
+    return (
+      uni.generalTuition +
+      uni.visaFee +
+      uni.accommodationFee +
+      uni.insuranceFee +
+      uni.additionalFees.reduce((sum, fee) => sum + fee.amount, 0) +
+      fixedCostsTotal
+    );
+  };
 
   const koreanUniversities = useMemo(() => {
     return universities.filter((uni) => uni.koreanData?.isKoreanUniversity || uni.country === 'South Korea');
@@ -200,18 +226,21 @@ export default function UniversitiesList() {
 
       <Card className="hidden lg:block">
         <CardContent className="p-0">
-          <Table className="min-w-[1200px] table-fixed">
+          <Table className="min-w-full table-fixed">
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[220px]">Tên trường</TableHead>
                 <TableHead className="w-[220px]">Tên tiếng Hàn</TableHead>
                 <TableHead className="w-[130px]">Quốc gia</TableHead>
                 <TableHead className="w-[160px]">Khu vực</TableHead>
-                <TableHead className="text-right w-[140px]">Chi phí cố định</TableHead>
-                <TableHead className="text-right w-[120px]">Học phí</TableHead>
-                <TableHead className="text-right w-[120px]">Phí visa</TableHead>
-                <TableHead className="text-right w-[120px]">Lưu trú</TableHead>
-                <TableHead className="text-right w-[120px]">Bảo hiểm</TableHead>
+
+                {/* DYNAMIC: Fixed cost columns */}
+                {getAllFixedCostTypes(filteredUniversities).map((costType) => (
+                  <TableHead key={costType} className="text-right w-[140px]">
+                    {costType}
+                  </TableHead>
+                ))}
+
                 <TableHead className="text-right w-[140px]">Tổng ước tính</TableHead>
                 {isAdmin && <TableHead className="text-center w-[140px]">Thao tác</TableHead>}
               </TableRow>
@@ -223,11 +252,18 @@ export default function UniversitiesList() {
                   <TableCell className="truncate">{uni.koreanName || '—'}</TableCell>
                   <TableCell>{uni.country || 'South Korea'}</TableCell>
                   <TableCell className="truncate">{uni.region || uni.koreanData?.address || '—'}</TableCell>
-                  <TableCell className="text-right">{formatFrom(calculateFixedCosts(uni), 'VND')}</TableCell>
-                  <TableCell className="text-right">{formatFrom(uni.generalTuition, 'VND')}</TableCell>
-                  <TableCell className="text-right">{formatFrom(uni.visaFee, 'VND')}</TableCell>
-                  <TableCell className="text-right">{formatFrom(uni.accommodationFee, 'VND')}</TableCell>
-                  <TableCell className="text-right">{formatFrom(uni.insuranceFee, 'VND')}</TableCell>
+
+                  {/* DYNAMIC: Fixed cost cells */}
+                {getAllFixedCostTypes(filteredUniversities).map((costType) => {
+                  const cost = uni.fixedCosts?.find(c => c.type === costType);
+                  const baseCurrency = (cost?.currency as Currency) || 'VND';
+                  return (
+                    <TableCell key={`${uni.id}-${costType}`} className="text-right">
+                        {cost ? formatFrom(cost.amount, baseCurrency) : '—'}
+                    </TableCell>
+                  );
+                })}
+
                   <TableCell className="text-right font-semibold text-primary">
                     {formatFrom(calculateTotal(uni), 'VND')}
                   </TableCell>
@@ -266,11 +302,15 @@ export default function UniversitiesList() {
             <CardContent className="space-y-2 text-sm">
               <div className="flex justify-between"><span>Quốc gia</span><span>{uni.country}</span></div>
               <div className="flex justify-between"><span>Khu vực</span><span>{uni.region || uni.koreanData?.address || '—'}</span></div>
-              <div className="flex justify-between"><span>Chi phí cố định</span><span>{formatFrom(calculateFixedCosts(uni), 'VND')}</span></div>
-              <div className="flex justify-between"><span>Học phí</span><span>{formatFrom(uni.generalTuition, 'VND')}</span></div>
-              <div className="flex justify-between"><span>Phí visa</span><span>{formatFrom(uni.visaFee, 'VND')}</span></div>
-              <div className="flex justify-between"><span>Lưu trú</span><span>{formatFrom(uni.accommodationFee, 'VND')}</span></div>
-              <div className="flex justify-between"><span>Bảo hiểm</span><span>{formatFrom(uni.insuranceFee, 'VND')}</span></div>
+
+              {/* DYNAMIC: Fixed cost lines */}
+              {getFixedCostTypes(uni).map((cost) => (
+                <div key={cost.type} className="flex justify-between">
+                  <span>{cost.type}</span>
+                  <span>{formatFrom(cost.amount, cost.currency || 'VND')}</span>
+                </div>
+              ))}
+
               <div className="flex justify-between font-semibold"><span>Tổng ước tính</span><span>{formatFrom(calculateTotal(uni), 'VND')}</span></div>
 
               <Button

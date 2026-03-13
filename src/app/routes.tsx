@@ -14,27 +14,33 @@ import StudentOnboarding from './pages/StudentOnboarding';
 import PublicOnboarding from './pages/PublicOnboarding';
 import StudentTracking from './pages/StudentTracking';
 import StudentLookup from './pages/StudentLookup';
+import RouteError from './components/RouteError';
 
 export const router = createHashRouter([
   {
     path: '/',
-    Component: PublicOnboarding
+    Component: PublicOnboarding,
+    errorElement: <RouteError />
   },
   {
     path: '/login',
-    Component: Login
+    Component: Login,
+    errorElement: <RouteError />
   },
   {
     path: '/student/lookup',
-    Component: StudentLookup
+    Component: StudentLookup,
+    errorElement: <RouteError />
   },
   {
     path: '/student/tracking/:code',
-    Component: StudentTracking
+    Component: StudentTracking,
+    errorElement: <RouteError />
   },
   {
     path: '/admin',
     Component: Layout,
+    errorElement: <RouteError />,
     children: [
       {
         index: true,
@@ -65,6 +71,7 @@ export const router = createHashRouter([
   {
     path: '/student',
     Component: Layout,
+    errorElement: <RouteError />,
     children: [
       {
         index: true,

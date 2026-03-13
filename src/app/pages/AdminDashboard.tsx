@@ -141,7 +141,7 @@ export default function AdminDashboard() {
             <DollarSign className="w-5 h-5 text-primary" />
           </div>
           <p className="text-3xl font-bold text-slate-900">
-            {formatFrom(totalCostManaged, 'USD')}
+            {formatFrom(totalCostManaged, 'VND')}
           </p>
         </div>
 
@@ -218,7 +218,7 @@ export default function AdminDashboard() {
                   onClick={() => handleSort('generalTuition')}
                 >
                   <div className="flex items-center gap-2">
-                    General Cost (USD)
+                    General Cost
                     <SortIcon columnKey="generalTuition" />
                   </div>
                 </th>
@@ -254,7 +254,7 @@ export default function AdminDashboard() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="font-semibold text-slate-900">
-                      ${uni.generalTuition.toLocaleString()}
+                      {formatFrom(uni.generalTuition, 'VND')}
                     </span>
                   </td>
                   <td className="px-6 py-4">
@@ -264,7 +264,7 @@ export default function AdminDashboard() {
                           key={idx}
                           className="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-50 text-blue-700 rounded"
                         >
-                          {fee.type}: ${fee.amount}
+                          {fee.type}: {formatFrom(fee.amount, 'VND')}
                         </span>
                       ))}
                       {uni.additionalFees.length > 2 && (

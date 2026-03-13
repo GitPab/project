@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router';
 import { useApp } from '../context/AppContext';
 import { useCurrency, Currency } from '../context/CurrencyContext';
 import { MultiCurrencyDisplay, TotalWithConversions } from '../components/MultiCurrencyDisplay';
+// ✅ FIX 1: Removed duplicate import that was here
+
 import type { VisaSystemCost, OptionalAddon } from '../context/AppContext';
 import { 
   ArrowLeft, MapPin, DollarSign, CheckCircle, Building, Home, Shield, FileText, Lock,
@@ -25,20 +27,19 @@ export default function UniversityDetail() {
   const { universities, registrations, registerForUniversity, user } = useApp();
   const { currency, formatFrom, convertAmount } = useCurrency();
   
-  // Korean university specific state
   const [selectedVisaType, setSelectedVisaType] = useState<string | null>(null);
   const [selectedAddons, setSelectedAddons] = useState<Record<string, boolean>>({});
   const [addonValues, setAddonValues] = useState<Record<string, number>>({});
   const [topikLevel, setTopikLevel] = useState<number | null>(null);
   const [dormMonths, setDormMonths] = useState<Record<string, number>>({});
 
-  // Initialize with only available visa systems
+  const university = universities.find(uni => uni.id === id);
+
   const availableVisaSystems = useMemo(() =>
-    university?.koreanData?.visaSystems?.filter(v => v.selectable !== false) || [],
+    university?.koreanData?.visaSystems?.filter((v: any) => v.selectable !== false) || [],
     [university]
   );
 
-  const university = universities.find(uni => uni.id === id);
   const isRegistered = registrations.some(r => r.universityId === id && r.studentEmail === user?.email);
   const isKorean = university?.koreanData?.isKoreanUniversity;
 
@@ -58,47 +59,38 @@ export default function UniversityDetail() {
     );
   }
 
-  // Initialize visa type on first render for Korean universities - use first AVAILABLE system
   React.useEffect(() => {
     if (isKorean && !selectedVisaType && availableVisaSystems.length > 0) {
       setSelectedVisaType(availableVisaSystems[0].visaType);
     }
   }, [isKorean, selectedVisaType, availableVisaSystems]);
 
-  // NOTE: All base costs in `University` are stored in USD,
-  // except Korean-specific fields that are explicitly KRW/VND in the dataset.
-
-  // Calculate total cost
   const calculateTotal = useMemo(() => {
-    let total = 0;
+    let totalCost = 0;
 
     if (isKorean && selectedVisaType) {
-      // Korean university calculation
-
       // Add fixed costs
-      if (university.fixedCosts) {
-        university.fixedCosts.forEach(cost => {
-          total += convertAmount(cost.amount, currency, cost.currency || 'USD');
-        });
-      }
+      university?.fixedCosts?.forEach(cost => {
+        totalCost += convertAmount(cost.amount, currency, cost.currency || 'USD');
+      });
 
       // Add visa system costs
       const visaSystem = university.koreanData?.visaSystems?.find(v => v.visaType === selectedVisaType);
       if (visaSystem) {
         if (visaSystem.tuitionPerTerm) {
-          total += convertAmount(visaSystem.tuitionPerTerm, currency, 'KRW');
+          totalCost += convertAmount(visaSystem.tuitionPerTerm, currency, 'KRW');
         }
         if (visaSystem.tuitionRange) {
-          total += convertAmount(visaSystem.tuitionRange.max, currency, 'KRW');
+          totalCost += convertAmount(visaSystem.tuitionRange.max, currency, 'KRW');
         }
         if (visaSystem.applicationFee) {
-          total += convertAmount(visaSystem.applicationFee, currency, 'KRW');
+          totalCost += convertAmount(visaSystem.applicationFee, currency, 'KRW');
         }
         if (visaSystem.enrollmentFee) {
-          total += convertAmount(visaSystem.enrollmentFee, currency, 'KRW');
+          totalCost += convertAmount(visaSystem.enrollmentFee, currency, 'KRW');
         }
         if (visaSystem.baseYearlyFee) {
-          total += convertAmount(visaSystem.baseYearlyFee, currency, 'KRW');
+          totalCost += convertAmount(visaSystem.baseYearlyFee, currency, 'KRW');
         }
       }
 
@@ -108,20 +100,23 @@ export default function UniversityDetail() {
           const addon = university.optionalAddons?.find(a => a.id === addonId);
           if (addon) {
             if (addon.type === 'scholarship') {
-              // Scholarships reduce the tuition cost
               const percentage = addonValues[addonId] || addon.percentage || 0;
               const tuitionCost = visaSystem?.tuitionRange?.max || visaSystem?.tuitionPerTerm || 0;
-              const discount = (tuitionCost * percentage) / 100;
-              total -= convertAmount(discount, currency, 'KRW');
+              const discountAmount = (tuitionCost * percentage) / 100;
+              totalCost -= convertAmount(discountAmount, currency, 'KRW');
             } else if (addon.type === 'dorm-vn') {
-              // Dorm VN: multiply by months
+              // ✅ FIX 2: Correctly handle dorm-vn (VND, monthly)
               const monthsSelected = dormMonths[addonId] || 6;
-              const totalAmount = (addon.amount || 0) * monthsSelected;
-              total += convertAmount(totalAmount, currency, 'VND');
-            } else {
+              const dormTotalAmount = (addon.amount || 0) * monthsSelected;
+              totalCost += convertAmount(dormTotalAmount, currency, 'VND');
+            } else if (addon.type === 'flight') {
+              // ✅ FIX 3: flight type uses VND
               const value = addonValues[addonId] || addon.amount || 0;
-              const addonCurrency = addon.type === 'dorm-vn' || addon.type === 'flight' ? 'VND' : 'KRW';
-              total += convertAmount(value, currency, addonCurrency);
+              totalCost += convertAmount(value, currency, 'VND');
+            } else {
+              // All other types (dorm-kr, savings, group, other) use KRW
+              const value = addonValues[addonId] || addon.amount || 0;
+              totalCost += convertAmount(value, currency, 'KRW');
             }
           }
         }
@@ -129,41 +124,32 @@ export default function UniversityDetail() {
 
       // Apply TOPIK scholarship if selected
       if (topikLevel !== null && selectedVisaType) {
-        const visaSystem = university.koreanData?.visaSystems?.find(v => v.visaType === selectedVisaType);
-        if (visaSystem) {
-          // TOPIK scholarship percentages (from Ajou data as reference)
+        const currentVisaSystem = university.koreanData?.visaSystems?.find(v => v.visaType === selectedVisaType);
+        if (currentVisaSystem) {
           const topikDiscounts: Record<number, number> = {
-            0: 0,
-            1: 10,
-            2: 15,
-            3: 25,
-            4: 40,
-            5: 60,
-            6: 80,
+            0: 0, 1: 10, 2: 15, 3: 25, 4: 40, 5: 60, 6: 80,
           };
           const discountPercent = topikDiscounts[topikLevel] || 0;
-          const tuitionCost = visaSystem.tuitionRange?.max || visaSystem.tuitionPerTerm || 0;
-          const discount = (tuitionCost * discountPercent) / 100;
-          total -= convertAmount(discount, currency, 'KRW');
+          const tuitionCost = currentVisaSystem.tuitionRange?.max || currentVisaSystem.tuitionPerTerm || 0;
+          const topikDiscountAmount = (tuitionCost * discountPercent) / 100;
+          totalCost -= convertAmount(topikDiscountAmount, currency, 'KRW');
         }
       }
     } else {
       // Traditional university calculation
-      total += convertAmount(university.generalTuition, currency);
-      total += convertAmount(university.visaFee, currency);
-      total += convertAmount(university.accommodationFee, currency);
-      total += convertAmount(university.insuranceFee, currency);
+      totalCost += convertAmount(university?.generalTuition || 0, currency);
+      totalCost += convertAmount(university?.visaFee || 0, currency);
+      totalCost += convertAmount(university?.accommodationFee || 0, currency);
+      totalCost += convertAmount(university?.insuranceFee || 0, currency);
 
-      if (university.additionalFees) {
-        university.additionalFees.forEach(fee => {
-          if (fee.selected !== false) {
-            total += convertAmount(fee.amount, currency);
-          }
-        });
-      }
+      university?.additionalFees?.forEach(fee => {
+        if (fee.selected !== false) {
+          totalCost += convertAmount(fee.amount, currency);
+        }
+      });
     }
 
-    return total;
+    return totalCost;
   }, [isKorean, selectedVisaType, selectedAddons, addonValues, dormMonths, topikLevel, currency, university, convertAmount]);
 
   const handleRegister = () => {
@@ -175,8 +161,6 @@ export default function UniversityDetail() {
 
   const toggleAddon = (addonId: string, addon: OptionalAddon) => {
     setSelectedAddons(prev => ({ ...prev, [addonId]: !prev[addonId] }));
-    
-    // Set default value if available
     if (!selectedAddons[addonId] && addon.options && addon.options.length > 0) {
       setAddonValues(prev => ({ ...prev, [addonId]: addon.options![0].value }));
     }
@@ -185,6 +169,12 @@ export default function UniversityDetail() {
   const IconComponent = (iconName: string) => {
     const Icon = iconMap[iconName];
     return Icon ? <Icon className="w-5 h-5" /> : <GraduationCap className="w-5 h-5" />;
+  };
+
+  // ✅ FIX 4: Helper to get correct currency for addon display
+  const getAddonCurrency = (addonType: string): Currency => {
+    if (addonType === 'dorm-vn' || addonType === 'flight') return 'VND';
+    return 'KRW';
   };
 
   return (
@@ -221,7 +211,7 @@ export default function UniversityDetail() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
-        {/* Common Info Section - NO COSTS HERE */}
+        {/* Common Info Section */}
         <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
           <h2 className="text-2xl font-bold text-slate-900 mb-4">Thông tin chung</h2>
           
@@ -272,14 +262,14 @@ export default function UniversityDetail() {
           </div>
         </div>
 
-        {/* Cost Section - Ajou Style */}
+        {/* Cost Section */}
         {isKorean && university.koreanData ? (
           <>
-            {/* Visa System Selection - only show available systems */}
+            {/* Visa System Selection */}
             <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
               <h2 className="text-2xl font-bold text-slate-900 mb-4">Bạn muốn theo học hệ nào?</h2>
               <div className="grid md:grid-cols-5 gap-3">
-                {availableVisaSystems.map((system) => (
+                {availableVisaSystems.map((system: any) => (
                   <button
                     key={system.visaType}
                     onClick={() => setSelectedVisaType(system.visaType)}
@@ -316,7 +306,7 @@ export default function UniversityDetail() {
                   </AccordionTrigger>
                   <AccordionContent className="px-6 pb-4">
                     <div className="space-y-3">
-                      {university.fixedCosts.map((cost, idx) => (
+                      {university.fixedCosts.map((cost: any, idx: number) => (
                         <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                           <span className="text-slate-700">{cost.type}</span>
                           <span className="font-semibold text-slate-900">
@@ -345,7 +335,7 @@ export default function UniversityDetail() {
                   </AccordionTrigger>
                   <AccordionContent className="px-6 pb-4">
                     {(() => {
-                      const visaSystem = university.koreanData?.visaSystems?.find(v => v.visaType === selectedVisaType);
+                      const visaSystem = university.koreanData?.visaSystems?.find((v: any) => v.visaType === selectedVisaType);
                       if (!visaSystem) return null;
 
                       return (
@@ -454,8 +444,7 @@ export default function UniversityDetail() {
 
                     {/* Other Add-ons */}
                     <div className="space-y-3">
-                      {university.optionalAddons.map((addon) => {
-                        // Skip scholarship add-ons as we handle them separately
+                      {university.optionalAddons.map((addon: OptionalAddon) => {
                         if (addon.type === 'scholarship') return null;
 
                         return (
@@ -473,7 +462,7 @@ export default function UniversityDetail() {
                                   {addon.nameVi || addon.name}
                                 </label>
 
-                                {/* Dorm with month slider */}
+                                {/* Dorm VN - month slider */}
                                 {selectedAddons[addon.id] && addon.type === 'dorm-vn' && (
                                   <div className="space-y-3 mt-3 p-3 bg-slate-50 rounded-lg">
                                     <div>
@@ -497,7 +486,7 @@ export default function UniversityDetail() {
                                   </div>
                                 )}
 
-                                {/* Dorm room type selector for KTX Hàn */}
+                                {/* Dorm KR - room type selector */}
                                 {selectedAddons[addon.id] && addon.type === 'dorm-kr' && addon.options && (
                                   <select
                                     value={addonValues[addon.id] || addon.options[0]?.value || 0}
@@ -535,14 +524,15 @@ export default function UniversityDetail() {
                                 )}
                               </div>
 
+                              {/* ✅ FIX 5: Use helper to get correct currency for display */}
                               {selectedAddons[addon.id] && (
                                 <div className="text-right whitespace-nowrap">
                                   <span className="text-sm font-semibold text-slate-900">
                                     {addon.type === 'dorm-vn'
-                                      ? formatFrom((addonValues[addon.id] || addon.amount || 0) * (dormMonths[addon.id] || 6), 'VND')
+                                      ? formatFrom((addon.amount || 0) * (dormMonths[addon.id] || 6), 'VND')
                                       : formatFrom(
                                           addonValues[addon.id] || addon.amount || 0,
-                                          addon.type === 'dorm-vn' || addon.type === 'flight' ? 'VND' : 'KRW',
+                                          getAddonCurrency(addon.type)
                                         )
                                     }
                                   </span>
@@ -584,7 +574,7 @@ export default function UniversityDetail() {
                 <span className="text-slate-700">Bảo hiểm (Insurance)</span>
                 <span className="font-semibold text-slate-900">{formatFrom(university.insuranceFee, 'USD')}</span>
               </div>
-              {university.additionalFees && university.additionalFees.map((fee, idx) => (
+              {university.additionalFees && university.additionalFees.map((fee: any, idx: number) => (
                 <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                   <span className="text-slate-700">{fee.type}</span>
                   <span className="font-semibold text-slate-900">{formatFrom(fee.amount, 'USD')}</span>
@@ -594,7 +584,7 @@ export default function UniversityDetail() {
           </div>
         )}
 
-        {/* Real-time Calculator - Total with Multi-Currency Display */}
+        {/* Total Calculator */}
         <div className="sticky bottom-6 z-10">
           <TotalWithConversions 
             amount={calculateTotal} 

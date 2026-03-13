@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useCurrency } from '../context/CurrencyContext';
+import { useAuth } from '../context/AuthContext';
 import type { University, AdditionalFee } from '../context/AppContext';
 import PriceInput from './PriceInput';
 import {
@@ -14,6 +15,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useDropzone } from 'react-dropzone';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import {
   validateCost,
   validateWordCount,
@@ -41,7 +43,8 @@ export interface UniversityFormProps {
 }
 
 export default function UniversityForm({ university, onClose, onSave }: UniversityFormProps) {
-  const { currency, convertAmount, formatFrom } = useCurrency();
+  const { currency, formatFrom } = useCurrency();
+  const { isAdmin } = useAuth();
   const isEditMode = !!university;
   const draftKey = university ? `university-draft-${university.id}` : null;
 
@@ -69,10 +72,6 @@ export default function UniversityForm({ university, onClose, onSave }: Universi
   const [isDragging, setIsDragging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [autoSaveErrorShown, setAutoSaveErrorShown] = useState(false);
-
-  // Temporary fee input state
-  const [newFeeType, setNewFeeType] = useState('');
-  const [newFeeAmount, setNewFeeAmount] = useState('');
 
   /**
    * Load draft from localStorage on mount (edit mode only)
@@ -220,18 +219,14 @@ export default function UniversityForm({ university, onClose, onSave }: Universi
    * Add additional fee
    */
   const addFee = () => {
-    if (newFeeType && newFeeAmount) {
-      setFormData({
-        ...formData,
-        additionalFees: [
-          ...formData.additionalFees,
-          { type: newFeeType, amount: Number(newFeeAmount) },
-        ],
-      });
-      setNewFeeType('');
-      setNewFeeAmount('');
-      toast.success('Fee added');
-    }
+    setFormData({
+      ...formData,
+      additionalFees: [
+        ...formData.additionalFees,
+        { type: '', amount: 0 },
+      ],
+    });
+    toast.success('Fee added');
   };
 
   /**
@@ -790,35 +785,25 @@ export default function UniversityForm({ university, onClose, onSave }: Universi
               {/* Existing Fees */}
               <div className="space-y-3 mb-4">
                 {formData.additionalFees.map((fee, index) => (
-                  <div key={index} className="flex gap-3 items-start">
-                    <input
-                      type="text"
-                      value={fee.type}
-                      onChange={(e) => handleFeeChange(index, 'type', e.target.value)}
-                      placeholder="Fee type (e.g., Application Fee)"
-                      className="flex-1 px-4 py-2 bg-white rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                      disabled={isSubmitting}
-                    />
-                    <div className="relative flex-1">
+                  <div key={index} className="grid grid-cols-1 md:grid-cols-[1.2fr_1fr_auto] gap-3 items-end">
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-slate-700">Loại phí</label>
                       <input
-                        type="number"
-                        value={Math.round(convertAmount(fee.amount, 'VND', currency))}
-                        onChange={(e) =>
-                          handleFeeChange(
-                            index,
-                            'amount',
-                            convertAmount(Number(e.target.value), currency, 'VND')
-                          )
-                        }
-                        placeholder="0"
+                        type="text"
+                        value={fee.type}
+                        onChange={(e) => handleFeeChange(index, 'type', e.target.value)}
+                        placeholder="Phí hồ sơ, phí nhập học..."
                         className="w-full px-4 py-2 bg-white rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-primary/20"
                         disabled={isSubmitting}
-                        min="0"
                       />
-                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-slate-500 font-medium">
-                        {currency}
-                      </span>
                     </div>
+                    <PriceInput
+                      label="Số tiền"
+                      value={fee.amount}
+                      onChange={(vnd) => handleFeeChange(index, 'amount', vnd)}
+                      disabled={isSubmitting}
+                      placeholder="0"
+                    />
                     <button
                       type="button"
                       onClick={() => removeFee(index)}
@@ -837,6 +822,54 @@ export default function UniversityForm({ university, onClose, onSave }: Universi
                   {isAdmin ? 'No additional fees added yet' : 'Chưa có phí bổ sung'}
                 </div>
               )}
+
+              {formData.additionalFees.length > 0 && (
+                <div className="rounded-lg border border-slate-200 overflow-hidden">
+                  <div className="bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-600 uppercase">
+                    Bảng phí bổ sung
+                  </div>
+                  <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Loại phí</TableHead>
+                      <TableHead className="text-right">Số tiền</TableHead>
+                      <TableHead className="text-right">Xóa</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {formData.additionalFees.map((fee, index) => (
+                      <TableRow key={index}>
+                        <TableCell className="text-slate-700">{fee.type || '—'}</TableCell>
+                        <TableCell className="text-right font-semibold text-slate-900">
+                          {formatFrom(fee.amount || 0, 'VND')}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <button
+                            type="button"
+                            onClick={() => removeFee(index)}
+                            className="inline-flex items-center justify-center rounded-md p-2 text-red-600 hover:bg-red-50 transition-colors"
+                            aria-label="Xóa phí"
+                            disabled={isSubmitting}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow className="bg-slate-50">
+                      <TableCell className="font-semibold text-slate-800">Tổng phí bổ sung</TableCell>
+                      <TableCell className="text-right font-bold text-slate-900">
+                        {formatFrom(
+                          formData.additionalFees.reduce((sum, fee) => sum + (fee.amount || 0), 0),
+                          'VND'
+                        )}
+                      </TableCell>
+                      <TableCell />
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
+            )}
             </div>
           </form>
         </div>

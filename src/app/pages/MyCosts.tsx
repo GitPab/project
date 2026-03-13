@@ -1,229 +1,277 @@
-import React, { useState, useMemo } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useApp } from '../context/AppContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useLanguage } from '../context/LanguageContext';
 import {
-  DollarSign,
   ChevronDown,
   ChevronUp,
   GraduationCap,
-  MapPin,
-  Calendar,
+  Lock,
   Plus,
   TrendingUp,
-  RefreshCw,
-  Lock,
-  Edit,
-  Check,
-  X,
-  AlertCircle
+  AlertCircle,
 } from 'lucide-react';
+import { getTrackingCode, searchTrackingCodesByEmail } from '../services/trackingCodeService';
+import type { TrackingCode } from '@/types/tracking';
+import { Button } from '../components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
+import { Progress } from '../components/ui/progress';
 
 export default function MyCosts() {
-  const { registrations, universities, user, updateRegistration } = useApp();
-  const { currency, formatFrom } = useCurrency();
-  const { t, language } = useLanguage();
+  const { registrations, universities, user, studentOnboardings } = useApp();
+  const { formatFrom, convertAmount } = useCurrency();
+  const { language } = useLanguage();
   const navigate = useNavigate();
   const [expandedCards, setExpandedCards] = useState<string[]>([]);
+  const [trackingInfo, setTrackingInfo] = useState<TrackingCode | null>(null);
 
-  // Get current student's registrations
-  // Can match by email (for logged-in students) or by tracking code
+  useEffect(() => {
+    const loadTracking = async () => {
+      if (!user) return;
+
+      if (user.trackingCode) {
+        const data = await getTrackingCode(user.trackingCode);
+        if (data) {
+          setTrackingInfo(data);
+          return;
+        }
+      }
+
+      if (user.email) {
+        const matches = await searchTrackingCodesByEmail(user.email);
+        if (matches.length > 0) setTrackingInfo(matches[0]);
+      }
+    };
+
+    loadTracking();
+  }, [user]);
+
   const studentRegistrations = useMemo(() => {
     if (!user) return [];
     return registrations.filter(
-      reg => reg.studentEmail === user.email ||
-              (user.trackingCode && reg.trackingCode === user.trackingCode)
+      (reg) => reg.studentEmail === user.email
     );
   }, [registrations, user]);
 
-  // Calculate costs for each registration
+  const latestOnboarding = useMemo(() => {
+    if (!user) return null;
+    const matches = studentOnboardings.filter((ob) => ob.email === user.email);
+    if (matches.length === 0) return null;
+    return matches.sort((a, b) => (a.submittedAt < b.submittedAt ? 1 : -1))[0];
+  }, [studentOnboardings, user]);
+
+  const estimatedTotalVnd = useMemo(() => {
+    if (trackingInfo?.initialTotalCostVnd) return trackingInfo.initialTotalCostVnd;
+    if (latestOnboarding?.initialTotalCost) {
+      return convertAmount(latestOnboarding.initialTotalCost, 'VND', 'USD');
+    }
+    return 0;
+  }, [trackingInfo, latestOnboarding, convertAmount]);
+
   const registeredUniversities = useMemo(() => {
-    return studentRegistrations.map(reg => {
-      const university = universities.find(uni => uni.id === reg.universityId);
-      if (!university) return null;
+    if (studentRegistrations.length > 0) {
+      return studentRegistrations
+        .map((reg) => {
+          const university = universities.find((uni) => uni.id === reg.universityId);
+          if (!university) return null;
 
-      // Always include tuition (it's mandatory)
-      const tuition = university.generalTuition;
+          const selectedFees = reg.selectedFees || {
+            visa: true,
+            accommodation: true,
+            insurance: true,
+            additional: university.additionalFees.map(() => true),
+          };
 
-      // Check selectedFees from registration, default to all selected if not specified
-      const selectedFees = reg.selectedFees || {
-        visa: true,
-        accommodation: true,
-        insurance: true,
-        additional: university.additionalFees.map(() => true)
-      };
+          const visa = selectedFees.visa ? university.visaFee : 0;
+          const accommodation = selectedFees.accommodation ? university.accommodationFee : 0;
+          const insurance = selectedFees.insurance ? university.insuranceFee : 0;
+          const additionalTotal = university.additionalFees.reduce((sum, fee, index) => {
+            if (selectedFees.additional && selectedFees.additional[index]) {
+              return sum + fee.amount;
+            }
+            return sum;
+          }, 0);
 
-      // Calculate fees based on selection
-      const visa = selectedFees.visa ? university.visaFee : 0;
-      const accommodation = selectedFees.accommodation ? university.accommodationFee : 0;
-      const insurance = selectedFees.insurance ? university.insuranceFee : 0;
+          const tuition = university.generalTuition;
+          const insuranceAndMisc = insurance + additionalTotal;
+          const total = tuition + visa + accommodation + insuranceAndMisc;
 
-      // Calculate additional fees based on selection
-      const additionalTotal = university.additionalFees.reduce((sum, fee, index) => {
-        if (selectedFees.additional && selectedFees.additional[index]) {
-          return sum + fee.amount;
-        }
-        return sum;
-      }, 0);
+          return {
+            registrationId: `${reg.studentEmail}-${reg.universityId}`,
+            trackingCode: user?.trackingCode,
+            university,
+            selectedFees,
+            costs: { tuition, visa, accommodation, insuranceAndMisc, total },
+            isEstimated: false,
+          };
+        })
+        .filter((x): x is NonNullable<typeof x> => x !== null);
+    }
 
-      const insuranceAndMisc = insurance + additionalTotal;
-      const total = tuition + visa + accommodation + insuranceAndMisc;
+    const fallbackUniversityId =
+      trackingInfo?.desiredUniversityId || latestOnboarding?.desiredUniversity;
+    if (!fallbackUniversityId) return [];
 
-      return {
-        registrationId: reg.id,
-        trackingCode: reg.trackingCode,
+    const university = universities.find((uni) => uni.id === fallbackUniversityId);
+    if (!university) return [];
+
+    const baseTotal =
+      university.generalTuition +
+      university.visaFee +
+      university.accommodationFee +
+      university.insuranceFee +
+      university.additionalFees.reduce((sum, fee) => sum + fee.amount, 0);
+
+    const useEstimate = baseTotal === 0 && estimatedTotalVnd > 0;
+
+    return [
+      {
+        registrationId: `fallback-${fallbackUniversityId}`,
+        trackingCode: user?.trackingCode || trackingInfo?.code,
         university,
-        selectedFees,
+        selectedFees: {
+          visa: true,
+          accommodation: true,
+          insurance: true,
+          additional: university.additionalFees.map(() => true),
+        },
         costs: {
-          tuition,
-          visa,
-          accommodation,
-          insuranceAndMisc,
-          total
-        }
-      };
-    }).filter((x): x is NonNullable<typeof x> => x !== null);
-  }, [studentRegistrations, universities]);
+          tuition: useEstimate ? estimatedTotalVnd : university.generalTuition,
+          visa: useEstimate ? 0 : university.visaFee,
+          accommodation: useEstimate ? 0 : university.accommodationFee,
+          insuranceAndMisc: useEstimate ? 0 : university.insuranceFee,
+          total: useEstimate ? estimatedTotalVnd : baseTotal,
+        },
+        isEstimated: useEstimate,
+      },
+    ];
+  }, [studentRegistrations, universities, user?.trackingCode, trackingInfo, latestOnboarding, estimatedTotalVnd]);
 
   const grandTotal = useMemo(
-    () => registeredUniversities.reduce((sum, reg) => sum + (reg?.costs.total || 0), 0),
+    () => registeredUniversities.reduce((sum, reg) => sum + reg.costs.total, 0),
     [registeredUniversities]
   );
 
-  // Mock budget goal for progress bar
-  const budgetGoal = 500000000; // 500M VND mock budget
+  const budgetGoal = 500000000;
   const progressPercentage = Math.min((grandTotal / budgetGoal) * 100, 100);
 
   const toggleCard = (id: string) => {
-    setExpandedCards(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    setExpandedCards((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
   };
 
-  // If student is not logged in or is admin
   if (!user || user.role === 'admin') {
     return (
       <div className="space-y-6 p-6">
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3">
-          <Lock className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-medium text-amber-900">
-              {language === 'vi' ? 'Chế độ xem giác hạn' : 'View mode restricted'}
-            </p>
-            <p className="text-xs text-amber-700 mt-1">
+        <Card className="border-amber-200 bg-amber-50">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Lock className="w-4 h-4" />
+              {language === 'vi' ? 'Chế độ xem giới hạn' : 'View mode restricted'}
+            </CardTitle>
+            <CardDescription>
               {language === 'vi'
                 ? 'Vui lòng hoàn thành đơn tư vấn để xem chi phí của bạn.'
                 : 'Please complete your application to view costs.'}
-            </p>
-          </div>
-        </div>
+            </CardDescription>
+          </CardHeader>
+        </Card>
       </div>
     );
   }
 
   return (
     <div className="space-y-6 p-6">
-      {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-slate-900">
           {language === 'vi' ? 'Chi phí của tôi' : 'My Costs'}
         </h1>
         <p className="text-slate-600 mt-1">
           {language === 'vi'
-            ? 'Quản lý và theo dõi chi phí học tập của bạn'
-            : 'Manage and track your study costs'}
+            ? 'Theo dõi chi phí du học theo từng trường'
+            : 'Track your study costs by university'}
         </p>
       </div>
 
-      {/* Summary Card */}
       {registeredUniversities.length > 0 ? (
-        <div className="bg-gradient-to-br from-primary/10 to-blue-100 rounded-xl border border-primary/20 p-6">
-          <div className="flex items-start justify-between mb-4">
-            <div>
-              <p className="text-sm text-slate-600 mb-1">
-                {language === 'vi' ? 'Tổng chi phí' : 'Total Costs'}
-              </p>
-              <h2 className="text-4xl font-bold text-primary">
-                {formatFrom(grandTotal, 'VND')}
-              </h2>
+        <Card className="border-primary/20 bg-gradient-to-br from-primary/10 to-blue-100">
+          <CardHeader>
+            <CardTitle className="text-base text-slate-600">
+              {language === 'vi' ? 'Tổng chi phí' : 'Total Costs'}
+            </CardTitle>
+            <div className="text-4xl font-bold text-primary">
+              {formatFrom(grandTotal, 'VND')}
             </div>
-            <DollarSign className="w-12 h-12 text-primary/30" />
-          </div>
-
-          {/* Progress Bar */}
-          <div className="space-y-2">
+            {trackingInfo?.code && (
+              <p className="text-xs text-slate-600">Tracking: {trackingInfo.code}</p>
+            )}
+          </CardHeader>
+          <CardContent className="space-y-2">
             <div className="flex justify-between text-xs text-slate-600">
               <span>{progressPercentage.toFixed(0)}% of budget</span>
               <span>{formatFrom(budgetGoal, 'VND')} goal</span>
             </div>
-            <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
-              <div
-                className="bg-gradient-to-r from-primary to-blue-600 h-full transition-all duration-500"
-                style={{ width: `${progressPercentage}%` }}
-              ></div>
-            </div>
-          </div>
-        </div>
+            <Progress value={progressPercentage} />
+          </CardContent>
+        </Card>
       ) : (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 text-center">
-          <GraduationCap className="w-12 h-12 text-blue-400 mx-auto mb-3" />
-          <p className="text-slate-700 font-medium">
-            {language === 'vi' ? 'Chưa có đơn đăng ký' : 'No registrations yet'}
-          </p>
-          <p className="text-sm text-slate-600 mt-1">
-            {language === 'vi'
-              ? 'Hoàn thành đơn tư vấn để xem chi phí ước tính.'
-              : 'Complete an application to see estimated costs.'}
-          </p>
-          <button
-            onClick={() => navigate('/')}
-            className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            {language === 'vi' ? 'Bắt đầu tư vấn' : 'Start Application'}
-          </button>
-        </div>
+        <Card className="border-blue-200 bg-blue-50">
+          <CardHeader>
+            <CardTitle className="text-base">
+              {language === 'vi' ? 'Chưa có đơn đăng ký' : 'No registrations yet'}
+            </CardTitle>
+            <CardDescription>
+              {language === 'vi'
+                ? 'Hoàn thành đơn tư vấn để xem chi phí ước tính.'
+                : 'Complete an application to see estimated costs.'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={() => navigate('/')}>
+              <Plus />
+              {language === 'vi' ? 'Bắt đầu tư vấn' : 'Start Application'}
+            </Button>
+          </CardContent>
+        </Card>
       )}
 
-      {/* Cost Cards by University */}
       <div className="space-y-4">
         {registeredUniversities.map((item) => {
           const isExpanded = expandedCards.includes(item.registrationId);
 
           return (
-            <div
-              key={item.registrationId}
-              className="bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-md transition-all"
-            >
-              {/* Card Header - Clickable to Expand */}
+            <Card key={item.registrationId}>
               <button
                 onClick={() => toggleCard(item.registrationId)}
-                className="w-full px-6 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors text-left"
+                className="w-full px-6 py-4 flex items-center justify-between text-left"
               >
-                <div className="flex items-center gap-4 flex-1 min-w-0">
-                  <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary to-blue-700 flex items-center justify-center flex-shrink-0">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary to-blue-700 flex items-center justify-center">
                     <GraduationCap className="w-6 h-6 text-white" />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-slate-900 truncate">
-                      {item.university.name}
-                    </h3>
-                    <p className="text-sm text-slate-500 flex items-center gap-2 mt-0.5">
-                      <MapPin className="w-3 h-3" />
+                  <div>
+                    <h3 className="font-semibold text-slate-900">{item.university.name}</h3>
+                    <p className="text-sm text-slate-500">
                       {item.university.region || item.university.country}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-4 flex-shrink-0">
+                <div className="flex items-center gap-3">
                   <div className="text-right">
-                    <p className="text-xs text-slate-500 mb-1">
+                    <p className="text-xs text-slate-500">
                       {language === 'vi' ? 'Tổng cộng' : 'Total'}
                     </p>
                     <p className="text-xl font-bold text-primary">
                       {formatFrom(item.costs.total, 'VND')}
                     </p>
+                    {item.isEstimated && (
+                      <p className="text-[11px] text-slate-500">
+                        {language === 'vi' ? 'Ước tính từ onboarding' : 'Estimated from onboarding'}
+                      </p>
+                    )}
                   </div>
                   {isExpanded ? (
                     <ChevronUp className="w-5 h-5 text-slate-400" />
@@ -233,87 +281,71 @@ export default function MyCosts() {
                 </div>
               </button>
 
-              {/* Expanded Details */}
               {isExpanded && (
                 <div className="border-t border-slate-200 px-6 py-4 bg-slate-50 space-y-3">
-                  {/* Cost Breakdown */}
-                  <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-xs text-slate-600 mb-1">
-                        {language === 'vi' ? 'Học phí' : 'Tuition'}
-                      </p>
+                      <p className="text-xs text-slate-600">Học phí</p>
                       <p className="font-semibold text-slate-900">
                         {formatFrom(item.costs.tuition, 'VND')}
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-slate-600 mb-1">
-                        {language === 'vi' ? 'Phí visa' : 'Visa'}
-                      </p>
+                      <p className="text-xs text-slate-600">Phí visa</p>
                       <p className="font-semibold text-slate-900">
                         {formatFrom(item.costs.visa, 'VND')}
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-slate-600 mb-1">
-                        {language === 'vi' ? 'Lưu trú' : 'Accommodation'}
-                      </p>
+                      <p className="text-xs text-slate-600">Lưu trú</p>
                       <p className="font-semibold text-slate-900">
                         {formatFrom(item.costs.accommodation, 'VND')}
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-slate-600 mb-1">
-                        {language === 'vi' ? 'Bảo hiểm & khác' : 'Insurance & Other'}
-                      </p>
+                      <p className="text-xs text-slate-600">Bảo hiểm & khác</p>
                       <p className="font-semibold text-slate-900">
                         {formatFrom(item.costs.insuranceAndMisc, 'VND')}
                       </p>
                     </div>
                   </div>
 
-                  {/* Tracking Code */}
                   {item.trackingCode && (
-                    <div className="bg-white rounded-lg p-3 border border-blue-200">
-                      <p className="text-xs text-slate-600 mb-1">
-                        {language === 'vi' ? 'Mã theo dõi' : 'Tracking Code'}
-                      </p>
-                      <p className="font-mono text-sm font-semibold text-primary">
+                    <div className="rounded-lg border border-blue-200 bg-white p-3 text-xs">
+                      <div className="text-slate-600">Tracking Code</div>
+                      <div className="font-mono font-semibold text-primary">
                         {item.trackingCode}
-                      </p>
+                      </div>
                     </div>
                   )}
 
-                  {/* Action Buttons */}
-                  <div className="flex gap-2 pt-2">
-                    <button
-                      onClick={() => navigate(`/student/university/${item.university.id}`)}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-colors text-sm font-medium"
-                    >
-                      <TrendingUp className="w-4 h-4" />
-                      {language === 'vi' ? 'Chi tiết' : 'Details'}
-                    </button>
-                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => navigate(`/student/university/${item.university.id}`)}
+                    className="w-full"
+                  >
+                    <TrendingUp />
+                    {language === 'vi' ? 'Chi tiết' : 'Details'}
+                  </Button>
                 </div>
               )}
-            </div>
+            </Card>
           );
         })}
       </div>
 
-      {/* Empty State */}
       {registeredUniversities.length === 0 && (
-        <div className="bg-slate-50 rounded-xl border border-dashed border-slate-300 p-12 text-center">
-          <AlertCircle className="w-12 h-12 text-slate-400 mx-auto mb-3" />
-          <p className="text-slate-700 font-medium">
-            {language === 'vi' ? 'Không có chi phí' : 'No costs'}
-          </p>
-          <p className="text-sm text-slate-600 mt-1">
-            {language === 'vi'
-              ? 'Hoàn thành quá trình tư vấn để xem chi phí.'
-              : 'Complete an application to view costs.'}
-          </p>
-        </div>
+        <Card className="border-dashed border-slate-300 bg-slate-50">
+          <CardHeader className="items-center text-center">
+            <AlertCircle className="w-10 h-10 text-slate-400" />
+            <CardTitle>{language === 'vi' ? 'Không có chi phí' : 'No costs'}</CardTitle>
+            <CardDescription>
+              {language === 'vi'
+                ? 'Hoàn thành quá trình tư vấn để xem chi phí.'
+                : 'Complete an application to view costs.'}
+            </CardDescription>
+          </CardHeader>
+        </Card>
       )}
     </div>
   );

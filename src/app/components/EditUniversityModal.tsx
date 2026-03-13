@@ -2,11 +2,12 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useFieldArray, useForm } from 'react-hook-form';
-import { Plus, Trash2, ChevronDown } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import type { University, VisaSystemCost } from '../context/AppContext';
+import type { University } from '../context/AppContext';
 import { useCurrency } from '../context/CurrencyContext';
+import type { Currency } from '../context/CurrencyContext';
 import PriceInput from './PriceInput';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
@@ -25,16 +26,21 @@ const feeSchema = z.object({
   amount: z.number().min(0, 'Số tiền phải là số không âm'),
 });
 
+// ✅ FIX 2: currency must be a valid Currency union type, not plain string
+const CURRENCY_VALUES = ['VND', 'KRW', 'USD', 'JPY', 'CNY'] as const;
+
 const fixedCostSchema = z.object({
   type: z.string().min(1, 'Vui lòng nhập loại phí'),
   amount: z.number().min(0, 'Số tiền phải là số không âm'),
-  currency: z.string().optional(),
+  currency: z.enum(CURRENCY_VALUES).optional(),
 });
 
+// ✅ FIX 3 & 5: Add 'type' field to addonSchema so Controller name is valid
 const addonSchema = z.object({
   id: z.string(),
   name: z.string().min(1, 'Vui lòng nhập tên phí'),
   amount: z.number().optional(),
+  type: z.string().optional(),
 });
 
 const formSchema = z.object({
@@ -53,13 +59,11 @@ const formSchema = z.object({
       });
     }
   }),
-  // Traditional costs
   generalTuition: z.number().min(0).optional(),
   visaFee: z.number().min(0).optional(),
   accommodationFee: z.number().min(0).optional(),
   insuranceFee: z.number().min(0).optional(),
   additionalFees: z.array(feeSchema).optional(),
-  // Korean university costs
   isKorean: z.boolean().optional(),
   selectedVisaType: z.string().optional(),
   fixedCosts: z.array(fixedCostSchema).optional(),
@@ -83,8 +87,16 @@ export default function EditUniversityModal({
 }: EditUniversityModalProps) {
   const { currency, formatFrom, convertAmount } = useCurrency();
   const isEditMode = !!university;
-  const isKoreanUni = university?.koreanData?.isKoreanUniversity || false;
   const [selectedVisaType, setSelectedVisaType] = useState<string | null>(null);
+  const [enabledVisaSystems, setEnabledVisaSystems] = useState<Set<string>>(new Set());
+
+  const ALL_VISA_OPTIONS = [
+    { type: 'D4-1' as const, label: 'D4-1', name: '(Tiếng Hàn)', description: 'Korean Language Program' },
+    { type: 'D2-1' as const, label: 'D2-1', name: '(Chuẩn bị)', description: 'University Preparation' },
+    { type: 'D2-2' as const, label: 'D2-2', name: '(Đại học)', description: 'Undergraduate' },
+    { type: 'D2-3' as const, label: 'D2-3', name: '(Sau đại học)', description: 'Graduate' },
+    { type: 'D2-6' as const, label: 'D2-6', name: '(Nâng cao)', description: 'Advanced' },
+  ];
 
   const defaultValues: FormValues = useMemo(
     () => ({
@@ -94,23 +106,26 @@ export default function EditUniversityModal({
       topTier: (university?.topTier || university?.koreanData?.topTier || 'Top2') as FormValues['topTier'],
       country: university?.country || 'South Korea',
       overview: university?.overview || '',
-      isKorean: isKoreanUni,
+      isKorean: university?.koreanData?.isKoreanUniversity ?? true,
       selectedVisaType: university?.koreanData?.visaSystems?.[0]?.visaType || 'D4-1',
-      // Traditional costs
       generalTuition: university?.generalTuition || 0,
       visaFee: university?.visaFee || 0,
       accommodationFee: university?.accommodationFee || 0,
       insuranceFee: university?.insuranceFee || 0,
       additionalFees: university?.additionalFees?.length ? university.additionalFees : [],
-      // Korean costs
-      fixedCosts: university?.fixedCosts || [],
+      fixedCosts: (university?.fixedCosts || []).map(c => ({
+        ...c,
+        // ✅ FIX 2: cast currency to the enum type
+        currency: (c.currency as (typeof CURRENCY_VALUES)[number] | undefined) ?? 'VND',
+      })),
       optionalAddons: (university?.optionalAddons || []).map(addon => ({
         id: addon.id,
         name: addon.name,
         amount: addon.amount,
+        type: addon.type || 'other',
       })),
     }),
-    [university, isKoreanUni]
+    [university]
   );
 
   const {
@@ -140,7 +155,7 @@ export default function EditUniversityModal({
     name: 'optionalAddons',
   });
 
-  const isKorean = watch('isKorean');
+  const isKorean = watch('isKorean') ?? true;
   const overviewValue = watch('overview') || '';
   const overviewCount = countWords(overviewValue);
   const selectedVisa = watch('selectedVisaType') || 'D4-1';
@@ -148,7 +163,9 @@ export default function EditUniversityModal({
   const fixedCostsSnapshot = watch('fixedCosts') || [];
   const fixedCostsTotal = useMemo(
     () => fixedCostsSnapshot.reduce((sum, cost) => {
-      const converted = convertAmount(cost?.amount || 0, currency, cost?.currency || 'VND');
+      // ✅ FIX 1: cast cost.currency to Currency before passing to convertAmount
+      const src = (cost?.currency as Currency | undefined) || 'VND';
+      const converted = convertAmount(cost?.amount || 0, currency, src);
       return sum + converted;
     }, 0),
     [fixedCostsSnapshot, currency, convertAmount]
@@ -166,7 +183,6 @@ export default function EditUniversityModal({
     [additionalFeesSnapshot]
   );
 
-  // Get current visa system costs from university data
   const currentVisaSystems = university?.koreanData?.visaSystems || [];
   const selectedVisaSystem = currentVisaSystems.find(v => v.visaType === selectedVisa);
 
@@ -185,12 +201,12 @@ export default function EditUniversityModal({
     if (isKorean && selectedVisaSystem) {
       return fixedCostsTotal + visaSystemCostTotal + addonsCostsTotal;
     }
-    // Traditional calculation
-    const traditional = (watch('generalTuition') || 0) +
-                       (watch('visaFee') || 0) +
-                       (watch('accommodationFee') || 0) +
-                       (watch('insuranceFee') || 0) +
-                       additionalFeesTotal;
+    const traditional =
+      (watch('generalTuition') || 0) +
+      (watch('visaFee') || 0) +
+      (watch('accommodationFee') || 0) +
+      (watch('insuranceFee') || 0) +
+      additionalFeesTotal;
     return traditional;
   }, [isKorean, selectedVisaSystem, fixedCostsTotal, visaSystemCostTotal, addonsCostsTotal, additionalFeesTotal, watch]);
 
@@ -198,11 +214,13 @@ export default function EditUniversityModal({
     if (open) {
       reset(defaultValues);
       setSelectedVisaType(defaultValues.selectedVisaType || 'D4-1');
+      setEnabledVisaSystems(new Set(currentVisaSystems.map(v => v.visaType)));
     }
-  }, [open, defaultValues, reset]);
+  }, [open, defaultValues, reset, currentVisaSystems]);
 
   const handleSave = handleSubmit((values) => {
     const topVisaLabel = values.topTier === 'Top1' ? 'Top 1' : values.topTier === 'Top2' ? 'Top 2' : 'Top 3';
+    const enabledVisaSystemsData = currentVisaSystems.filter(vs => enabledVisaSystems.has(vs.visaType));
 
     const payload: Partial<University> = {
       name: values.name,
@@ -213,27 +231,29 @@ export default function EditUniversityModal({
       overview: values.overview || '',
       koreanData: {
         ...(university?.koreanData || { isKoreanUniversity: true }),
-        isKoreanUniversity: isKorean || isKoreanUni,
+        isKoreanUniversity: isKorean ?? true,
         address: values.region || university?.koreanData?.address,
         topTier: values.topTier,
         topVisa: topVisaLabel,
-        visaSystems: currentVisaSystems.length > 0 ? currentVisaSystems : undefined,
+        visaSystems: enabledVisaSystemsData.length > 0 ? enabledVisaSystemsData : undefined,
       },
     };
 
-    if (isKorean || isKoreanUni) {
-      // Save Korean-specific costs
-      payload.fixedCosts = values.fixedCosts;
+    if (isKorean) {
+      // ✅ FIX 2: cast currency field when saving
+      payload.fixedCosts = (values.fixedCosts || []).map(c => ({
+        ...c,
+        currency: c.currency as Currency | undefined,
+      }));
       payload.optionalAddons = (values.optionalAddons || []).map(addon => ({
         id: addon.id,
         name: addon.name,
         nameVi: addon.name,
-        type: 'other' as const,
+        type: (addon.type || 'other') as 'dorm-vn' | 'dorm-kr' | 'flight' | 'savings' | 'scholarship' | 'group' | 'other',
         amount: addon.amount,
         selectable: true,
       }));
     } else {
-      // Save traditional costs
       payload.generalTuition = values.generalTuition || 0;
       payload.visaFee = values.visaFee || 0;
       payload.accommodationFee = values.accommodationFee || 0;
@@ -246,7 +266,6 @@ export default function EditUniversityModal({
     toast.success(isEditMode ? 'Đã cập nhật trường' : 'Đã thêm trường');
   });
 
-  // Visa system buttons - ONLY show available systems from currentVisaSystems
   const allVisaLabels: Record<string, { label: string; name: string }> = {
     'D4-1': { label: 'D4-1', name: '(Tiếng Hàn)' },
     'D2-1': { label: 'D2-1', name: '(Chuẩn bị)' },
@@ -260,7 +279,10 @@ export default function EditUniversityModal({
       type: vs.visaType,
       ...allVisaLabels[vs.visaType] || { label: vs.visaType, name: '' }
     }))
-    .sort((a, b) => ['D4-1', 'D2-1', 'D2-2', 'D2-3', 'D2-6'].indexOf(a.type) - ['D4-1', 'D2-1', 'D2-2', 'D2-3', 'D2-6'].indexOf(b.type));
+    .sort((a, b) =>
+      ['D4-1', 'D2-1', 'D2-2', 'D2-3', 'D2-6'].indexOf(a.type) -
+      ['D4-1', 'D2-1', 'D2-2', 'D2-3', 'D2-6'].indexOf(b.type)
+    );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -283,12 +305,7 @@ export default function EditUniversityModal({
                   control={control}
                   name="name"
                   render={({ field }) => (
-                    <Input
-                      id="name"
-                      {...field}
-                      placeholder="Ajou University"
-                      aria-invalid={!!errors.name}
-                    />
+                    <Input id="name" {...field} placeholder="Ajou University" aria-invalid={!!errors.name} />
                   )}
                 />
                 {errors.name && <p className="text-xs text-red-600">{errors.name.message}</p>}
@@ -341,9 +358,7 @@ export default function EditUniversityModal({
                 <Controller
                   control={control}
                   name="country"
-                  render={({ field }) => (
-                    <Input id="country" {...field} disabled />
-                  )}
+                  render={({ field }) => <Input id="country" {...field} disabled />}
                 />
               </div>
             </div>
@@ -372,27 +387,38 @@ export default function EditUniversityModal({
           </div>
 
           {/* Korean University Cost Management */}
-          {(isKorean || isKoreanUni) && (
+          {isKorean && (
             <div className="space-y-4">
               <h3 className="text-sm font-semibold text-slate-900">Quản lý chi phí (Đại học Hàn)</h3>
 
               {/* Visa System Selector */}
               <div className="space-y-3">
-                <Label>Chọn hệ visa</Label>
+                <Label>Hệ Visa Có Sẵn (Chọn những hệ bạn muốn cung cấp)</Label>
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-                  {visaSystemButtons.map(visa => (
+                  {ALL_VISA_OPTIONS.map((visa) => (
                     <button
                       key={visa.type}
                       type="button"
-                      onClick={() => setSelectedVisaType(visa.type)}
-                      className={`px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
-                        selectedVisa === visa.type
-                          ? 'bg-primary text-white'
-                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      onClick={() => {
+                        const newSet = new Set(enabledVisaSystems);
+                        if (newSet.has(visa.type)) {
+                          newSet.delete(visa.type);
+                          if (selectedVisa === visa.type) {
+                            setSelectedVisaType(Array.from(newSet)[0] || null);
+                          }
+                        } else {
+                          newSet.add(visa.type);
+                        }
+                        setEnabledVisaSystems(newSet);
+                      }}
+                      className={`px-3 py-3 rounded-lg text-xs font-semibold transition-all border-2 ${
+                        enabledVisaSystems.has(visa.type)
+                          ? 'bg-primary text-white border-primary'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:border-primary/50 hover:bg-slate-100'
                       }`}
                     >
-                      <div>{visa.label}</div>
-                      <div className="text-[10px] font-normal opacity-75">{visa.name}</div>
+                      <div className="font-bold">{visa.label}</div>
+                      <div className="text-[10px] font-normal opacity-75 mt-1">{visa.name}</div>
                     </button>
                   ))}
                 </div>
@@ -405,9 +431,7 @@ export default function EditUniversityModal({
                   <AccordionTrigger className="hover:no-underline">
                     <div className="flex items-center justify-between w-full">
                       <span className="font-semibold">Chi phí cố định</span>
-                      <span className="text-sm text-slate-500">
-                        {formatFrom(fixedCostsTotal, 'VND')}
-                      </span>
+                      <span className="text-sm text-slate-500">{formatFrom(fixedCostsTotal, 'VND')}</span>
                     </div>
                   </AccordionTrigger>
                   <AccordionContent className="space-y-4 pt-4">
@@ -449,11 +473,15 @@ export default function EditUniversityModal({
 
                         <div className="space-y-2">
                           <Label className="text-xs">Tiền tệ</Label>
+                          {/* ✅ FIX 2: Use string value from enum */}
                           <Controller
                             control={control}
                             name={`fixedCosts.${index}.currency`}
                             render={({ field }) => (
-                              <Select value={field.value || 'VND'} onValueChange={field.onChange}>
+                              <Select
+                                value={field.value || 'VND'}
+                                onValueChange={(val) => field.onChange(val as (typeof CURRENCY_VALUES)[number])}
+                              >
                                 <SelectTrigger className="text-sm">
                                   <SelectValue />
                                 </SelectTrigger>
@@ -467,12 +495,7 @@ export default function EditUniversityModal({
                           />
                         </div>
 
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeFixedCost(index)}
-                        >
+                        <Button type="button" variant="ghost" size="icon" onClick={() => removeFixedCost(index)}>
                           <Trash2 className="w-4 h-4" />
                         </Button>
                       </div>
@@ -495,9 +518,7 @@ export default function EditUniversityModal({
                   <AccordionTrigger className="hover:no-underline">
                     <div className="flex items-center justify-between w-full">
                       <span className="font-semibold">Chi phí theo hệ ({selectedVisa})</span>
-                      <span className="text-sm text-slate-500">
-                        {formatFrom(visaSystemCostTotal, 'VND')}
-                      </span>
+                      <span className="text-sm text-slate-500">{formatFrom(visaSystemCostTotal, 'VND')}</span>
                     </div>
                   </AccordionTrigger>
                   <AccordionContent className="space-y-4 pt-4">
@@ -552,12 +573,14 @@ export default function EditUniversityModal({
                   <AccordionTrigger className="hover:no-underline">
                     <div className="flex items-center justify-between w-full">
                       <span className="font-semibold">Phí tùy chọn</span>
-                      <span className="text-sm text-slate-500">
-                        {formatFrom(addonsCostsTotal, 'VND')}
-                      </span>
+                      <span className="text-sm text-slate-500">{formatFrom(addonsCostsTotal, 'VND')}</span>
                     </div>
                   </AccordionTrigger>
                   <AccordionContent className="space-y-4 pt-4">
+                    <p className="text-xs text-slate-600 bg-blue-50 border border-blue-200 rounded p-2">
+                      Phí tùy chọn có thể là KTX, vé máy bay, học bổng hoặc các loại phí khác.
+                    </p>
+
                     {addonFields.length === 0 && (
                       <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-3 text-sm text-slate-500">
                         Chưa có phí tùy chọn. Nhấn "+ Thêm" để thêm.
@@ -565,51 +588,85 @@ export default function EditUniversityModal({
                     )}
 
                     {addonFields.map((field, index) => (
-                      <div key={field.id} className="grid grid-cols-1 md:grid-cols-[1.5fr_1fr_auto] gap-3 items-end p-3 bg-slate-50 rounded-lg">
-                        <div className="space-y-2">
-                          <Label className="text-xs">Tên phí</Label>
-                          <Controller
-                            control={control}
-                            name={`optionalAddons.${index}.name`}
-                            render={({ field }) => (
-                              <Input {...field} placeholder="KTX Hàn, Vé máy bay, Học bổng..." className="text-sm" />
-                            )}
-                          />
+                      <div key={field.id} className="space-y-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="space-y-2">
+                            <Label className="text-xs">Loại phí</Label>
+                            {/* ✅ FIX 3 & 4: name is now valid since 'type' is in addonSchema; value cast to string */}
+                            <Controller
+                              control={control}
+                              name={`optionalAddons.${index}.type`}
+                              render={({ field }) => (
+                                <Select
+                                  value={String(field.value || 'other')}
+                                  onValueChange={field.onChange}
+                                >
+                                  <SelectTrigger className="text-sm">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="other">Khác</SelectItem>
+                                    <SelectItem value="dorm-vn">KTX Việt Nam</SelectItem>
+                                    <SelectItem value="dorm-kr">KTX Hàn Quốc</SelectItem>
+                                    <SelectItem value="flight">Vé máy bay</SelectItem>
+                                    <SelectItem value="savings">Sổ tiết kiệm</SelectItem>
+                                    <SelectItem value="scholarship">Học bổng</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              )}
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label className="text-xs">Tên phí</Label>
+                            <Controller
+                              control={control}
+                              name={`optionalAddons.${index}.name`}
+                              render={({ field }) => (
+                                <Input {...field} placeholder="VD: KTX 4-người, Vé Hà Nội..." className="text-sm" />
+                              )}
+                            />
+                          </div>
                         </div>
 
-                        <div className="space-y-2">
-                          <Label className="text-xs">Số tiền (VND)</Label>
-                          <Controller
-                            control={control}
-                            name={`optionalAddons.${index}.amount`}
-                            render={({ field }) => (
-                              <Input
-                                type="number"
-                                {...field}
-                                onChange={e => field.onChange(Number(e.target.value))}
-                                placeholder="0"
-                                className="text-sm"
-                              />
-                            )}
-                          />
-                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-end">
+                          <div className="space-y-2">
+                            <Label className="text-xs">Số tiền (VND)</Label>
+                            <Controller
+                              control={control}
+                              name={`optionalAddons.${index}.amount`}
+                              render={({ field }) => (
+                                <Input
+                                  type="number"
+                                  {...field}
+                                  onChange={e => field.onChange(Number(e.target.value))}
+                                  placeholder="0"
+                                  className="text-sm"
+                                />
+                              )}
+                            />
+                          </div>
 
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeAddon(index)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-600 hover:text-red-700"
+                            onClick={() => removeAddon(index)}
+                          >
+                            <Trash2 className="w-4 h-4 mr-1" />
+                            Xóa
+                          </Button>
+                        </div>
                       </div>
                     ))}
 
+                    {/* ✅ FIX 5: 'type' is now valid in appendAddon since schema includes it */}
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => appendAddon({ id: Date.now().toString(), name: '', amount: 0 })}
+                      onClick={() => appendAddon({ id: Date.now().toString(), name: '', type: 'other', amount: 0 })}
                     >
                       <Plus className="w-4 h-4 mr-2" />
                       Thêm phí tùy chọn
@@ -642,8 +699,8 @@ export default function EditUniversityModal({
             </div>
           )}
 
-          {/* Traditional Cost Management (for non-Korean universities) */}
-          {!isKorean && !isKoreanUni && (
+          {/* Traditional Cost Management */}
+          {!isKorean && (
             <div className="space-y-4">
               <h3 className="text-sm font-semibold text-slate-900">Chi phí ({currency})</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -651,48 +708,28 @@ export default function EditUniversityModal({
                   control={control}
                   name="generalTuition"
                   render={({ field }) => (
-                    <PriceInput
-                      label="Học phí"
-                      value={field.value || 0}
-                      onChange={field.onChange}
-                      error={errors.generalTuition?.message}
-                    />
+                    <PriceInput label="Học phí" value={field.value || 0} onChange={field.onChange} error={errors.generalTuition?.message} />
                   )}
                 />
                 <Controller
                   control={control}
                   name="visaFee"
                   render={({ field }) => (
-                    <PriceInput
-                      label="Phí visa"
-                      value={field.value || 0}
-                      onChange={field.onChange}
-                      error={errors.visaFee?.message}
-                    />
+                    <PriceInput label="Phí visa" value={field.value || 0} onChange={field.onChange} error={errors.visaFee?.message} />
                   )}
                 />
                 <Controller
                   control={control}
                   name="accommodationFee"
                   render={({ field }) => (
-                    <PriceInput
-                      label="Lưu trú"
-                      value={field.value || 0}
-                      onChange={field.onChange}
-                      error={errors.accommodationFee?.message}
-                    />
+                    <PriceInput label="Lưu trú" value={field.value || 0} onChange={field.onChange} error={errors.accommodationFee?.message} />
                   )}
                 />
                 <Controller
                   control={control}
                   name="insuranceFee"
                   render={({ field }) => (
-                    <PriceInput
-                      label="Bảo hiểm"
-                      value={field.value || 0}
-                      onChange={field.onChange}
-                      error={errors.insuranceFee?.message}
-                    />
+                    <PriceInput label="Bảo hiểm" value={field.value || 0} onChange={field.onChange} error={errors.insuranceFee?.message} />
                   )}
                 />
               </div>
@@ -700,11 +737,7 @@ export default function EditUniversityModal({
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <Label>Phí bổ sung</Label>
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => appendAdditional({ type: '', amount: 0 })}
-                  >
+                  <Button type="button" size="sm" onClick={() => appendAdditional({ type: '', amount: 0 })}>
                     <Plus />
                     Thêm phí
                   </Button>
@@ -728,7 +761,6 @@ export default function EditUniversityModal({
                         )}
                       />
                     </div>
-
                     <div>
                       <Controller
                         control={control}
@@ -743,13 +775,7 @@ export default function EditUniversityModal({
                         )}
                       />
                     </div>
-
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeAdditional(index)}
-                    >
+                    <Button type="button" variant="ghost" size="icon" onClick={() => removeAdditional(index)}>
                       <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
@@ -803,7 +829,6 @@ export default function EditUniversityModal({
                 )}
               </div>
 
-              {/* Traditional Total */}
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
                 <div className="text-right">
                   <div className="text-sm text-slate-600 mb-1">Tổng chi phí</div>
