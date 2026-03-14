@@ -10,26 +10,21 @@ const __dirname = path.dirname(__filename)
 export default defineConfig({
   base: './',
   plugins: [
-    // The React and Tailwind plugins are both required for Make, even if
-    // Tailwind is not being actively used – do not remove them
     react(),
     tailwindcss(),
   ],
   resolve: {
     alias: {
-      // Alias @ to the src directory
       '@': path.resolve(__dirname, './src'),
     },
   },
-
-  // File types to support raw imports. Never add .css, .tsx, or .ts files to this.
   assetsInclude: ['**/*.svg', '**/*.csv'],
 
   build: {
     rollupOptions: {
       output: {
         manualChunks: (id) => {
-          // Vendor libraries
+          // Vendor libraries - optimized chunking
           if (id.includes('node_modules')) {
             if (id.includes('@radix-ui') || id.includes('cmdk')) {
               return 'vendor-ui';
@@ -43,8 +38,13 @@ export default defineConfig({
             if (id.includes('html2canvas') || id.includes('jspdf') || id.includes('xlsx')) {
               return 'vendor-export';
             }
+            if (id.includes('lucide-react')) {
+              return 'vendor-icons';
+            }
+            // All other vendor libs go to vendor-other to avoid circular dependencies
             return 'vendor-other';
           }
+          
           // Pages - split each route into separate chunk
           if (id.includes('pages/')) {
             const match = id.match(/pages\/(\w+)/);
@@ -52,17 +52,38 @@ export default defineConfig({
               return `page-${match[1].toLowerCase()}`;
             }
           }
+          
           // Context - separate chunk
           if (id.includes('context/')) {
             return 'context';
           }
-          // Components - separate chunk
+          
+          // Components - split into smaller chunks
           if (id.includes('components/')) {
+            if (id.includes('ui/')) {
+              return 'components-ui';
+            }
             return 'components';
           }
         },
       },
     },
-    chunkSizeWarningLimit: 600,
+    chunkSizeWarningLimit: 400, // Lower limit for better performance
+    minify: 'terser',
+    sourcemap: false, // Disable sourcemaps for production
+    target: 'es2015', // Modern browser target
+  },
+  
+  // Development server optimization
+  server: {
+    port: 5173,
+    host: true,
+    open: true,
+  },
+  
+  // Preview server optimization
+  preview: {
+    port: 4173,
+    host: true,
   },
 })

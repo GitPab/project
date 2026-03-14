@@ -4,6 +4,7 @@ import { useApp } from '../context/AppContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useLanguage } from '../context/LanguageContext';
 import { MapPin, CheckCircle, Lock, Search, Star, UserPlus, GraduationCap } from 'lucide-react';
+import StudentInfoSidebar from '../components/StudentInfoSidebar';
 
 export default function StudentHome() {
   const { universities, registrations, user } = useApp();
@@ -30,30 +31,32 @@ export default function StudentHome() {
   const paginatedUniversities = filteredUniversities.slice(startIndex, startIndex + itemsPerPage);
 
   return (
-    <div className="space-y-6 p-6">
-      {/* CTA Banner for Consultation */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-800 rounded-xl p-6 text-white shadow-lg">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
-              <UserPlus className="w-7 h-7" />
-            </div>
-            <div>
-              <h3 className="text-xl font-bold mb-1">
-                {language === 'vi' ? 'Đăng ký tư vấn miễn phí' :
-                 language === 'ko' ? '무료 상담 신청' :
-                 'Free Consultation Sign Up'}
-              </h3>
-              <p className="text-blue-100 text-sm">
-                {language === 'vi' ? 'Nhận tư vấn chi tiết về chi phí và hồ sơ du học Hàn Quốc' :
-                 language === 'ko' ? '한국 유학 비용 및 서류에 대한 자세한 상담을 받으세요' :
-                 'Get detailed consultation on Korean study abroad costs and applications'}
+    <div className="flex gap-6">
+      {/* Main Content */}
+      <div className="flex-1 space-y-6 p-6">
+        {/* CTA Banner for Consultation */}
+        <div className="bg-gradient-to-r from-blue-600 to-blue-800 rounded-xl p-6 text-white shadow-lg">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
+                <UserPlus className="w-7 h-7" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold mb-1">
+                  {language === 'vi' ? 'Đăng ký tư vấn miễn phí' :
+                   language === 'ko' ? '무료 상담 신청' :
+                   'Free Consultation Sign Up'}
+                </h3>
+                <p className="text-blue-100 text-sm">
+                  {language === 'vi' ? 'Nhận tư vấn chi tiết về chi phí và hồ sơ du học Hàn Quốc' :
+                   language === 'ko' ? '한국 유학 비용 및 서류에 대한 자세한 상담을 받으세요' :
+                   'Get detailed consultation on Korean study abroad costs and applications'}
               </p>
             </div>
           </div>
           <button
             onClick={() => navigate('/student/onboarding')}
-            className="px-6 py-3 bg-white text-blue-700 rounded-lg hover:bg-blue-50 transition-colors font-semibold flex items-center gap-2 whitespace-nowrap"
+            className="px-6 py-3 bg-white text-[#003AB7] border border-[#003AB7] rounded-lg hover:bg-[#003AB7] hover:text-white active:bg-[#002A8F] active:text-white transition-all duration-200 font-semibold flex items-center gap-2 whitespace-nowrap shadow-sm hover:shadow-md active:shadow-inner"
           >
             <GraduationCap className="w-5 h-5" />
             {language === 'vi' ? 'Đăng ký ngay' :
@@ -237,6 +240,27 @@ export default function StudentHome() {
           <p className="text-slate-600">Không tìm thấy trường đại học phù hợp</p>
         </div>
       )}
+      </div>
+      
+      {/* Student Info Sidebar */}
+      <div className="w-80 flex-shrink-0">
+        <StudentInfoSidebar 
+          student={{
+            name: user?.name || "Nguyễn Văn A",
+            email: user?.email || "student@example.com",
+            phone: "+84-123-456-789",
+            university: "Konkuk University",
+            program: "Du học D4-1",
+            startDate: "09/2023",
+            status: "active",
+            gpa: "3.2",
+            totalCost: "₩15,000,000",
+            remainingCost: "₩8,500,000",
+            nextPayment: "15/03/2025",
+            progress: 65
+          }}
+        />
+      </div>
     </div>
   );
 }

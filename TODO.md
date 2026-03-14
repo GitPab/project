@@ -1,11 +1,17 @@
-# University Detail Pages Error Fix Progress
+# Design Update to Figma Plan - Progress Tracker
 
-## Plan Steps:
-- [x] Step 1: Create this TODO.md
-- [ ] Step 2: Fix UniversityDetail.tsx (imports, calculateTotal logic, convertAmount, null checks)
-- [ ] Step 3: Fix UniversityDetailKorean.tsx (calculateKoreanTotal variable, className template, null checks)
-- [ ] Step 4: Verify no TS errors (run npm run build)
-- [ ] Step 5: Test pages in dev server
-- [ ] Step 6: Complete task
+## Pending Steps
+- [ ] 1. Update theme.css with Figma colors/radius (extract from Figma data/images)
+- [ ] 2. Refactor PublicOnboarding.tsx to match Figma 'Home' frame (hero banner, form, TOP 3 unis, recommendations)
+- [ ] 3. Update Layout.tsx for Figma header (add banner slider if needed)
+- [ ] 4. Enhance UniversitiesList.tsx / SchoolCard.tsx for Figma university grid/list
+- [ ] 5. Update UniversityDetailKorean.tsx for 'Thông tin trường' frame
+- [ ] 6. Download Figma images to public/img/ using ImageWithFallback
+- [ ] 7. Test responsive design across devices
+- [ ] 8. Run `npm run dev` and verify
 
-Current: Step 2 partial (UniversityDetail.tsx fixed), starting addon type fixes & Step 3
+## Completed
+(none yet)
+
+*Last updated: Initial creation*
+

@@ -104,6 +104,50 @@ const mockSupabaseClient = {
     if (typeof window === 'undefined') return;
     localStorage.removeItem(mockSupabaseClient.getStorageKey(code));
   },
+  
+  // Realtime channel support
+  channel: (name: string) => {
+    return {
+      on: (event: string, config: any, callback: any) => {
+        // Mock implementation - just return chainable object
+        return {
+          subscribe: () => {
+            console.log(`Mock subscribe to channel: ${name}`);
+            return {
+              unsubscribe: () => {
+                console.log(`Mock unsubscribe from channel: ${name}`);
+              }
+            };
+          }
+        };
+      },
+      subscribe: () => {
+        return {
+          unsubscribe: () => {}
+        };
+      }
+    };
+  },
+  
+  // Database query support
+  from: (table: string) => {
+    return {
+      select: (columns?: string) => ({
+        eq: (column: string, value: any) => ({
+          single: () => Promise.resolve({ data: null, error: null }),
+          order: () => Promise.resolve({ data: [], error: null }),
+        }),
+        order: () => Promise.resolve({ data: [], error: null }),
+      }),
+      update: (data: any) => ({
+        eq: (column: string, value: any) => Promise.resolve({ error: null, data: null }),
+      }),
+      insert: (data: any) => Promise.resolve({ error: null, data: null }),
+      delete: () => ({
+        eq: (column: string, value: any) => Promise.resolve({ error: null, data: null }),
+      }),
+    };
+  },
 };
 
 /**

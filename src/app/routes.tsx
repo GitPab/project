@@ -4,6 +4,7 @@ import Layout from './components/Layout';
 import Login from './pages/Login';
 import AdminDashboard from './pages/AdminDashboard';
 import UniversitiesList from './pages/UniversitiesList';
+import UniversityInfo from './pages/UniversityInfo';
 import AdminRegistrations from './pages/AdminRegistrations';
 import StudentMonitoring from './pages/StudentMonitoring';
 import StudentHome from './pages/StudentHome';
@@ -20,6 +21,11 @@ export const router = createHashRouter([
   {
     path: '/',
     Component: PublicOnboarding,
+    errorElement: <RouteError />
+  },
+  {
+    path: '/universities',
+    Component: UniversityInfo,
     errorElement: <RouteError />
   },
   {

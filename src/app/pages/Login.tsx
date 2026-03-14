@@ -25,7 +25,7 @@ export default function Login() {
         <div className="mb-4 text-center">
           <button
             onClick={() => navigate('/')}
-            className="text-sm text-slate-500 hover:text-primary transition-colors inline-flex items-center gap-1"
+            className="text-sm text-slate-500 hover:text-[#003AB7] transition-colors inline-flex items-center gap-1"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Student Onboarding
@@ -60,7 +60,7 @@ export default function Login() {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3 bg-slate-50 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
+                    className="w-full pl-11 pr-4 py-3 bg-slate-50 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#003AB7]/50 focus:border-[#003AB7] transition-all"
                     placeholder="your.email@example.com"
                     required
                   />
@@ -75,7 +75,7 @@ export default function Login() {
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3 bg-slate-50 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
+                    className="w-full pl-11 pr-4 py-3 bg-slate-50 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#003AB7]/50 focus:border-[#003AB7] transition-all"
                     placeholder="Enter your password"
                     required
                   />
@@ -88,10 +88,10 @@ export default function Login() {
                   <button
                     type="button"
                     onClick={() => setRole('student')}
-                    className={`flex flex-col items-center justify-center gap-2 py-4 px-4 rounded-lg border-2 transition-all ${
+                    className={`flex flex-col items-center justify-center gap-2 py-4 px-4 rounded-lg border-2 transition-all active:scale-95 ${
                       role === 'student'
-                        ? 'border-primary bg-primary/5 text-primary shadow-sm'
-                        : 'border-slate-300 bg-white text-slate-700 hover:border-primary/50'
+                        ? 'border-[#003AB7] bg-[#003AB7]/5 text-[#003AB7] shadow-sm'
+                        : 'border-slate-300 bg-white text-slate-700 hover:border-[#003AB7]/50 active:bg-[#F0F7FF] active:text-[#003AB7]'
                     }`}
                   >
                     <UserCircle className="w-6 h-6" />
@@ -101,10 +101,10 @@ export default function Login() {
                   <button
                     type="button"
                     onClick={() => setRole('admin')}
-                    className={`flex flex-col items-center justify-center gap-2 py-4 px-4 rounded-lg border-2 transition-all ${
+                    className={`flex flex-col items-center justify-center gap-2 py-4 px-4 rounded-lg border-2 transition-all active:scale-95 ${
                       role === 'admin'
-                        ? 'border-primary bg-primary/5 text-primary shadow-sm'
-                        : 'border-slate-300 bg-white text-slate-700 hover:border-primary/50'
+                        ? 'border-[#003AB7] bg-[#003AB7]/5 text-[#003AB7] shadow-sm'
+                        : 'border-slate-300 bg-white text-slate-700 hover:border-[#003AB7]/50 active:bg-[#F0F7FF] active:text-[#003AB7]'
                     }`}
                   >
                     <Shield className="w-6 h-6" />
@@ -116,7 +116,7 @@ export default function Login() {
 
               <button
                 type="submit"
-                className="w-full bg-primary text-white py-3 rounded-lg hover:bg-primary/90 transition-colors font-medium shadow-md hover:shadow-lg"
+                className="w-full bg-[#003AB7] text-white py-3 rounded-lg hover:bg-[#002A8F] active:bg-[#001F70] transition-colors font-medium shadow-md hover:shadow-lg active:shadow-inner"
               >
                 Sign In
               </button>

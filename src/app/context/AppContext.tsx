@@ -30,6 +30,7 @@ interface AppContextType {
   login: (email: string, password: string, role: 'admin' | 'student', studentInfo?: { displayName?: string; phone?: string; trackingCode?: string }) => void;
   logout: () => void;
   universities: University[];
+  setUniversities: (updater: (prev: University[]) => University[]) => void;
   updateUniversity: (id: string, updates: Partial<University>) => void;
   addUniversities: (universities: University[]) => void;
   registrations: Registration[];
@@ -95,6 +96,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const addUniversities = (universities: University[]) => {
     setUniversities(prev => [...prev, ...universities]);
+  };
+
+  const updateUniversitiesList = (updater: (prev: University[]) => University[]) => {
+    setUniversities(prev => updater(prev));
   };
 
   const registerForUniversity = (universityId: string, selectedFees?: {
@@ -196,6 +201,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         login,
         logout,
         universities,
+        setUniversities: updateUniversitiesList,
         updateUniversity,
         addUniversities,
         registrations,

@@ -4,11 +4,14 @@ import { useApp, University } from '../context/AppContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useLanguage } from '../context/LanguageContext';
 import { generateUniqueTrackingCode, saveTrackingCode } from '../services/trackingCodeService';
-import RecommendedSchools from '../components/RecommendedSchools';
+import TBTLogo from '../components/TBTLogo';
+import Statistics from '../components/Statistics';
+import UniversityPartners from '../components/UniversityPartners';
+import Testimonials from '../components/Testimonials';
+import EnhancedFooter from '../components/EnhancedFooter';
 import {
   GraduationCap,
   Phone,
-  User,
   Search,
   ChevronRight,
   Calculator,
@@ -16,8 +19,6 @@ import {
   Award,
   TrendingUp,
   CheckCircle2,
-  ArrowRight,
-  PhoneCall,
   Mail
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -273,321 +274,286 @@ export default function PublicOnboarding() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100">
-      {/* Marketing Banner */}
-      <div className="relative w-full bg-gradient-to-r from-primary to-blue-700 text-white overflow-hidden">
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNncmlkKSIvPjwvc3ZnPg==')] bg-repeat"></div>
-        </div>
-        
-        <div className="container mx-auto px-4 py-8 relative z-10">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex-1 text-center md:text-left">
-              <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full mb-4">
-                <Award className="w-5 h-5" />
-                <span className="text-sm font-semibold">
-                  {language === 'vi' ? '🇰🇷 Du Học Hàn Quốc - Cơ Hội Vàng!' : language === 'ko' ? '🇰🇷 한국 유학 - 황금 기회!' : '🇰🇷 Study in Korea - Golden Opportunity!'}
+    <div className="min-h-screen bg-white">
+      {/* Header - Fixed Position */}
+      <div className="fixed top-0 left-0 right-0 w-full h-20 bg-white border-b border-[#558EFF] z-50">
+        <div className="container mx-auto px-6 lg:px-12 h-full flex items-center justify-between">
+          {/* Logo/Brand */}
+          <TBTLogo size="md" variant="full" />
+
+          {/* Right Actions */}
+          <div className="flex items-center space-x-6">
+            {/* Language Switcher */}
+            <div className="relative group">
+              <button className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-[#F8F9FA] transition-colors border border-[#558EFF]">
+                <Globe className="w-5 h-5 text-[#003AB7]" />
+                <span className="text-sm font-medium text-[#003AB7] font-['Be_Vietnam_Pro']">
+                  🇻🇳 VI
                 </span>
-              </div>
-              <h1 className="text-3xl md:text-4xl font-bold mb-3">
-                {language === 'vi' ? 'Du Học Châu Á - Tương Lai Của Bạn Bắt Đầu Tại Đây!' : language === 'ko' ? '아시아 유학 - 당신의 미래는 여기서 시작됩니다!' : 'Study in Asia - Your Future Starts Here!'}
-              </h1>
-              <p className="text-lg text-blue-100 mb-4">
-                {language === 'vi' ? 'Ajou University & 50+ trường hàng đầu Châu Á' : language === 'ko' ? 'Ajou 대학교 및 아시아 상위 50개 이상의 대학' : 'Ajou University & 50+ Top Asian Universities'}
-              </p>
-              <div className="flex flex-wrap gap-4 items-center justify-center md:justify-start text-sm">
-                <div className="flex items-center gap-2">
-                  <PhoneCall className="w-4 h-4" />
-                  <span className="font-semibold">0123-456-789</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Mail className="w-4 h-4" />
-                  <span>contact@duhoc.vn</span>
-                </div>
-              </div>
+              </button>
             </div>
-            <button
-              onClick={() => document.getElementById('onboarding-form')?.scrollIntoView({ behavior: 'smooth' })}
-              className="flex items-center gap-2 bg-white text-primary px-8 py-4 rounded-full font-bold text-lg shadow-xl hover:shadow-2xl hover:scale-105 transition-all"
-            >
-              <PhoneCall className="w-5 h-5" />
-              {language === 'vi' ? 'Tư Vấn Miễn Phí' : language === 'ko' ? '무료 상담' : 'Free Consultation'}
-              <ArrowRight className="w-5 h-5" />
-            </button>
           </div>
         </div>
       </div>
+      
+      {/* Hero Section with Background Image - Below Header */}
+      <div className="relative w-full h-[600px] overflow-hidden mt-20">
+        <img 
+          src="https://api.builder.io/api/v1/image/assets/TEMP/837bae42c20ab2474078bc4c99a3b73de0e38775?width=3840" 
+          alt="Hero Banner" 
+          className="w-full h-full object-cover"
+        />
+      </div>
 
-      <div className="container mx-auto px-4 py-8 md:py-12">
-        <div className="max-w-7xl mx-auto">
-          {/* Main Form Section */}
-          <div id="onboarding-form" className="bg-white rounded-2xl shadow-xl border border-slate-200 p-6 md:p-10 mb-8">
-            <div className="text-center mb-8">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-primary to-blue-700 rounded-2xl mb-4">
-                <GraduationCap className="w-8 h-8 text-white" />
-              </div>
-              <h2 className="text-3xl font-bold text-slate-900 mb-2">
-                {language === 'vi' ? 'Đăng Ký Tư Vấn Du Học' : language === 'ko' ? '유학 상담 신청' : 'Register for Study Abroad Consultation'}
-              </h2>
-              <p className="text-slate-600">
-                {language === 'vi' ? 'Điền thông tin để nhận tư vấn chi tiết về chi phí và lộ trình du học' : language === 'ko' ? '비용 및 유학 과정에 대한 자세한 상담을 받으려면 정보를 입력하세요' : 'Fill in your information to receive detailed consultation on costs and study abroad roadmap'}
-              </p>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Full Name */}
-                <div>
-                  <label className="block mb-2 text-sm font-semibold text-slate-700">
-                    <User className="w-4 h-4 inline mr-2" />
-                    {language === 'vi' ? 'Họ và tên' : language === 'ko' ? '이름' : 'Full Name'} <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-50 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
-                    placeholder={language === 'vi' ? 'Nguyễn Văn A' : language === 'ko' ? '홍길동' : 'John Doe'}
-                    required
-                  />
-                </div>
-
-                {/* Phone Number */}
-                <div>
-                  <label className="block mb-2 text-sm font-semibold text-slate-700">
-                    <Phone className="w-4 h-4 inline mr-2" />
-                    {language === 'vi' ? 'Số điện thoại' : language === 'ko' ? '전화번호' : 'Phone Number'} <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="tel"
-                    value={phoneNumber}
-                    onChange={(e) => handlePhoneChange(e.target.value)}
-                    className={`w-full px-4 py-3 bg-slate-50 rounded-lg border transition-all ${
-                      phoneError ? 'border-red-500 focus:ring-red-500/50' : 'border-slate-300 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary'
-                    }`}
-                    placeholder="+84 987 654 321 hoặc 0987654321"
-                    required
-                  />
-                  {phoneError && (
-                    <p className="text-red-500 text-xs mt-1">{phoneError}</p>
-                  )}
-                </div>
+      {/* Registration Form Card - Centered on Page */}
+      <div className="relative -mt-48 mb-16">
+        <div className="container mx-auto px-4">
+          <div className="max-w-[1366px] mx-auto">
+            <div className="bg-white rounded-[30px] border border-[#558EFF] shadow-[14px_22px_25px_-9px_rgba(85,142,255,0.25)] p-8 md:p-12">
+              
+              {/* Form Header */}
+              <div className="text-center mb-8">
+                <h2 className="text-2xl font-bold text-[#003AB7] mb-3 font-['Be_Vietnam_Pro']">
+                  ĐĂNG KÝ TƯ VẤN DU HỌC
+                </h2>
+                <p className="text-sm text-[#4D4D4D] font-['Be_Vietnam_Pro']">
+                  Điền thông tin để nhận tư vấn chi tiết về chi phí và lộ trình du học
+                </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* System Dropdown */}
-                <div>
-                  <label className="block mb-2 text-sm font-semibold text-slate-700">
-                    <Globe className="w-4 h-4 inline mr-2" />
-                    {language === 'vi' ? 'Hệ visa / Chương trình' : language === 'ko' ? '비자 시스템 / 프로그램' : 'Visa System / Program'}
-                  </label>
-                  <select
-                    value={selectedSystem}
-                    onChange={(e) => setSelectedSystem(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-50 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
-                  >
-                    {VISA_SYSTEMS.map(system => (
-                      <option key={system.value} value={system.value}>
-                        {getLabel(system, 'label')}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* TOPIK Level */}
-                <div>
-                  <label className="block mb-2 text-sm font-semibold text-slate-700">
-                    <Award className="w-4 h-4 inline mr-2" />
-                    {language === 'vi' ? 'Trình độ TOPIK' : language === 'ko' ? 'TOPIK 레벨' : 'TOPIK Level'}
-                  </label>
-                  <select
-                    value={topikLevel}
-                    onChange={(e) => setTopikLevel(Number(e.target.value))}
-                    className="w-full px-4 py-3 bg-slate-50 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
-                  >
-                    {TOPIK_LEVELS.map(level => (
-                      <option key={level.value} value={level.value}>
-                        {getLabel(level, 'label')}
-                      </option>
-                    ))}
-                  </select>
-                  {topikLevel >= 5 && (
-                    <p className="text-green-600 text-xs mt-1 flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3" />
-                      {language === 'vi' ? `Đủ điều kiện giảm ${topikLevel === 5 ? '40%' : '50%'} học phí!` : language === 'ko' ? `${topikLevel === 5 ? '40%' : '50%'} 장학금 자격!` : `Eligible for ${topikLevel === 5 ? '40%' : '50%'} scholarship!`}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Desired University */}
-              <div>
-                <label className="block mb-2 text-sm font-semibold text-slate-700">
-                  <Search className="w-4 h-4 inline mr-2" />
-                  {language === 'vi' ? 'Trường mong muốn' : language === 'ko' ? '희망 대학' : 'Desired University'}
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={universitySearch}
-                    onChange={(e) => setUniversitySearch(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-50 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
-                    placeholder={language === 'vi' ? 'Tìm kiếm trường...' : language === 'ko' ? '대학 검색...' : 'Search university...'}
-                  />
-                  {universitySearch && (
-                    <div className="absolute z-20 w-full mt-2 bg-white border border-slate-200 rounded-lg shadow-xl max-h-64 overflow-y-auto">
-                      {searchableUniversities.slice(0, 10).map(uni => (
-                        <button
-                          key={uni.id}
-                          type="button"
-                          onClick={() => {
-                            setDesiredUniversity(uni.id);
-                            setUniversitySearch('');
-                          }}
-                          className="w-full text-left px-4 py-3 hover:bg-blue-50 transition-colors border-b border-slate-100 last:border-0"
-                        >
-                          <div className="font-semibold text-slate-900">{uni.name}</div>
-                          <div className="text-xs text-slate-600">{uni.country} • {uni.ranking}</div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                
-                {/* Selected University Display */}
-                {selectedUni && (
-                  <div className="mt-3 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                    <div className="flex items-start gap-3">
-                      <div className="w-12 h-12 bg-gradient-to-br from-primary to-blue-700 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <GraduationCap className="w-6 h-6 text-white" />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-bold text-slate-900">{selectedUni.name}</h4>
-                        <p className="text-sm text-slate-600">{selectedUni.country} • {selectedUni.ranking}</p>
-                      </div>
-                    </div>
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Full Name */}
+                  <div>
+                    <label className="block mb-2 text-sm font-bold text-[#4D4D4D] font-['Be_Vietnam_Pro']">
+                      Họ và tên <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      className="w-full px-4 py-3 bg-[#F8F9FA] rounded-lg border border-[#558EFF] focus:outline-none focus:ring-2 focus:ring-[#558EFF]/50 focus:border-[#003AB7] transition-all font-['Be_Vietnam_Pro']"
+                      placeholder="Nguyễn Văn A"
+                      required
+                    />
                   </div>
-                )}
-              </div>
 
-              {/* Initial Costs Section */}
-              {initialCost > 0 && (
-                <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl p-6 border border-emerald-200">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Calculator className="w-5 h-5 text-emerald-700" />
-                    <h3 className="text-lg font-bold text-emerald-900">
-                      {language === 'vi' ? 'Chi Phí Ước Tính Ban Đầu' : language === 'ko' ? '초기 예상 비용' : 'Initial Estimated Costs'}
-                    </h3>
+                  {/* Phone Number */}
+                  <div>
+                    <label className="block mb-2 text-sm font-bold text-[#4D4D4D] font-['Be_Vietnam_Pro']">
+                      Số điện thoại <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="tel"
+                      value={phoneNumber}
+                      onChange={(e) => handlePhoneChange(e.target.value)}
+                      className={`w-full px-4 py-3 bg-[#F8F9FA] rounded-lg border transition-all font-['Be_Vietnam_Pro'] ${
+                        phoneError ? 'border-red-500 focus:ring-red-500/50' : 'border-[#558EFF] focus:outline-none focus:ring-2 focus:ring-[#558EFF]/50 focus:border-[#003AB7]'
+                      }`}
+                      placeholder="+84 987 654 321 hoặc 0987654321"
+                      required
+                    />
+                    {phoneError && (
+                      <p className="text-red-500 text-xs mt-1 font-['Be_Vietnam_Pro']">{phoneError}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* System Dropdown */}
+                  <div>
+                    <label className="block mb-2 text-sm font-bold text-[#4D4D4D] font-['Be_Vietnam_Pro']">
+                      Hệ visa / Chương trình
+                    </label>
+                    <select
+                      value={selectedSystem}
+                      onChange={(e) => setSelectedSystem(e.target.value)}
+                      className="w-full px-4 py-3 bg-[#F8F9FA] rounded-lg border border-[#558EFF] focus:outline-none focus:ring-2 focus:ring-[#558EFF]/50 focus:border-[#003AB7] transition-all font-['Be_Vietnam_Pro']"
+                    >
+                      {VISA_SYSTEMS.map(system => (
+                        <option key={system.value} value={system.value}>
+                          {getLabel(system, 'label')}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* TOPIK Level */}
+                  <div>
+                    <label className="block mb-2 text-sm font-bold text-[#4D4D4D] font-['Be_Vietnam_Pro']">
+                      Trình độ TOPIK
+                    </label>
+                    <select
+                      value={topikLevel}
+                      onChange={(e) => setTopikLevel(Number(e.target.value))}
+                      className="w-full px-4 py-3 bg-[#F8F9FA] rounded-lg border border-[#558EFF] focus:outline-none focus:ring-2 focus:ring-[#558EFF]/50 focus:border-[#003AB7] transition-all font-['Be_Vietnam_Pro']"
+                    >
+                      {TOPIK_LEVELS.map(level => (
+                        <option key={level.value} value={level.value}>
+                          {getLabel(level, 'label')}
+                        </option>
+                      ))}
+                    </select>
+                    {topikLevel >= 5 && (
+                      <p className="text-green-600 text-xs mt-1 flex items-center gap-1 font-['Be_Vietnam_Pro']">
+                        <CheckCircle2 className="w-3 h-3" />
+                        {language === 'vi' ? `Đủ điều kiện giảm ${topikLevel === 5 ? '40%' : '50%'} học phí!` : language === 'ko' ? `${topikLevel === 5 ? '40%' : '50%'} 장학금 자격!` : `Eligible for ${topikLevel === 5 ? '40%' : '50%'} scholarship!`}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Desired University */}
+                <div>
+                  <label className="block mb-2 text-sm font-bold text-[#4D4D4D] font-['Be_Vietnam_Pro']">
+                    Trường mong muốn
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={universitySearch}
+                      onChange={(e) => setUniversitySearch(e.target.value)}
+                      className="w-full px-4 py-3 bg-[#F8F9FA] rounded-lg border border-[#558EFF] focus:outline-none focus:ring-2 focus:ring-[#558EFF]/50 focus:border-[#003AB7] transition-all font-['Be_Vietnam_Pro']"
+                      placeholder="Tìm kiếm trường..."
+                    />
+                    {universitySearch && (
+                      <div className="absolute z-20 w-full mt-2 bg-white border border-[#558EFF] rounded-lg shadow-xl max-h-64 overflow-y-auto">
+                        {searchableUniversities.slice(0, 10).map(uni => (
+                          <button
+                            key={uni.id}
+                            type="button"
+                            onClick={() => {
+                              setDesiredUniversity(uni.id);
+                              setUniversitySearch('');
+                            }}
+                            className="w-full text-left px-4 py-3 hover:bg-[#F8F9FA] transition-colors border-b border-[#558EFF]/20 last:border-0 font-['Be_Vietnam_Pro']"
+                          >
+                            <div className="font-bold text-[#003AB7]">{uni.name}</div>
+                            <div className="text-xs text-[#4D4D4D]">{uni.country} • {uni.ranking}</div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   
-                  <div className="space-y-3">
-                    {/* Common Costs */}
-                    {selectedSystem === 'D4-1' && (
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="text-slate-700">
-                          {language === 'vi' ? '📚 Khóa học tiếng Hàn' : language === 'ko' ? '📚 한국어 코스' : '📚 Korean Language Course'}
-                        </span>
-                        <span className="font-semibold text-slate-900">~13,000,000 VND</span>
-                      </div>
-                    )}
-                    
-                    {/* System Costs */}
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-slate-700">
-                        {language === 'vi' ? '🎓 Chi phí hệ thống' : language === 'ko' ? '🎓 시스템 비용' : '🎓 System Costs'}
-                      </span>
-                      <span className="font-semibold text-slate-900">
-                        {selectedSystem === 'D2-2' ? (language === 'vi' ? 'Học phí đại học' : language === 'ko' ? '학부 등록금' : 'Undergraduate Tuition') : 
-                         selectedSystem === 'D2-3' ? (language === 'vi' ? 'Học phí sau đại học' : language === 'ko' ? '대학원 등록금' : 'Graduate Tuition') :
-                         (language === 'vi' ? 'Học phí khóa học' : language === 'ko' ? '과정 수업료' : 'Course Tuition')}
-                      </span>
-                    </div>
-
-                    {/* Scholarship Discount */}
-                    {topikLevel >= 5 && (
-                      <div className="flex justify-between items-center text-sm text-green-700">
-                        <span className="flex items-center gap-1">
-                          <CheckCircle2 className="w-4 h-4" />
-                          {language === 'vi' ? `Học bổng TOPIK ${topikLevel}` : language === 'ko' ? `TOPIK ${topikLevel} 장학금` : `TOPIK ${topikLevel} Scholarship`}
-                        </span>
-                        <span className="font-semibold">-{topikLevel === 5 ? '40%' : '50%'}</span>
-                      </div>
-                    )}
-
-                    <div className="pt-3 border-t border-emerald-300">
-                      <div className="flex justify-between items-center">
-                        <span className="font-bold text-emerald-900">
-                          {language === 'vi' ? 'Tổng Chi Phí Ban Đầu:' : language === 'ko' ? '초기 총 비용:' : 'Initial Total Cost:'}
-                        </span>
-                        <div className="text-right">
-                          <div className="text-2xl font-bold text-emerald-700">
-                            {formatFrom(initialCost, 'VND')}
-                          </div>
-                          {currency !== 'VND' && (
-                            <div className="text-xs text-emerald-600">
-                              ≈ {new Intl.NumberFormat('vi-VN', {
-                                style: 'currency',
-                                currency: 'VND',
-                                minimumFractionDigits: 0,
-                                maximumFractionDigits: 0,
-                              }).format(initialCost)}
-                            </div>
-                          )}
+                  {/* Selected University Display */}
+                  {selectedUni && (
+                    <div className="mt-3 p-4 bg-[#F8F9FA] rounded-lg border border-[#558EFF]">
+                      <div className="flex items-start gap-3">
+                        <div className="w-12 h-12 bg-gradient-to-br from-[#003AB7] to-[#558EFF] rounded-lg flex items-center justify-center flex-shrink-0">
+                          <GraduationCap className="w-6 h-6 text-white" />
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-bold text-[#003AB7] font-['Be_Vietnam_Pro']">{selectedUni.name}</h4>
+                          <p className="text-sm text-[#4D4D4D] font-['Be_Vietnam_Pro']">{selectedUni.country} • {selectedUni.ranking}</p>
                         </div>
                       </div>
                     </div>
-                  </div>
-
-                  <p className="text-xs text-slate-600 mt-3 italic">
-                    {language === 'vi' ? '* Chưa bao gồm chi phí bổ sung (KTX, vé máy bay, v.v.). Xem chi tiết đầy đủ sau khi Tra Cứu.' : 
-                     language === 'ko' ? '* 추가 비용(기숙사, 항공권 등) 미포함. 조회 후 전체 세부정보를 확인하세요.' : 
-                     '* Does not include additional costs (dorm, flight, etc.). See full details after查询.'}
-                  </p>
+                  )}
                 </div>
-              )}
 
-              {/* Submit Button */}
-              <button
-                type="submit"
-                className="w-full bg-gradient-to-r from-primary to-blue-700 text-white py-4 rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all font-bold text-lg shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
-              >
-                <TrendingUp className="w-5 h-5" />
-                {language === 'vi' ? 'Tra Cứu Chi Tiết' : language === 'ko' ? '세부 정보 조회' : 'View Full Details'}
-                <ChevronRight className="w-5 h-5" />
-              </button>
-            </form>
-          </div>
-
-          {/* Recommended Schools - NEW CARD GRID COMPONENT */}
-          <RecommendedSchools
-            onUniversitySelect={(uniId) => {
-              setDesiredUniversity(uniId);
-              // Scroll back to the form
-              document.getElementById('onboarding-form')?.scrollIntoView({ behavior: 'smooth' });
-            }}
-          />
-
-          {/* Footer Links */}
-          <div className="mt-8 text-center space-y-2">
-            <button
-              onClick={() => navigate('/student/lookup')}
-              className="block text-sm text-primary hover:text-blue-700 transition-colors underline mx-auto"
-            >
-              {language === 'vi' ? '📊 Tra Cứu Trạng Thái Hồ Sơ' :
-               language === 'ko' ? '📊 신청 현황 조회' :
-               '📊 Check Application Status'}
-            </button>
-            <button
-              onClick={() => navigate('/login')}
-              className="block text-sm text-slate-600 hover:text-primary transition-colors underline mx-auto"
-            >
-              {language === 'vi' ? '🔐 Đăng Nhập Quản Trị Viên / Học Viên' :
-               language === 'ko' ? '🔐 관리자 / 학생 로그인' :
-               '🔐 Admin / Student Login'}
-            </button>
+                {/* Submit Button */}
+                <button
+                  type="submit"
+                  className="w-full bg-gradient-to-r from-[#003AB7] to-[#558EFF] text-white py-4 rounded-xl hover:from-[#002A8F] hover:to-[#447DFF] transition-all font-bold text-lg shadow-lg hover:shadow-xl flex items-center justify-center gap-2 font-['Be_Vietnam_Pro']"
+                >
+                  <TrendingUp className="w-5 h-5" />
+                  Tra Cứu Chi Tiết
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </form>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* University Showcase Section */}
+      <div className="mb-16">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl md:text-3xl font-bold text-[#003AB7] mb-3 font-['Be_Vietnam_Pro']">
+              TRƯỜNG TOP VISA TẠI HÀN QUỐC
+            </h2>
+            <p className="text-sm text-[#4D4D4D] font-['Be_Vietnam_Pro']">
+              Các trường đại học phổ biến được học viên Việt Nam lựa chọn
+            </p>
+          </div>
+
+          {/* University Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {searchableUniversities.slice(0, 9).map((uni, index) => (
+              <div 
+                key={uni.id}
+                className="bg-white rounded-[20px] border-2 border-[#558EFF] shadow-[14px_22px_25px_-9px_rgba(85,142,255,0.25)] overflow-hidden hover:shadow-xl transition-all cursor-pointer group"
+                onClick={() => {
+                  setDesiredUniversity(uni.id);
+                  document.getElementById('onboarding-form')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+              >
+                {/* University Image Placeholder */}
+                <div className="h-48 bg-gradient-to-br from-[#003AB7] to-[#558EFF] flex items-center justify-center">
+                  <GraduationCap className="w-16 h-16 text-white opacity-50" />
+                </div>
+                
+                {/* University Info */}
+                <div className="p-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className={`text-xs font-bold px-2 py-1 rounded ${
+                      index === 0 ? 'bg-yellow-100 text-yellow-800' :
+                      index === 1 ? 'bg-gray-100 text-gray-800' :
+                      index === 2 ? 'bg-orange-100 text-orange-800' :
+                      'bg-blue-100 text-blue-800'
+                    } font-['Be_Vietnam_Pro']`}>
+                      {index === 0 ? 'TOP 1' : index === 1 ? 'TOP 2' : index === 2 ? 'TOP 3' : `TOP ${index + 1}`}
+                    </span>
+                    <span className="text-xs text-[#4D4D4D] font-['Be_Vietnam_Pro']">Seoul</span>
+                  </div>
+                  
+                  <h3 className="font-bold text-[#003AB7] mb-2 font-['Be_Vietnam_Pro'] line-clamp-2">
+                    {uni.name}
+                  </h3>
+                  
+                  <p className="text-xs text-[#4D4D4D] mb-4 font-['Be_Vietnam_Pro']">
+                    {uni.country} • {uni.ranking}
+                  </p>
+                  
+                  <button className="w-full bg-[#F8F9FA] text-[#003AB7] py-2 rounded-lg hover:bg-[#003AB7] hover:text-white transition-all font-bold text-sm font-['Be_Vietnam_Pro'] group-hover:bg-[#003AB7] group-hover:text-white">
+                    Tìm hiểu thêm
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Statistics Section */}
+      <Statistics />
+
+      {/* University Partners Section */}
+      <UniversityPartners />
+
+      {/* Testimonials Section */}
+      <Testimonials />
+
+      {/* Footer Links */}
+      <div className="text-center space-y-4 mb-8">
+        <button
+          onClick={() => navigate('/student/lookup')}
+          className="block text-sm text-[#003AB7] hover:text-[#002A8F] transition-colors underline mx-auto font-['Be_Vietnam_Pro']"
+        >
+          📊 Tra Cứu Trạng Thái Hồ Sơ
+        </button>
+        <button
+          onClick={() => navigate('/login')}
+          className="block text-sm text-[#4D4D4D] hover:text-[#003AB7] transition-colors underline mx-auto font-['Be_Vietnam_Pro']"
+        >
+          🔐 Đăng Nhập Quản Trị Viên / Học Viên
+        </button>
+      </div>
+
+      {/* Enhanced Footer */}
+      <EnhancedFooter />
     </div>
   );
 }

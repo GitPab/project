@@ -15,6 +15,79 @@ import {
 import { toast } from 'sonner';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../components/ui/accordion';
 
+// Inline cost calculation to avoid import issues
+interface SimpleCostCalculation {
+  amount: number;
+  currency: string;
+  systemsIncluded: string[];
+}
+
+function calculateSimpleUniversityCost(university: any): SimpleCostCalculation {
+  // Calculate total from legacy fields
+  const generalTuition = university.generalTuition || 0;
+  const visaFee = university.visaFee || 0;
+  const accommodationFee = university.accommodationFee || 0;
+  const insuranceFee = university.insuranceFee || 0;
+  
+  // Calculate additional fees
+  let additionalFeesTotal = 0;
+  if (university.additionalFees && Array.isArray(university.additionalFees)) {
+    additionalFeesTotal = university.additionalFees.reduce((sum: number, fee: any) => sum + (fee.amount || 0), 0);
+  }
+  
+  // Calculate systems-based costs if available
+  let systemsTotal = 0;
+  let systemsIncluded: string[] = [];
+  
+  if (university.systems && Array.isArray(university.systems)) {
+    const availableSystems = university.systems.filter((system: any) => system.available);
+    systemsIncluded = availableSystems.map((system: any) => system.code);
+    
+    availableSystems.forEach((system: any) => {
+      if (system.fees && Array.isArray(system.fees)) {
+        system.fees.forEach((fee: any) => {
+          let feeAmount = 0;
+          
+          switch (fee.type) {
+            case 'fixed':
+              feeAmount = fee.base_value || 0;
+              break;
+            case 'optional':
+              if (fee.required || fee.default_selected) {
+                feeAmount = fee.base_value || 0;
+              }
+              break;
+            case 'optional_multiple':
+            case 'variable_time':
+              const defaultOption = fee.options?.find((opt: any) => opt.id === fee.default_selected) || fee.options?.[0];
+              if (defaultOption) {
+                feeAmount = defaultOption.value || 0;
+              }
+              break;
+            case 'percentage':
+              const defaultCondition = fee.conditions?.[0];
+              if (defaultCondition) {
+                feeAmount = -((fee.base_value || 0) * (defaultCondition.percentage || 0)) / 100;
+              }
+              break;
+          }
+          
+          systemsTotal += feeAmount;
+        });
+      }
+    });
+  }
+  
+  // Use systems-based calculation if available, otherwise use legacy
+  const totalAmount = systemsTotal > 0 ? systemsTotal : (generalTuition + visaFee + accommodationFee + insuranceFee + additionalFeesTotal);
+  
+  return {
+    amount: totalAmount,
+    currency: 'VND',
+    systemsIncluded
+  };
+}
+
 // Icon mapping
 const iconMap: Record<string, React.ComponentType<any>> = {
   GraduationCap, Scale, Microscope, Cpu, TrendingUp, Lightbulb, Zap, Atom, BarChart3, Rocket,
@@ -34,6 +107,9 @@ export default function UniversityDetail() {
   const [dormMonths, setDormMonths] = useState<Record<string, number>>({});
 
   const university = universities.find(uni => uni.id === id);
+  
+  // Calculate merged cost
+  const mergedCost = calculateSimpleUniversityCost(university);
 
   const availableVisaSystems = useMemo(() =>
     university?.koreanData?.visaSystems?.filter((v: any) => v.selectable !== false) || [],
@@ -50,7 +126,7 @@ export default function UniversityDetail() {
           <p className="text-xl text-slate-600">University not found</p>
           <button 
             onClick={() => navigate(-1)}
-            className="mt-4 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
+            className="mt-4 px-4 py-2 bg-white text-[#003AB7] rounded-lg hover:bg-[#003AB7] hover:text-white"
           >
             Go Back
           </button>
@@ -230,7 +306,7 @@ export default function UniversityDetail() {
             {isKorean && university.koreanData?.address && (
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <MapPin className="w-5 h-5 text-primary" />
+                  <MapPin className="w-5 h-5 text-[#003AB7]" />
                   <span className="font-semibold text-slate-700">Địa chỉ:</span>
                 </div>
                 <p className="text-slate-600 ml-7">{university.koreanData.address}</p>
@@ -239,13 +315,13 @@ export default function UniversityDetail() {
 
             <div className="md:col-span-2">
               <div className="flex items-center gap-2 mb-2">
-                <GraduationCap className="w-5 h-5 text-primary" />
+                <GraduationCap className="w-5 h-5 text-[#003AB7]" />
                 <span className="font-semibold text-slate-700">Định hướng học thuật:</span>
               </div>
               <div className="ml-7 space-y-2">
                 {university.academicPrograms.map((program, idx) => (
                   <div key={idx} className="flex items-start gap-2">
-                    <div className="text-primary mt-0.5">{IconComponent(program.icon)}</div>
+                    <div className="text-[#003AB7] mt-0.5">{IconComponent(program.icon)}</div>
                     <div>
                       <p className="font-medium text-slate-800">{program.title}</p>
                       <p className="text-sm text-slate-600">{program.description}</p>
@@ -275,8 +351,8 @@ export default function UniversityDetail() {
                     onClick={() => setSelectedVisaType(system.visaType)}
                     className={`p-4 rounded-lg border-2 transition-all ${
                       selectedVisaType === system.visaType
-                        ? 'border-primary bg-blue-50 shadow-md'
-                        : 'border-slate-200 hover:border-primary/50 hover:bg-slate-50'
+                        ? 'border-[#003AB7] bg-blue-50 shadow-md'
+                        : 'border-slate-200 hover:border-[#003AB7]/50 hover:bg-slate-50'
                     }`}
                   >
                     <div className="font-bold text-lg text-slate-900">{system.visaType}</div>
@@ -393,7 +469,7 @@ export default function UniversityDetail() {
                   <AccordionTrigger className="px-6 py-4 hover:no-underline">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                        <Plus className="w-5 h-5 text-green-600" />
+                        <Plus className="w-5 h-5 text-white" />
                       </div>
                       <div className="text-left">
                         <h3 className="text-lg font-semibold text-slate-900">Chi phí tùy chọn (Optional Add-ons)</h3>
@@ -410,7 +486,7 @@ export default function UniversityDetail() {
                           id="scholarship-toggle"
                           checked={topikLevel !== null}
                           onChange={(e) => setTopikLevel(e.target.checked ? 0 : null)}
-                          className="mt-1 w-5 h-5 text-primary rounded focus:ring-primary"
+                          className="mt-1 w-5 h-5 text-[#003AB7] rounded focus:ring-primary"
                         />
                         <div className="flex-1">
                           <label htmlFor="scholarship-toggle" className="font-semibold text-slate-900 cursor-pointer block mb-2">
@@ -455,7 +531,7 @@ export default function UniversityDetail() {
                                 id={addon.id}
                                 checked={selectedAddons[addon.id] || false}
                                 onChange={() => toggleAddon(addon.id, addon)}
-                                className="mt-1 w-5 h-5 text-primary rounded focus:ring-primary"
+                                className="mt-1 w-5 h-5 text-[#003AB7] rounded focus:ring-primary"
                               />
                               <div className="flex-1">
                                 <label htmlFor={addon.id} className="font-medium text-slate-800 cursor-pointer block mb-2">
@@ -467,7 +543,7 @@ export default function UniversityDetail() {
                                   <div className="space-y-3 mt-3 p-3 bg-slate-50 rounded-lg">
                                     <div>
                                       <label className="text-sm font-medium text-slate-700 block mb-2">
-                                        Số tháng: <span className="font-bold text-primary">{dormMonths[addon.id] || 6}</span>
+                                        Số tháng: <span className="font-bold text-[#003AB7]">{dormMonths[addon.id] || 6}</span>
                                       </label>
                                       <input
                                         type="range"
@@ -556,30 +632,27 @@ export default function UniversityDetail() {
         ) : (
           // Traditional university costs
           <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-            <h2 className="text-2xl font-bold text-slate-900 mb-4">Chi phí</h2>
+            <h2 className="text-xl font-bold text-slate-900 mb-4">Cost Breakdown</h2>
             <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                <span className="text-slate-700">Học phí (Tuition)</span>
-                <span className="font-semibold text-slate-900">{formatFrom(university.generalTuition, 'USD')}</span>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                <span className="text-slate-700">Phí visa (Visa Fee)</span>
-                <span className="font-semibold text-slate-900">{formatFrom(university.visaFee, 'USD')}</span>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                <span className="text-slate-700">Chỗ ở (Accommodation)</span>
-                <span className="font-semibold text-slate-900">{formatFrom(university.accommodationFee, 'USD')}</span>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                <span className="text-slate-700">Bảo hiểm (Insurance)</span>
-                <span className="font-semibold text-slate-900">{formatFrom(university.insuranceFee, 'USD')}</span>
-              </div>
-              {university.additionalFees && university.additionalFees.map((fee: any, idx: number) => (
-                <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                  <span className="text-slate-700">{fee.type}</span>
-                  <span className="font-semibold text-slate-900">{formatFrom(fee.amount, 'USD')}</span>
+              <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
+                <div className="flex items-center gap-3">
+                  <DollarSign className="w-5 h-5 text-blue-600" />
+                  <span className="text-slate-700 font-medium">Total Estimated Cost</span>
                 </div>
-              ))}
+                <span className="font-bold text-blue-600 text-lg">{formatFrom(mergedCost.amount, 'VND')}</span>
+              </div>
+              {mergedCost.systemsIncluded.length > 0 && (
+                <div className="p-4 bg-slate-50 rounded-lg">
+                  <span className="text-sm text-slate-600">Available Systems: </span>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {mergedCost.systemsIncluded.map((system, index) => (
+                      <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
+                        {system}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -596,7 +669,7 @@ export default function UniversityDetail() {
           {!isRegistered && user?.role === 'student' && (
             <button
               onClick={handleRegister}
-              className="w-full mt-4 px-6 py-4 bg-gradient-to-r from-primary to-blue-700 text-white rounded-xl hover:shadow-lg transition-all font-semibold text-lg flex items-center justify-center gap-2"
+              className="w-full mt-4 px-6 py-4 bg-gradient-to-r from-[#003AB7] to-[#558EFF] text-white rounded-xl hover:from-[#002A8F] hover:to-[#447DFF] transition-all font-semibold text-lg flex items-center justify-center gap-2"
             >
               <CheckCircle className="w-5 h-5" />
               Đăng ký ngay
@@ -605,8 +678,8 @@ export default function UniversityDetail() {
 
           {isRegistered && (
             <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-xl flex items-center gap-3">
-              <CheckCircle className="w-5 h-5 text-green-600" />
-              <span className="font-medium text-green-900">Bạn đã đăng ký chương trình này</span>
+              <CheckCircle className="w-5 h-5 text-white" />
+              <span className="font-medium text-white">Bạn đã đăng ký chương trình này</span>
             </div>
           )}
         </div>

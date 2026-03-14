@@ -61,7 +61,7 @@ export default function StudentTracking() {
     switch (status) {
       case 'pending': return 'bg-yellow-50 border-yellow-200 text-yellow-800';
       case 'in-review': return 'bg-blue-50 border-blue-200 text-blue-800';
-      case 'approved': return 'bg-green-50 border-green-200 text-green-800';
+      case 'approved': return 'bg-green-50 border-green-200 text-white';
       case 'contacted': return 'bg-purple-50 border-purple-200 text-purple-800';
       default: return 'bg-gray-50 border-gray-200 text-gray-800';
     }
@@ -114,7 +114,7 @@ export default function StudentTracking() {
                 </p>
                 <button
                   onClick={() => navigate('/')}
-                  className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+                  className="px-4 py-2 bg-white text-[#003AB7] border border-[#003AB7] rounded-lg hover:bg-[#003AB7] hover:text-white active:bg-[#002A8F] active:text-white transition-all duration-200 shadow-sm hover:shadow-md active:shadow-inner"
                 >
                   {language === 'vi' ? 'Quay lại' : language === 'ko' ? '돌아가기' : 'Go Back'}
                 </button>
@@ -157,7 +157,7 @@ export default function StudentTracking() {
                   title={language === 'vi' ? 'Sao chép' : language === 'ko' ? '복사' : 'Copy'}
                 >
                   {copied ? (
-                    <Check className="w-5 h-5 text-green-600" />
+                    <Check className="w-5 h-5 text-white" />
                   ) : (
                     <Copy className="w-5 h-5 text-slate-600" />
                   )}
@@ -174,12 +174,12 @@ export default function StudentTracking() {
 
             {/* Success Message */}
             <div className="bg-green-50 rounded-2xl shadow-lg border border-green-200 p-6 mb-6 flex items-start gap-4">
-              <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0 mt-1" />
+              <CheckCircle className="w-6 h-6 text-white flex-shrink-0 mt-1" />
               <div>
-                <h2 className="text-lg font-bold text-green-900 mb-2">
+                <h2 className="text-lg font-bold text-white mb-2">
                   {language === 'vi' ? 'Đăng ký thành công!' : language === 'ko' ? '등록 완료!' : 'Registration Complete!'}
                 </h2>
-                <p className="text-sm text-green-800">
+                <p className="text-sm text-white">
                   {language === 'vi'
                     ? 'Cảm ơn bạn đã đăng ký. Chúng tôi sẽ xem xét hồ sơ của bạn và liên hệ với bạn sớm.'
                     : language === 'ko'

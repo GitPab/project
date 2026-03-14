@@ -3,6 +3,21 @@
  */
 
 import { Currency, ProgressStatus } from './common';
+import type { FlexibleFee } from './fees';
+
+export interface UniversitySystem {
+  id: string;
+  code: string; // D4-1, D2-2, D2-3, etc.
+  name: string;
+  nameVi?: string;
+  nameKo?: string;
+  nameEn?: string;
+  description?: string;
+  available: boolean;
+  fees: FlexibleFee[];
+  createdAt?: string;
+  updatedAt?: string;
+}
 
 export interface AdditionalFee {
   type: string;
@@ -84,30 +99,21 @@ export interface University {
   id: string;
   name: string;
   koreanName?: string;
-  region?: string;
-  topTier?: 'Top1' | 'Top2' | 'Top3';
   country: string;
-  countryCode: string;
-  tagline: string;
-  thumbnail: string;
-  heroImage: string;
-  overview: string;
-  academicPrograms: AcademicProgram[];
-  galleryImages: string[];
-  ranking: string;
-  worldRanking: number;
-
-  // Traditional cost structure (for non-Korean universities)
-  generalTuition: number;
-  visaFee: number;
-  accommodationFee: number;
-  insuranceFee: number;
-  additionalFees: AdditionalFee[];
-
-  // Korean university data (optional)
+  region?: string;
+  ranking?: string;
+  description?: string;
+  
+  // New systems-based structure
+  systems: UniversitySystem[];
+  
+  // Legacy fields for backward compatibility
+  generalTuition?: number;
+  visaFee?: number;
+  accommodationFee?: number;
+  insuranceFee?: number;
+  additionalFees?: AdditionalFee[];
   koreanData?: KoreanUniversityData;
-
-  // Fixed costs for Korean universities (always apply)
   fixedCosts?: Array<{
     type: string;
     amount: number;
@@ -115,11 +121,8 @@ export interface University {
     category?: string;
     description?: string;
   }>;
-
-  // Optional add-ons for Korean universities
   optionalAddons?: OptionalAddon[];
-
-  majors?: string[]; // For search filtering
+  majors?: string[];
 }
 
 export interface Registration {

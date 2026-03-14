@@ -5,20 +5,20 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "./utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all duration-200 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive active:scale-95",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        default: "bg-[#003AB7] text-white hover:bg-[#002A8F] active:bg-[#001F70] shadow-sm hover:shadow-md active:shadow-inner",
         destructive:
-          "bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
+          "bg-[#DC3545] text-white hover:bg-[#C82333] active:bg-[#B02A37] focus-visible:ring-[#DC3545]/20 dark:focus-visible:ring-[#DC3545]/40 active:shadow-inner",
         outline:
-          "border bg-background text-foreground hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50",
+          "border border-[#003AB7] bg-white text-[#003AB7] hover:bg-[#003AB7] hover:text-white active:bg-[#002A8F] active:text-white active:border-[#002A8F] shadow-sm hover:shadow-md active:shadow-inner",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+          "bg-[#F8F9FA] text-[#003AB7] hover:bg-[#003AB7] hover:text-white active:bg-[#002A8F] active:text-white border border-[#003AB7] shadow-sm hover:shadow-md active:shadow-inner",
         ghost:
-          "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
-        link: "text-primary underline-offset-4 hover:underline",
+          "text-[#003AB7] hover:bg-[#F0F7FF] hover:text-[#002A8F] active:bg-[#E6F3FF] active:text-[#001F70]",
+        link: "text-[#003AB7] underline-offset-4 hover:underline active:text-[#002A8F]",
       },
       size: {
         default: "h-9 px-4 py-2 has-[>svg]:px-3",

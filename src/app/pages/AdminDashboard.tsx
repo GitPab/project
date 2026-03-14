@@ -15,13 +15,103 @@ import {
   RefreshCw,
   Upload,
   Edit,
+  Calculator,
+  TrendingUp,
+  TrendingDown,
+  Info,
 } from 'lucide-react';
 import type { University } from '../context/AppContext';
 import { toast } from 'sonner';
 import ImportUniversitiesModal from '../components/ImportUniversitiesModal';
 import UniversityForm from '../components/UniversityForm';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip';
 
-type SortKey = 'name' | 'country' | 'generalTuition' | 'lastUpdated';
+// Inline cost calculation to avoid import issues
+interface SimpleCostCalculation {
+  amount: number;
+  currency: string;
+  systemsIncluded: string[];
+}
+
+function calculateSimpleUniversityCost(university: any): SimpleCostCalculation {
+  // Calculate total from legacy fields
+  const generalTuition = university.generalTuition || 0;
+  const visaFee = university.visaFee || 0;
+  const accommodationFee = university.accommodationFee || 0;
+  const insuranceFee = university.insuranceFee || 0;
+  
+  // Calculate additional fees
+  let additionalFeesTotal = 0;
+  if (university.additionalFees && Array.isArray(university.additionalFees)) {
+    additionalFeesTotal = university.additionalFees.reduce((sum: number, fee: any) => sum + (fee.amount || 0), 0);
+  }
+  
+  // Calculate systems-based costs if available
+  let systemsTotal = 0;
+  let systemsIncluded: string[] = [];
+  
+  if (university.systems && Array.isArray(university.systems)) {
+    const availableSystems = university.systems.filter((system: any) => system.available);
+    systemsIncluded = availableSystems.map((system: any) => system.code);
+    
+    availableSystems.forEach((system: any) => {
+      if (system.fees && Array.isArray(system.fees)) {
+        system.fees.forEach((fee: any) => {
+          let feeAmount = 0;
+          
+          switch (fee.type) {
+            case 'fixed':
+              feeAmount = fee.base_value || 0;
+              break;
+            case 'optional':
+              if (fee.required || fee.default_selected) {
+                feeAmount = fee.base_value || 0;
+              }
+              break;
+            case 'optional_multiple':
+            case 'variable_time':
+              const defaultOption = fee.options?.find((opt: any) => opt.id === fee.default_selected) || fee.options?.[0];
+              if (defaultOption) {
+                feeAmount = defaultOption.value || 0;
+              }
+              break;
+            case 'percentage':
+              const defaultCondition = fee.conditions?.[0];
+              if (defaultCondition) {
+                feeAmount = -((fee.base_value || 0) * (defaultCondition.percentage || 0)) / 100;
+              }
+              break;
+          }
+          
+          systemsTotal += feeAmount;
+        });
+      }
+    });
+  }
+  
+  // Use systems-based calculation if available, otherwise use legacy
+  const totalAmount = systemsTotal > 0 ? systemsTotal : (generalTuition + visaFee + accommodationFee + insuranceFee + additionalFeesTotal);
+  
+  return {
+    amount: totalAmount,
+    currency: 'VND',
+    systemsIncluded
+  };
+}
+
+function generateSimpleCostTooltip(cost: SimpleCostCalculation): string {
+  let tooltip = `Estimated Total Cost: ${cost.amount.toLocaleString()} VND\n\n`;
+  
+  if (cost.systemsIncluded.length > 0) {
+    tooltip += `Systems: ${cost.systemsIncluded.join(', ')}\n`;
+  }
+  
+  tooltip += `Currency: ${cost.currency}`;
+  
+  return tooltip;
+}
+
+type SortKey = 'name' | 'country' | 'estimatedCost' | 'lastUpdated';
 type SortOrder = 'asc' | 'desc';
 
 export default function AdminDashboard() {
@@ -35,13 +125,30 @@ export default function AdminDashboard() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
 
+  // Calculate estimated costs for all universities
+  const costCalculations = useMemo(() => {
+    const calculations = new Map<string, SimpleCostCalculation>();
+    universities.forEach(university => {
+      try {
+        const cost = calculateSimpleUniversityCost(university);
+        calculations.set(university.id, cost);
+      } catch (err) {
+        console.error(`Error calculating cost for ${university.name}:`, err);
+        // Set default cost calculation
+        calculations.set(university.id, {
+          amount: 0,
+          currency: 'VND',
+          systemsIncluded: []
+        });
+      }
+    });
+    return calculations;
+  }, [universities]);
+
   // Calculate stats
   const totalUniversities = universities.length;
   const activeStudents = registrations.length;
-  const totalCostManaged = universities.reduce((sum, uni) => 
-    sum + uni.generalTuition + uni.visaFee + uni.accommodationFee + uni.insuranceFee +
-    uni.additionalFees.reduce((feeSum, fee) => feeSum + fee.amount, 0), 0
-  );
+  const totalCostManaged = Array.from(costCalculations.values()).reduce((sum, cost) => sum + cost.amount, 0);
   const pendingUpdates = 0; // Mock value
 
   // Filter and sort universities
@@ -64,9 +171,9 @@ export default function AdminDashboard() {
           aValue = a.country;
           bValue = b.country;
           break;
-        case 'generalTuition':
-          aValue = a.generalTuition;
-          bValue = b.generalTuition;
+        case 'estimatedCost':
+          aValue = costCalculations.get(a.id)?.amount || 0;
+          bValue = costCalculations.get(b.id)?.amount || 0;
           break;
         case 'lastUpdated':
           // Mock last updated dates
@@ -100,7 +207,8 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="space-y-6 p-6">
+    <TooltipProvider>
+      <div className="space-y-6 p-6">
       {/* Currency Toggle Button - Fixed Position */}
       <button
         onClick={toggleCurrency}
@@ -215,15 +323,13 @@ export default function AdminDashboard() {
                 </th>
                 <th 
                   className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider cursor-pointer hover:bg-slate-100"
-                  onClick={() => handleSort('generalTuition')}
+                  onClick={() => handleSort('estimatedCost')}
                 >
                   <div className="flex items-center gap-2">
-                    General Cost
-                    <SortIcon columnKey="generalTuition" />
+                    <Calculator className="w-4 h-4" />
+                    Estimated Total Cost
+                    <SortIcon columnKey="estimatedCost" />
                   </div>
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                  Additional Fees
                 </th>
                 <th 
                   className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider cursor-pointer hover:bg-slate-100"
@@ -253,26 +359,28 @@ export default function AdminDashboard() {
                     <span className="text-slate-700">{uni.country}</span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="font-semibold text-slate-900">
-                      {formatFrom(uni.generalTuition, 'VND')}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex flex-wrap gap-1">
-                      {uni.additionalFees.slice(0, 2).map((fee, idx) => (
-                        <span
-                          key={idx}
-                          className="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-50 text-blue-700 rounded"
-                        >
-                          {fee.type}: {formatFrom(fee.amount, 'VND')}
-                        </span>
-                      ))}
-                      {uni.additionalFees.length > 2 && (
-                        <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-slate-100 text-slate-600 rounded">
-                          +{uni.additionalFees.length - 2} more
-                        </span>
-                      )}
-                    </div>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center gap-2 cursor-help">
+                          <DollarSign className="w-4 h-4 text-slate-400" />
+                          <div>
+                            <div className="font-semibold text-blue-600">
+                              {formatFrom(costCalculations.get(uni.id)?.amount || 0, 'VND')}
+                            </div>
+                            {(costCalculations.get(uni.id)?.systemsIncluded.length || 0) > 0 && (
+                              <div className="text-xs text-slate-600">
+                                Systems: {costCalculations.get(uni.id)?.systemsIncluded.join(', ') || ''}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <pre className="text-xs whitespace-pre-wrap">
+                          {generateSimpleCostTooltip(costCalculations.get(uni.id) || { amount: 0, currency: 'VND', systemsIncluded: [] })}
+                        </pre>
+                      </TooltipContent>
+                    </Tooltip>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
                     {new Date().toLocaleDateString()}
@@ -339,5 +447,6 @@ export default function AdminDashboard() {
         />
       )}
     </div>
+  </TooltipProvider>
   );
 }

@@ -129,17 +129,98 @@ export default function UniversityDetailKorean() {
     });
   };
 
+  interface SimpleCostCalculation {
+    amount: number;
+    currency: string;
+    systemsIncluded: string[];
+  }
+
+  function calculateSimpleUniversityCost(university: any): SimpleCostCalculation {
+    // Calculate total from legacy fields
+    const generalTuition = university.generalTuition || 0;
+    const visaFee = university.visaFee || 0;
+    const accommodationFee = university.accommodationFee || 0;
+    const insuranceFee = university.insuranceFee || 0;
+  
+    // Calculate additional fees
+    let additionalFeesTotal = 0;
+    if (university.additionalFees && Array.isArray(university.additionalFees)) {
+      additionalFeesTotal = university.additionalFees.reduce((sum: number, fee: any) => sum + (fee.amount || 0), 0);
+    }
+  
+    // Calculate systems-based costs if available
+    let systemsTotal = 0;
+    let systemsIncluded: string[] = [];
+  
+    if (university.systems && Array.isArray(university.systems)) {
+      const availableSystems = university.systems.filter((system: any) => system.available);
+      systemsIncluded = availableSystems.map((system: any) => system.code);
+    
+      availableSystems.forEach((system: any) => {
+        if (system.fees && Array.isArray(system.fees)) {
+          system.fees.forEach((fee: any) => {
+            let feeAmount = 0;
+          
+            switch (fee.type) {
+              case 'fixed':
+                feeAmount = fee.base_value || 0;
+                break;
+              case 'optional':
+                if (fee.required || fee.default_selected) {
+                  feeAmount = fee.base_value || 0;
+                }
+                break;
+              case 'optional_multiple':
+              case 'variable_time':
+                const defaultOption = fee.options?.find((opt: any) => opt.id === fee.default_selected) || fee.options?.[0];
+                if (defaultOption) {
+                  feeAmount = defaultOption.value || 0;
+                }
+                break;
+              case 'percentage':
+                const defaultCondition = fee.conditions?.[0];
+                if (defaultCondition) {
+                  feeAmount = -((fee.base_value || 0) * (defaultCondition.percentage || 0)) / 100;
+                }
+                break;
+            }
+          
+            systemsTotal += feeAmount;
+          });
+        }
+      });
+    }
+  
+    // Use systems-based calculation if available, otherwise use legacy
+    const totalAmount = systemsTotal > 0 ? systemsTotal : (generalTuition + visaFee + accommodationFee + insuranceFee + additionalFeesTotal);
+  
+    return {
+      amount: totalAmount,
+      currency: 'VND',
+      systemsIncluded
+    };
+  }
+
+  const calculateTraditionalTotal = () => {
+    return (
+      university.generalTuition +
+      university.visaFee +
+      university.accommodationFee +
+      university.insuranceFee +
+      (university.additionalFees || []).reduce((sum: number, fee: any) => sum + fee.amount, 0)
+    );
+  };
+
+  // Calculate merged cost
+  const mergedCost = calculateSimpleUniversityCost(university);
   const costBreakdown = [
-    { icon: Building, label: 'Học phí', amount: university.generalTuition, color: 'bg-blue-100 text-blue-600' },
-    { icon: FileText, label: 'Phí visa', amount: university.visaFee, color: 'bg-purple-100 text-purple-600' },
-    { icon: Shield, label: 'Chi phí lưu trú', amount: university.accommodationFee, color: 'bg-green-100 text-green-600' },
-    { icon: Shield, label: 'Bảo hiểm', amount: university.insuranceFee, color: 'bg-orange-100 text-orange-600' },
+    { icon: DollarSign, label: 'Tổng chi phí ước tính', amount: mergedCost.amount, color: 'bg-blue-100 text-blue-600', systems: mergedCost.systemsIncluded },
   ];
 
   const tabClass = (tab: string) =>
-    `px-6 py-4 font-medium transition-colors border-b-2 ${
+    `px-6 py-4 font-medium transition-all duration-200 border-b-2 ${
       activeTab === tab
-        ? 'border-primary text-primary bg-blue-50/50'
+        ? 'border-[#003AB7] text-[#003AB7] bg-blue-50/50'
         : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
     }`;
 
@@ -235,23 +316,23 @@ export default function UniversityDetailKorean() {
             </div>
             <div className="flex items-center gap-4 w-full md:w-auto">
               <div className="flex items-center gap-2 flex-1 md:flex-initial">
-                <DollarSign className="w-5 h-5 text-primary" />
+                <DollarSign className="w-5 h-5 text-[#003AB7]" />
                 <div>
                   <p className="text-xs text-slate-600">Tổng chi phí</p>
-                  <p className="text-xl font-bold text-primary">
+                  <p className="text-xl font-bold text-[#003AB7]">
                     {formatCurrency(isKorean ? calculateKoreanTotal : convertAmount(calculateTraditionalTotal(), currency))}
                   </p>
                 </div>
               </div>
               {isRegistered ? (
-                <div className="flex items-center gap-2 px-4 py-2.5 bg-green-50 border border-green-200 text-green-700 rounded-lg">
+                <div className="flex items-center gap-2 px-4 py-2.5 bg-green-50 border border-green-200 text-white rounded-lg">
                   <CheckCircle className="w-5 h-5" />
                   <span className="font-medium">Đã đăng ký</span>
                 </div>
               ) : (
                 <button
                   onClick={handleRegister}
-                  className="px-6 py-2.5 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors font-medium shadow-sm whitespace-nowrap"
+                  className="px-6 py-2.5 bg-white text-[#003AB7] border border-[#003AB7] rounded-lg hover:bg-[#003AB7] hover:text-white active:bg-[#002A8F] active:text-white transition-all duration-200 font-medium shadow-sm whitespace-nowrap hover:shadow-md active:shadow-inner"
                 >
                   Đăng ký ngay
                 </button>
@@ -292,7 +373,7 @@ export default function UniversityDetailKorean() {
               {(university.academicPrograms || []).map((program: any, index: number) => {
                 const IconComponent = iconMap[program.icon] || GraduationCap;
                 return (
-                  <div key={index} className="group p-5 border-2 border-slate-200 rounded-xl hover:border-primary hover:shadow-md transition-all">
+                  <div key={index} className="group p-5 border-2 border-slate-200 rounded-xl hover:border-[#003AB7] hover:shadow-md transition-all">
                     <div className="flex items-start gap-4">
                       <div className="w-12 h-12 bg-gradient-to-br from-primary to-blue-700 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
                         <IconComponent className="w-6 h-6 text-white" />
@@ -327,13 +408,13 @@ export default function UniversityDetailKorean() {
                         onClick={() => setSelectedVisaType(visa.visaType)}
                         className={`p-4 rounded-lg border-2 transition-all text-left ${
                           selectedVisaType === visa.visaType
-                            ? 'border-primary bg-blue-50 shadow-md'
+                            ? 'border-[#003AB7] bg-blue-50 shadow-md'
                             : 'border-slate-200 hover:border-blue-300 bg-white'
                         }`}
                       >
                         <div className="flex items-center justify-between mb-2">
-                          <span className="font-bold text-lg text-primary">{visa.visaType}</span>
-                          {selectedVisaType === visa.visaType && <Check className="w-5 h-5 text-primary" />}
+                          <span className="font-bold text-lg text-[#003AB7]">{visa.visaType}</span>
+                          {selectedVisaType === visa.visaType && <Check className="w-5 h-5 text-[#003AB7]" />}
                         </div>
                         <p className="text-sm text-slate-600">{visa.description}</p>
                       </button>
@@ -431,7 +512,7 @@ export default function UniversityDetailKorean() {
                 {university.optionalAddons && university.optionalAddons.length > 0 && (
                   <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
                     <h2 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
-                      <CheckCircle className="w-5 h-5 text-green-600" />
+                      <CheckCircle className="w-5 h-5 text-white" />
                       Chi phí tùy chọn (Optional Add-ons)
                     </h2>
                     <p className="text-sm text-slate-600 mb-4">Chọn các dịch vụ bổ sung bạn muốn</p>
@@ -445,8 +526,8 @@ export default function UniversityDetailKorean() {
                               className={[
                                 'mt-0.5 w-6 h-6 rounded border-2 flex items-center justify-center transition-colors flex-shrink-0',
                                 selectedAddons[addon.id]
-                                  ? 'bg-primary border-primary'
-                                  : 'border-slate-300 hover:border-primary'
+                                  ? 'bg-[#003AB7] border-[#003AB7]'
+                                  : 'border-slate-300 hover:border-[#003AB7]'
                               ].join(' ')}
                             >
                               {selectedAddons[addon.id] && <Check className="w-4 h-4 text-white" />}
@@ -465,7 +546,7 @@ export default function UniversityDetailKorean() {
                                   )}
                                 </div>
                                 {addon.amount !== undefined && !addon.requiresInput && !addon.amountRange && (
-                                  <span className={addon.type === 'scholarship' ? 'font-bold whitespace-nowrap text-green-600' : 'font-bold whitespace-nowrap text-slate-900'}>
+                                  <span className={addon.type === 'scholarship' ? 'font-bold whitespace-nowrap text-white' : 'font-bold whitespace-nowrap text-slate-900'}>
                                     {addon.type === 'scholarship'
                                       ? `-${addon.percentage}%`
                                       : formatCurrency(convertCurrencyAmount(addon.amount, (addon.type === 'dorm-vn' || addon.type === 'flight') ? 'VND' : 'KRW'))
@@ -500,7 +581,7 @@ export default function UniversityDetailKorean() {
                                 <div className="mt-3">
                                   <div className="flex items-center justify-between mb-2">
                                     <span className="text-sm text-slate-600">Điều chỉnh giá vé:</span>
-                                    <span className="text-sm font-bold text-primary">
+                                    <span className="text-sm font-bold text-[#003AB7]">
                                       {formatCurrency(convertCurrencyAmount(addonValues[addon.id] || addon.amount || addon.amountRange.min, 'VND'))}
                                     </span>
                                   </div>
@@ -544,7 +625,7 @@ export default function UniversityDetailKorean() {
                 {/* Cost Summary */}
                 <div className="bg-gradient-to-br from-green-50 to-white rounded-xl border-2 border-green-200 p-6 shadow-lg sticky bottom-6">
                   <h2 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
-                    <DollarSign className="w-5 h-5 text-green-600" />
+                    <DollarSign className="w-5 h-5 text-white" />
                     Tổng kết chi phí (Cost Summary)
                   </h2>
                   <div className="space-y-2 mb-4">
@@ -578,10 +659,10 @@ export default function UniversityDetailKorean() {
                       </div>
                     )}
                   </div>
-                  <div className="pt-4 border-t-2 border-green-300">
+                  <div className="mt-4 pt-4 border-t-2 border-green-300">
                     <div className="flex justify-between items-center">
                       <span className="text-lg font-bold text-slate-900">Tổng cộng (Total)</span>
-                      <span className="text-3xl font-bold text-primary">{formatCurrency(calculateKoreanTotal)}</span>
+                      <span className="text-3xl font-bold text-[#003AB7]">{formatCurrency(calculateKoreanTotal)}</span>
                     </div>
                     <p className="text-xs text-slate-500 mt-2 text-right">Hiển thị trong {currency} • Tỷ giá thực tế</p>
                   </div>
@@ -636,15 +717,15 @@ export default function UniversityDetailKorean() {
                       </div>
                     ))}
                   </div>
-                  {(university.additionalFees || []).length > 0 && (
+                  {/* Systems information */}
+                  {mergedCost.systemsIncluded.length > 0 && (
                     <div className="border-t border-slate-200 pt-6">
-                      <h3 className="text-lg font-semibold text-slate-900 mb-4">Phí bổ sung</h3>
-                      <div className="space-y-2">
-                        {university.additionalFees.map((fee: any, index: number) => (
-                          <div key={index} className="flex justify-between items-center p-4 bg-slate-50 rounded-lg">
-                            <span className="text-sm text-slate-700">{fee.type}</span>
-                            <span className="font-semibold text-slate-900">{formatCurrency(convertAmount(fee.amount, currency))}</span>
-                          </div>
+                      <h3 className="text-lg font-semibold text-slate-900 mb-4">Hệ thống có sẵn</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {mergedCost.systemsIncluded.map((system, index) => (
+                          <span key={index} className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                            {system}
+                          </span>
                         ))}
                       </div>
                     </div>
@@ -678,7 +759,7 @@ export default function UniversityDetailKorean() {
                     ))}
                     <div className="flex justify-between py-4 pt-5 border-t-2 border-slate-300">
                       <span className="text-lg font-bold text-slate-900">Tổng chi phí ước tính</span>
-                      <span className="text-2xl font-bold text-primary">{formatCurrency(convertAmount(calculateTraditionalTotal(), currency))}</span>
+                      <span className="text-2xl font-bold text-[#003AB7]">{formatCurrency(convertAmount(calculateTraditionalTotal(), currency))}</span>
                     </div>
                   </div>
                 </div>
@@ -718,12 +799,12 @@ export default function UniversityDetailKorean() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div className="p-6 bg-gradient-to-br from-blue-50 to-blue-100/50 border-2 border-blue-200 rounded-xl">
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center">
+                    <div className="w-12 h-12 bg-[#003AB7] rounded-xl flex items-center justify-center">
                       <Award className="w-6 h-6 text-white" />
                     </div>
                     <div>
                       <p className="text-sm text-slate-600">World Ranking</p>
-                      <p className="text-3xl font-bold text-primary">#{university.worldRanking}</p>
+                      <p className="text-3xl font-bold text-[#003AB7]">#{university.worldRanking}</p>
                     </div>
                   </div>
                   <p className="text-sm text-slate-700">{university.ranking}</p>
@@ -748,13 +829,13 @@ export default function UniversityDetailKorean() {
                   {university.koreanData.studentSupport && university.koreanData.studentSupport.length > 0 && (
                     <div className="mb-6 p-6 bg-green-50 rounded-xl border border-green-200">
                       <h3 className="text-lg font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                        <Users className="w-5 h-5 text-green-600" />
+                        <Users className="w-5 h-5 text-white" />
                         Hỗ trợ sinh viên (Student Support)
                       </h3>
                       <ul className="space-y-2">
                         {university.koreanData.studentSupport.map((support: string, idx: number) => (
                           <li key={idx} className="text-sm text-slate-700 flex items-start gap-2">
-                            <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                            <CheckCircle className="w-4 h-4 text-white mt-0.5 flex-shrink-0" />
                             <span>{support}</span>
                           </li>
                         ))}
