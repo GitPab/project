@@ -16,4 +16,5 @@ export interface KoreanUniversityData {
   languageCourse?: { available: boolean; priceVND?: number };
   studentSupport?: string[];
   jobOpportunities?: string;
+  workOpportunity?: string;
 }

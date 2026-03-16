@@ -1,688 +1,396 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { useApp } from '../context/AppContext';
-import { useCurrency, Currency } from '../context/CurrencyContext';
-import { MultiCurrencyDisplay, TotalWithConversions } from '../components/MultiCurrencyDisplay';
-// ✅ FIX 1: Removed duplicate import that was here
-
-import type { VisaSystemCost, OptionalAddon } from '../context/AppContext';
+import { useCurrency } from '../context/CurrencyContext';
+import { TotalWithConversions } from '../components/MultiCurrencyDisplay';
 import { 
-  ArrowLeft, MapPin, DollarSign, CheckCircle, Building, Home, Shield, FileText, Lock,
-  GraduationCap, Scale, Microscope, Cpu, TrendingUp, Lightbulb, Zap, Atom, BarChart3, Rocket,
-  Building2, Briefcase, BookOpen, Leaf, Users, Stethoscope, Globe, TestTube, Megaphone, Award, Star,
-  ChevronDown, AlertCircle, Info, Check, X, Plus, Minus
+  ArrowLeft, MapPin, Star, GraduationCap, Home, Briefcase, Award, 
+  Clock, CheckCircle, Users 
 } from 'lucide-react';
 import { toast } from 'sonner';
+import type { AcademicProgram } from '../../types/university';
+import type { Currency } from '../../types/common';
+import { Button } from '../components/ui/button';
+import { Badge } from '../components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../components/ui/accordion';
 
-// Inline cost calculation to avoid import issues
-interface SimpleCostCalculation {
-  amount: number;
-  currency: string;
-  systemsIncluded: string[];
-}
-
-function calculateSimpleUniversityCost(university: any): SimpleCostCalculation {
-  // Calculate total from legacy fields
-  const generalTuition = university.generalTuition || 0;
-  const visaFee = university.visaFee || 0;
-  const accommodationFee = university.accommodationFee || 0;
-  const insuranceFee = university.insuranceFee || 0;
-  
-  // Calculate additional fees
-  let additionalFeesTotal = 0;
-  if (university.additionalFees && Array.isArray(university.additionalFees)) {
-    additionalFeesTotal = university.additionalFees.reduce((sum: number, fee: any) => sum + (fee.amount || 0), 0);
-  }
-  
-  // Calculate systems-based costs if available
-  let systemsTotal = 0;
-  let systemsIncluded: string[] = [];
-  
-  if (university.systems && Array.isArray(university.systems)) {
-    const availableSystems = university.systems.filter((system: any) => system.available);
-    systemsIncluded = availableSystems.map((system: any) => system.code);
-    
-    availableSystems.forEach((system: any) => {
-      if (system.fees && Array.isArray(system.fees)) {
-        system.fees.forEach((fee: any) => {
-          let feeAmount = 0;
-          
-          switch (fee.type) {
-            case 'fixed':
-              feeAmount = fee.base_value || 0;
-              break;
-            case 'optional':
-              if (fee.required || fee.default_selected) {
-                feeAmount = fee.base_value || 0;
-              }
-              break;
-            case 'optional_multiple':
-            case 'variable_time':
-              const defaultOption = fee.options?.find((opt: any) => opt.id === fee.default_selected) || fee.options?.[0];
-              if (defaultOption) {
-                feeAmount = defaultOption.value || 0;
-              }
-              break;
-            case 'percentage':
-              const defaultCondition = fee.conditions?.[0];
-              if (defaultCondition) {
-                feeAmount = -((fee.base_value || 0) * (defaultCondition.percentage || 0)) / 100;
-              }
-              break;
-          }
-          
-          systemsTotal += feeAmount;
-        });
-      }
-    });
-  }
-  
-  // Use systems-based calculation if available, otherwise use legacy
-  const totalAmount = systemsTotal > 0 ? systemsTotal : (generalTuition + visaFee + accommodationFee + insuranceFee + additionalFeesTotal);
-  
-  return {
-    amount: totalAmount,
-    currency: 'VND',
-    systemsIncluded
-  };
-}
-
-// Icon mapping
-const iconMap: Record<string, React.ComponentType<any>> = {
-  GraduationCap, Scale, Microscope, Cpu, TrendingUp, Lightbulb, Zap, Atom, BarChart3, Rocket,
-  Building2, Briefcase, BookOpen, Leaf, Users, Stethoscope, Globe, TestTube, Megaphone, Building
-};
-
 export default function UniversityDetail() {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { universities, registrations, registerForUniversity, user } = useApp();
   const { currency, formatFrom, convertAmount } = useCurrency();
-  
-  const [selectedVisaType, setSelectedVisaType] = useState<string | null>(null);
-  const [selectedAddons, setSelectedAddons] = useState<Record<string, boolean>>({});
-  const [addonValues, setAddonValues] = useState<Record<string, number>>({});
-  const [topikLevel, setTopikLevel] = useState<number | null>(null);
-  const [dormMonths, setDormMonths] = useState<Record<string, number>>({});
 
   const university = universities.find(uni => uni.id === id);
   
-  // Calculate merged cost
-  const mergedCost = calculateSimpleUniversityCost(university);
+  // All visa systems to render
+  const ALL_VISA_SYSTEMS = ['D4-1', 'D2-1', 'D2-2', 'D2-3', 'D2-6'] as const;
+  
+  const VISA_LABELS = {
+    'D4-1': 'Hệ tiếng',
+    'D2-1': 'Dự bị ĐH',
+    'D2-2': 'Đại học',
+    'D2-3': 'Sau đại học',
+    'D2-6': 'Nghiên cứu'
+  };
 
-  const availableVisaSystems = useMemo(() =>
-    university?.koreanData?.visaSystems?.filter((v: any) => v.selectable !== false) || [],
-    [university]
-  );
+  // Get available visa systems
+  const availableVisaSystems = useMemo(() => {
+    const systems = university?.koreanData?.visaSystems || [];
+    return systems.filter((s: any) => s.available !== false);
+  }, [university?.koreanData?.visaSystems]);
 
-  const isRegistered = registrations.some(r => r.universityId === id && r.studentEmail === user?.email);
-  const isKorean = university?.koreanData?.isKoreanUniversity;
+  // Auto-select first available visa system
+  const [selectedVisaType, setSelectedVisaType] = useState<string>(() => {
+    const firstAvailable = availableVisaSystems[0]?.visaType;
+    return firstAvailable || 'D4-1';
+  });
+  
+  // Update selected visa type when available systems change
+  useEffect(() => {
+    if (availableVisaSystems.length > 0 && !availableVisaSystems.find((s: any) => s.visaType === selectedVisaType)) {
+      setSelectedVisaType(availableVisaSystems[0].visaType);
+      // Reset TOPIK level when switching visa systems
+      setTopikLevel(0);
+    }
+  }, [availableVisaSystems, selectedVisaType]);
+  
+  const [selectedAddons, setSelectedAddons] = useState<Record<string, boolean>>({});
+  const [addonValues, setAddonValues] = useState<Record<string, number>>({});
+  const [topikLevel, setTopikLevel] = useState<number>(0);
+  const [dormMonths, setDormMonths] = useState<number>(6);
 
   if (!university) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="text-center">
-          <p className="text-xl text-slate-600">University not found</p>
-          <button 
-            onClick={() => navigate(-1)}
-            className="mt-4 px-4 py-2 bg-white text-[#003AB7] rounded-lg hover:bg-[#003AB7] hover:text-white"
-          >
-            Go Back
-          </button>
+          <h2 className="text-2xl font-bold mb-4">Không tìm thấy trường đại học</h2>
+          <Button onClick={() => navigate(-1)}>Quay lại</Button>
         </div>
       </div>
     );
   }
 
-  React.useEffect(() => {
-    if (isKorean && !selectedVisaType && availableVisaSystems.length > 0) {
-      setSelectedVisaType(availableVisaSystems[0].visaType);
-    }
-  }, [isKorean, selectedVisaType, availableVisaSystems]);
+  const isRegistered = registrations.some(r => r.universityId === id && r.studentEmail === user?.email);
+  const isKorean = university.koreanData?.isKoreanUniversity ?? true;
 
-  const calculateTotal = useMemo(() => {
-    let totalCost = 0;
+  // Visa system hiện tại
+  const currentVisaSystem = university.koreanData?.visaSystems?.find(
+    (v: any) => v.visaType === selectedVisaType
+  );
 
-    if (isKorean && selectedVisaType) {
-      // Add fixed costs
-      university?.fixedCosts?.forEach(cost => {
-        totalCost += convertAmount(cost.amount, currency, cost.currency || 'USD');
-      });
+  // Tính tổng chi phí (đồng bộ với Edit Modal)
+  // Includes: fixed costs for selected visa, visa system costs, optional addons
+  // Excludes: scholarships (subtracted), costs not applicable to selected visa
+  const totalCost = useMemo(() => {
+    let total = 0;
 
-      // Add visa system costs
-      const visaSystem = university.koreanData?.visaSystems?.find(v => v.visaType === selectedVisaType);
-      if (visaSystem) {
-        if (visaSystem.tuitionPerTerm) {
-          totalCost += convertAmount(visaSystem.tuitionPerTerm, currency, 'KRW');
-        }
-        if (visaSystem.tuitionRange) {
-          totalCost += convertAmount(visaSystem.tuitionRange.max, currency, 'KRW');
-        }
-        if (visaSystem.applicationFee) {
-          totalCost += convertAmount(visaSystem.applicationFee, currency, 'KRW');
-        }
-        if (visaSystem.enrollmentFee) {
-          totalCost += convertAmount(visaSystem.enrollmentFee, currency, 'KRW');
-        }
-        if (visaSystem.baseYearlyFee) {
-          totalCost += convertAmount(visaSystem.baseYearlyFee, currency, 'KRW');
-        }
+    // Chi phí cố định - only include those that apply to selected visa type
+    (university.fixedCosts || []).forEach((cost: any) => {
+      // Check if this fee applies to the selected visa system (he_ap_dung)
+      const appliesToSystems = cost.appliesToSystems || cost.visaType || [];
+      const isApplicable = appliesToSystems.length === 0 || appliesToSystems.includes(selectedVisaType);
+      
+      if (!isApplicable) return;
+      
+      // Check if this is a scholarship type - should subtract
+      const isScholarship = cost.category === 'scholarship' || 
+                            cost.type?.toLowerCase().includes('học bổng') ||
+                            cost.type?.toLowerCase().includes('scholarship');
+      
+      const amount = cost.amount || 0;
+      if (isScholarship) {
+        total -= convertAmount(amount, currency, cost.currency || 'VND');
+      } else {
+        total += convertAmount(amount, currency, cost.currency || 'VND');
       }
+    });
 
-      // Add selected optional addons
-      Object.entries(selectedAddons).forEach(([addonId, isSelected]) => {
-        if (isSelected) {
-          const addon = university.optionalAddons?.find(a => a.id === addonId);
-          if (addon) {
-            if (addon.type === 'scholarship') {
-              const percentage = addonValues[addonId] || addon.percentage || 0;
-              const tuitionCost = visaSystem?.tuitionRange?.max || visaSystem?.tuitionPerTerm || 0;
-              const discountAmount = (tuitionCost * percentage) / 100;
-              totalCost -= convertAmount(discountAmount, currency, 'KRW');
-            } else if (addon.type === 'dorm-vn') {
-              // ✅ FIX 2: Correctly handle dorm-vn (VND, monthly)
-              const monthsSelected = dormMonths[addonId] || 6;
-              const dormTotalAmount = (addon.amount || 0) * monthsSelected;
-              totalCost += convertAmount(dormTotalAmount, currency, 'VND');
-            } else if (addon.type === 'flight') {
-              // ✅ FIX 3: flight type uses VND
-              const value = addonValues[addonId] || addon.amount || 0;
-              totalCost += convertAmount(value, currency, 'VND');
-            } else {
-              // All other types (dorm-kr, savings, group, other) use KRW
-              const value = addonValues[addonId] || addon.amount || 0;
-              totalCost += convertAmount(value, currency, 'KRW');
-            }
-          }
-        }
-      });
-
-      // Apply TOPIK scholarship if selected
-      if (topikLevel !== null && selectedVisaType) {
-        const currentVisaSystem = university.koreanData?.visaSystems?.find(v => v.visaType === selectedVisaType);
-        if (currentVisaSystem) {
-          const topikDiscounts: Record<number, number> = {
-            0: 0, 1: 10, 2: 15, 3: 25, 4: 40, 5: 60, 6: 80,
-          };
-          const discountPercent = topikDiscounts[topikLevel] || 0;
-          const tuitionCost = currentVisaSystem.tuitionRange?.max || currentVisaSystem.tuitionPerTerm || 0;
-          const topikDiscountAmount = (tuitionCost * discountPercent) / 100;
-          totalCost -= convertAmount(topikDiscountAmount, currency, 'KRW');
-        }
+    // Chi phí theo hệ visa
+    if (currentVisaSystem) {
+      if (currentVisaSystem.tuitionPerTerm) {
+        total += convertAmount(currentVisaSystem.tuitionPerTerm, currency, 'KRW');
       }
-    } else {
-      // Traditional university calculation
-      totalCost += convertAmount(university?.generalTuition || 0, currency);
-      totalCost += convertAmount(university?.visaFee || 0, currency);
-      totalCost += convertAmount(university?.accommodationFee || 0, currency);
-      totalCost += convertAmount(university?.insuranceFee || 0, currency);
-
-      university?.additionalFees?.forEach(fee => {
-        if (fee.selected !== false) {
-          totalCost += convertAmount(fee.amount, currency);
-        }
-      });
+      if (currentVisaSystem.tuitionRange?.max) {
+        total += convertAmount(currentVisaSystem.tuitionRange.max, currency, 'KRW');
+      }
+      if (currentVisaSystem.applicationFee) {
+        total += convertAmount(currentVisaSystem.applicationFee, currency, 'KRW');
+      }
+      if (currentVisaSystem.enrollmentFee) {
+        total += convertAmount(currentVisaSystem.enrollmentFee, currency, 'KRW');
+      }
     }
 
-    return totalCost;
-  }, [isKorean, selectedVisaType, selectedAddons, addonValues, dormMonths, topikLevel, currency, university, convertAmount]);
+    // Chi phí tùy chọn - only include if applicable to selected visa
+    Object.entries(selectedAddons).forEach(([addonId, isSelected]) => {
+      if (!isSelected) return;
+
+      const addon = university.optionalAddons?.find((a: any) => a.id === addonId);
+      if (!addon) return;
+      
+      // Check if addon applies to selected visa type
+      const addonVisaTypes = addon.visaType || [];
+      if (addonVisaTypes.length > 0 && !addonVisaTypes.includes(selectedVisaType)) {
+        return; // Skip if not applicable to current visa
+      }
+
+      let amount = addon.amount || 0;
+
+      if (addon.type === 'scholarship' && topikLevel > 0) {
+        const tuition = currentVisaSystem?.tuitionRange?.max || currentVisaSystem?.tuitionPerTerm || 0;
+        const discountPercent = [0, 10, 20, 30, 50, 70, 100][topikLevel] || 0;
+        amount = -Math.round((tuition * discountPercent) / 100);
+      } else if (addon.type === 'dorm-vn' || addon.type === 'dorm-kr') {
+        amount = (addon.amount || 800000) * dormMonths;
+      } else if (addon.type === 'flight' || addon.type === 'savings') {
+        amount = addonValues[addonId] || addon.amount || 0;
+      }
+
+      total += convertAmount(amount, currency, (addon.currency || 'KRW') as Currency);
+    });
+
+    return Math.max(0, total);
+  }, [university, selectedVisaType, selectedAddons, addonValues, dormMonths, topikLevel, currency, currentVisaSystem]);
 
   const handleRegister = () => {
     registerForUniversity(university.id);
     toast.success('Đăng ký thành công!', {
-      description: `Bạn đã đăng ký thành công tại ${university.name}`
+      description: `Bạn đã đăng ký tư vấn tại ${university.name}`,
     });
   };
 
-  const toggleAddon = (addonId: string, addon: OptionalAddon) => {
-    setSelectedAddons(prev => ({ ...prev, [addonId]: !prev[addonId] }));
-    if (!selectedAddons[addonId] && addon.options && addon.options.length > 0) {
-      setAddonValues(prev => ({ ...prev, [addonId]: addon.options![0].value }));
-    }
-  };
-
-  const IconComponent = (iconName: string) => {
-    const Icon = iconMap[iconName];
-    return Icon ? <Icon className="w-5 h-5" /> : <GraduationCap className="w-5 h-5" />;
-  };
-
-  // ✅ FIX 4: Helper to get correct currency for addon display
-  const getAddonCurrency = (addonType: string): Currency => {
-    if (addonType === 'dorm-vn' || addonType === 'flight') return 'VND';
-    return 'KRW';
+  const toggleAddon = (id: string) => {
+    setSelectedAddons(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
   return (
-    <div className="min-h-screen bg-blue-50">
+    <div className="min-h-screen bg-slate-50 pb-20">
       {/* Hero Section */}
-      <div className="relative h-80 overflow-hidden">
+      <div className="relative h-[420px] overflow-hidden">
         <img 
-          src={university.heroImage} 
+          src={university.heroImage || university.thumbnail || '/default-university.jpg'} 
           alt={university.name}
-          className="w-full h-full object-cover"
+          className="absolute inset-0 w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-black/20" />
-        
-        <button
-          onClick={() => navigate(-1)}
-          className="absolute top-6 left-6 flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-md text-white rounded-lg transition-colors border border-white/20"
-        >
-          <ArrowLeft className="w-5 h-5" />
-          <span>Quay lại</span>
-        </button>
+        <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/50 to-black/80" />
 
-        <div className="absolute bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-black/80 to-transparent">
-          <div className="max-w-7xl mx-auto">
-            <div className="flex items-center gap-2 text-white/80 mb-2">
-              <span className="text-2xl">{university.countryCode}</span>
-              <MapPin className="w-4 h-4" />
-              <span>{university.country}</span>
+        <div className="absolute top-6 left-6">
+          <Button 
+            onClick={() => navigate(-1)}
+            variant="secondary"
+            className="bg-white/90 hover:bg-white text-slate-900"
+          >
+            ← Quay lại
+          </Button>
+        </div>
+
+        <div className="absolute bottom-0 left-0 right-0 p-8 text-white">
+          <div className="max-w-6xl mx-auto">
+            <div className="flex items-center gap-3 mb-2">
+              <Badge variant="secondary" className="bg-white/20 text-white border-white/30">
+                Hàn Quốc
+              </Badge>
+              <div className="flex items-center gap-1">
+                <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
+                <span className="font-medium">{university.ranking}</span>
+              </div>
             </div>
-            <h1 className="text-4xl font-bold text-white mb-2">{university.name}</h1>
-            <p className="text-lg text-white/90">{university.tagline}</p>
+            <h1 className="text-4xl font-bold mb-1">{university.name}</h1>
+            <p className="text-xl opacity-90">{university.koreanName}</p>
+            <p className="mt-2 flex items-center gap-2 text-lg">
+              <MapPin className="w-5 h-5" /> {university.region || university.koreanData?.address}
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
-        {/* Common Info Section */}
-        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-          <h2 className="text-2xl font-bold text-slate-900 mb-4">Thông tin chung</h2>
-          
-          <div className="grid md:grid-cols-2 gap-6">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
-                <span className="font-semibold text-slate-700">Xếp hạng:</span>
-              </div>
-              <p className="text-slate-600 ml-7">{university.ranking}</p>
-              {isKorean && university.koreanData?.koreanRanking && (
-                <p className="text-sm text-slate-500 ml-7 mt-1">{university.koreanData.koreanRanking}</p>
-              )}
+      <div className="max-w-6xl mx-auto px-6 py-10 space-y-12">
+        {/* Thông tin chung */}
+        <div className="grid md:grid-cols-3 gap-8">
+          <div className="md:col-span-2 bg-white rounded-3xl p-8 shadow-sm">
+            <h2 className="text-2xl font-bold mb-6">Thông tin chung</h2>
+            <div className="prose text-slate-600 leading-relaxed">
+              {university.overview}
             </div>
 
-            {isKorean && university.koreanData?.address && (
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <MapPin className="w-5 h-5 text-[#003AB7]" />
-                  <span className="font-semibold text-slate-700">Địa chỉ:</span>
+            {university.academicPrograms && (
+              <div className="mt-8">
+                <h3 className="font-semibold mb-4 flex items-center gap-2">
+                  <GraduationCap className="text-[#003AB7]" /> Chuyên ngành tiêu biểu
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {university.academicPrograms?.map((prog: AcademicProgram, i: number) => (
+                    <Badge key={i} variant="outline" className="px-4 py-1.5">{prog.title}</Badge>
+                  ))}
                 </div>
-                <p className="text-slate-600 ml-7">{university.koreanData.address}</p>
               </div>
             )}
-
-            <div className="md:col-span-2">
-              <div className="flex items-center gap-2 mb-2">
-                <GraduationCap className="w-5 h-5 text-[#003AB7]" />
-                <span className="font-semibold text-slate-700">Định hướng học thuật:</span>
-              </div>
-              <div className="ml-7 space-y-2">
-                {university.academicPrograms.map((program, idx) => (
-                  <div key={idx} className="flex items-start gap-2">
-                    <div className="text-[#003AB7] mt-0.5">{IconComponent(program.icon)}</div>
-                    <div>
-                      <p className="font-medium text-slate-800">{program.title}</p>
-                      <p className="text-sm text-slate-600">{program.description}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
 
-          <div className="mt-6 pt-6 border-t border-slate-200">
-            <h3 className="font-semibold text-slate-700 mb-3">Giới thiệu</h3>
-            <p className="text-slate-600 leading-relaxed">{university.overview}</p>
+          {/* Sidebar */}
+          <div className="space-y-6">
+            <div className="bg-white rounded-3xl p-6 shadow-sm">
+              <h3 className="font-semibold mb-4">Xếp hạng & Khu vực</h3>
+              <p className="text-2xl font-bold text-[#003AB7]">{university.ranking}</p>
+              <p className="text-slate-600 mt-1">{university.region}</p>
+            </div>
+
+            <div className="bg-white rounded-3xl p-6 shadow-sm">
+              <h3 className="font-semibold mb-4 flex items-center gap-2">
+                <Briefcase className="text-emerald-600" /> Cơ hội việc làm thêm
+              </h3>
+              <p className="text-sm text-slate-600">{(university.koreanData as any)?.workOpportunity || university.description || "Nhiều cơ hội tại khu vực gần trường"}</p>
+            </div>
           </div>
         </div>
 
-        {/* Cost Section */}
-        {isKorean && university.koreanData ? (
-          <>
-            {/* Visa System Selection */}
-            <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-              <h2 className="text-2xl font-bold text-slate-900 mb-4">Bạn muốn theo học hệ nào?</h2>
-              <div className="grid md:grid-cols-5 gap-3">
-                {availableVisaSystems.map((system: any) => (
+        {/* Chi phí chi tiết - Đồng bộ với Edit Modal */}
+        <div className="bg-white rounded-3xl p-8 shadow-sm">
+          <h2 className="text-2xl font-bold mb-8">Chi phí du học chi tiết</h2>
+
+          {/* Chọn hệ visa - All tabs visible, available clickable, non-available disabled */}
+          <div className="mb-8">
+            <p className="text-slate-500 mb-3">Chọn hệ du học</p>
+            <div className="flex flex-wrap gap-3">
+              {ALL_VISA_SYSTEMS.map(visaType => {
+                const isAvailable = availableVisaSystems.some((s: any) => s.visaType === visaType);
+                
+                return (
                   <button
-                    key={system.visaType}
-                    onClick={() => setSelectedVisaType(system.visaType)}
-                    className={`p-4 rounded-lg border-2 transition-all ${
-                      selectedVisaType === system.visaType
-                        ? 'border-[#003AB7] bg-blue-50 shadow-md'
-                        : 'border-slate-200 hover:border-[#003AB7]/50 hover:bg-slate-50'
+                    key={visaType}
+                    onClick={() => isAvailable && setSelectedVisaType(visaType)}
+                    disabled={!isAvailable}
+                    className={`px-6 py-3 rounded-2xl font-medium transition-all relative ${
+                      selectedVisaType === visaType
+                        ? 'bg-[#003AB7] text-white border-[#003AB7] shadow-lg'
+                        : isAvailable
+                        ? 'bg-white border-slate-200 hover:border-[#003AB7]/50 hover:bg-slate-50'
+                        : 'bg-slate-100 border-slate-200 opacity-45 cursor-not-allowed'
                     }`}
                   >
-                    <div className="font-bold text-lg text-slate-900">{system.visaType}</div>
-                    <div className="text-xs text-slate-600 mt-1 line-clamp-2">
-                      {system.visaName || system.description}
-                    </div>
+                    {/* Available tabs show green dot and sub-label */}
+                    {isAvailable && (
+                      <>
+                        <div className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-500 rounded-full" />
+                        <div className="text-xs text-slate-500 mt-1">
+                          {VISA_LABELS[visaType]}
+                        </div>
+                      </>
+                    )}
+                    
+                    {/* Non-available tabs show strike-through and "Không có" */}
+                    {!isAvailable && (
+                      <>
+                        <span className="line-through">{visaType}</span>
+                        <div className="text-xs text-red-500 mt-1">
+                          Không có
+                        </div>
+                      </>
+                    )}
+                    
+                    {/* Always show visa type */}
+                    <span className={isAvailable ? '' : 'opacity-60'}>
+                      {visaType}
+                    </span>
                   </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Cost Breakdown */}
-            <Accordion type="multiple" defaultValue={['fixed', 'system', 'addons']} className="space-y-4">
-              {/* Fixed Costs */}
-              {university.fixedCosts && university.fixedCosts.length > 0 && (
-                <AccordionItem value="fixed" className="bg-white rounded-xl border border-slate-200 shadow-sm">
-                  <AccordionTrigger className="px-6 py-4 hover:no-underline">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-                        <Shield className="w-5 h-5 text-red-600" />
-                      </div>
-                      <div className="text-left">
-                        <h3 className="text-lg font-semibold text-slate-900">Chi phí cố định (Fixed Costs)</h3>
-                        <p className="text-sm text-slate-600">Luôn được tính vào tổng chi phí</p>
-                      </div>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="px-6 pb-4">
-                    <div className="space-y-3">
-                      {university.fixedCosts.map((cost: any, idx: number) => (
-                        <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                          <span className="text-slate-700">{cost.type}</span>
-                          <span className="font-semibold text-slate-900">
-                            {formatFrom(cost.amount, cost.currency || 'USD')}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              )}
-
-              {/* System-Specific Costs */}
-              {selectedVisaType && (
-                <AccordionItem value="system" className="bg-white rounded-xl border border-slate-200 shadow-sm">
-                  <AccordionTrigger className="px-6 py-4 hover:no-underline">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <FileText className="w-5 h-5 text-blue-600" />
-                      </div>
-                      <div className="text-left">
-                        <h3 className="text-lg font-semibold text-slate-900">Chi phí theo hệ {selectedVisaType}</h3>
-                        <p className="text-sm text-slate-600">Dựa trên visa system đã chọn</p>
-                      </div>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="px-6 pb-4">
-                    {(() => {
-                      const visaSystem = university.koreanData?.visaSystems?.find((v: any) => v.visaType === selectedVisaType);
-                      if (!visaSystem) return null;
-
-                      return (
-                        <div className="space-y-3">
-                          {visaSystem.applicationFee && (
-                            <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                              <span className="text-slate-700">Phí đơn (Application Fee)</span>
-                              <span className="font-semibold text-slate-900">
-                                {formatFrom(visaSystem.applicationFee, 'KRW')}
-                              </span>
-                            </div>
-                          )}
-                          {visaSystem.enrollmentFee && (
-                            <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                              <span className="text-slate-700">Phí nhập học (Enrollment Fee)</span>
-                              <span className="font-semibold text-slate-900">
-                                {formatFrom(visaSystem.enrollmentFee, 'KRW')}
-                              </span>
-                            </div>
-                          )}
-                          {visaSystem.tuitionPerTerm && (
-                            <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                              <span className="text-slate-700">Học phí mỗi kỳ (Tuition per Term)</span>
-                              <span className="font-semibold text-slate-900">
-                                {formatFrom(visaSystem.tuitionPerTerm, 'KRW')}
-                              </span>
-                            </div>
-                          )}
-                          {visaSystem.tuitionRange && (
-                            <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                              <span className="text-slate-700">Học phí (Tuition Range)</span>
-                              <span className="font-semibold text-slate-900">
-                                {formatFrom(visaSystem.tuitionRange.min, 'KRW')} - {formatFrom(visaSystem.tuitionRange.max, 'KRW')}
-                              </span>
-                            </div>
-                          )}
-                          {visaSystem.baseYearlyFee && (
-                            <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                              <span className="text-slate-700">Hóa đơn hàng năm (Base Yearly Fee)</span>
-                              <span className="font-semibold text-slate-900">
-                                {formatFrom(visaSystem.baseYearlyFee, 'KRW')}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </AccordionContent>
-                </AccordionItem>
-              )}
-
-              {/* Optional Add-ons */}
-              {university.optionalAddons && university.optionalAddons.length > 0 && (
-                <AccordionItem value="addons" className="bg-white rounded-xl border border-slate-200 shadow-sm">
-                  <AccordionTrigger className="px-6 py-4 hover:no-underline">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                        <Plus className="w-5 h-5 text-white" />
-                      </div>
-                      <div className="text-left">
-                        <h3 className="text-lg font-semibold text-slate-900">Chi phí tùy chọn (Optional Add-ons)</h3>
-                        <p className="text-sm text-slate-600">Chọn các dịch vụ bổ sung</p>
-                      </div>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="px-6 pb-4 space-y-4">
-                    {/* Scholarship Section */}
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                      <div className="flex items-start gap-3">
-                        <input
-                          type="checkbox"
-                          id="scholarship-toggle"
-                          checked={topikLevel !== null}
-                          onChange={(e) => setTopikLevel(e.target.checked ? 0 : null)}
-                          className="mt-1 w-5 h-5 text-[#003AB7] rounded focus:ring-primary"
-                        />
-                        <div className="flex-1">
-                          <label htmlFor="scholarship-toggle" className="font-semibold text-slate-900 cursor-pointer block mb-2">
-                            🎓 Bạn có học bổng TOPIK?
-                          </label>
-                          {topikLevel !== null && (
-                            <div className="space-y-3">
-                              <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">
-                                  Mức TOPIK (0-6)
-                                </label>
-                                <select
-                                  value={topikLevel}
-                                  onChange={(e) => setTopikLevel(Number(e.target.value))}
-                                  className="w-full p-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
-                                >
-                                  <option value={0}>0 - Không có chứng chỉ</option>
-                                  <option value={1}>1 - Sơ cấp</option>
-                                  <option value={2}>2 - Sơ cấp nâng cao</option>
-                                  <option value={3}>3 - Trung cấp</option>
-                                  <option value={4}>4 - Trung cấp nâng cao</option>
-                                  <option value={5}>5 - Cao cấp</option>
-                                  <option value={6}>6 - Cao cấp nâng cao</option>
-                                </select>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Other Add-ons */}
-                    <div className="space-y-3">
-                      {university.optionalAddons.map((addon: OptionalAddon) => {
-                        if (addon.type === 'scholarship') return null;
-
-                        return (
-                          <div key={addon.id} className="border border-slate-200 rounded-lg p-4">
-                            <div className="flex items-start gap-3">
-                              <input
-                                type="checkbox"
-                                id={addon.id}
-                                checked={selectedAddons[addon.id] || false}
-                                onChange={() => toggleAddon(addon.id, addon)}
-                                className="mt-1 w-5 h-5 text-[#003AB7] rounded focus:ring-primary"
-                              />
-                              <div className="flex-1">
-                                <label htmlFor={addon.id} className="font-medium text-slate-800 cursor-pointer block mb-2">
-                                  {addon.nameVi || addon.name}
-                                </label>
-
-                                {/* Dorm VN - month slider */}
-                                {selectedAddons[addon.id] && addon.type === 'dorm-vn' && (
-                                  <div className="space-y-3 mt-3 p-3 bg-slate-50 rounded-lg">
-                                    <div>
-                                      <label className="text-sm font-medium text-slate-700 block mb-2">
-                                        Số tháng: <span className="font-bold text-[#003AB7]">{dormMonths[addon.id] || 6}</span>
-                                      </label>
-                                      <input
-                                        type="range"
-                                        min="1"
-                                        max="12"
-                                        value={dormMonths[addon.id] || 6}
-                                        onChange={(e) => setDormMonths(prev => ({ ...prev, [addon.id]: Number(e.target.value) }))}
-                                        className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-primary"
-                                      />
-                                      <div className="flex justify-between text-xs text-slate-500 mt-1">
-                                        <span>1</span>
-                                        <span>6</span>
-                                        <span>12</span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Dorm KR - room type selector */}
-                                {selectedAddons[addon.id] && addon.type === 'dorm-kr' && addon.options && (
-                                  <select
-                                    value={addonValues[addon.id] || addon.options[0]?.value || 0}
-                                    onChange={(e) => setAddonValues(prev => ({ ...prev, [addon.id]: parseInt(e.target.value) }))}
-                                    className="mt-2 w-full p-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
-                                  >
-                                    {addon.options.map((option) => (
-                                      <option key={option.value} value={option.value}>
-                                        {option.label}
-                                      </option>
-                                    ))}
-                                  </select>
-                                )}
-
-                                {/* Generic options selector */}
-                                {selectedAddons[addon.id] && addon.requiresInput && addon.options && addon.type !== 'dorm-kr' && addon.type !== 'dorm-vn' && (
-                                  <select
-                                    value={addonValues[addon.id] || addon.options[0]?.value || 0}
-                                    onChange={(e) => setAddonValues(prev => ({ ...prev, [addon.id]: parseInt(e.target.value) }))}
-                                    className="mt-2 w-full p-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
-                                  >
-                                    {addon.options.map((option) => (
-                                      <option key={option.value} value={option.value}>
-                                        {option.label}
-                                      </option>
-                                    ))}
-                                  </select>
-                                )}
-
-                                {addon.conditional && (
-                                  <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
-                                    <Info className="w-3 h-3" />
-                                    {addon.conditional}
-                                  </p>
-                                )}
-                              </div>
-
-                              {/* ✅ FIX 5: Use helper to get correct currency for display */}
-                              {selectedAddons[addon.id] && (
-                                <div className="text-right whitespace-nowrap">
-                                  <span className="text-sm font-semibold text-slate-900">
-                                    {addon.type === 'dorm-vn'
-                                      ? formatFrom((addon.amount || 0) * (dormMonths[addon.id] || 6), 'VND')
-                                      : formatFrom(
-                                          addonValues[addon.id] || addon.amount || 0,
-                                          getAddonCurrency(addon.type)
-                                        )
-                                    }
-                                  </span>
-                                  {addon.type === 'dorm-vn' && (
-                                    <div className="text-xs text-slate-500">
-                                      {formatFrom(addon.amount || 0, 'VND')}/tháng
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              )}
-            </Accordion>
-          </>
-        ) : (
-          // Traditional university costs
-          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-            <h2 className="text-xl font-bold text-slate-900 mb-4">Cost Breakdown</h2>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
-                <div className="flex items-center gap-3">
-                  <DollarSign className="w-5 h-5 text-blue-600" />
-                  <span className="text-slate-700 font-medium">Total Estimated Cost</span>
-                </div>
-                <span className="font-bold text-blue-600 text-lg">{formatFrom(mergedCost.amount, 'VND')}</span>
-              </div>
-              {mergedCost.systemsIncluded.length > 0 && (
-                <div className="p-4 bg-slate-50 rounded-lg">
-                  <span className="text-sm text-slate-600">Available Systems: </span>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {mergedCost.systemsIncluded.map((system, index) => (
-                      <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
-                        {system}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
+                );
+              })}
             </div>
           </div>
-        )}
 
-        {/* Total Calculator */}
-        <div className="sticky bottom-6 z-10">
-          <TotalWithConversions 
-            amount={calculateTotal} 
-            baseCurrency={currency}
-            label="Tổng chi phí ước tính"
-            className="shadow-xl"
-          />
-          
-          {!isRegistered && user?.role === 'student' && (
-            <button
-              onClick={handleRegister}
-              className="w-full mt-4 px-6 py-4 bg-gradient-to-r from-[#003AB7] to-[#558EFF] text-white rounded-xl hover:from-[#002A8F] hover:to-[#447DFF] transition-all font-semibold text-lg flex items-center justify-center gap-2"
-            >
-              <CheckCircle className="w-5 h-5" />
-              Đăng ký ngay
-            </button>
-          )}
+          <Accordion type="multiple" defaultValue={['fixed', 'system', 'optional']} className="space-y-4">
+            {/* Fixed Costs */}
+            <AccordionItem value="fixed">
+              <AccordionTrigger className="text-lg font-semibold">Chi phí cố định</AccordionTrigger>
+              <AccordionContent>
+                <div className="space-y-3">
+                  {(university.fixedCosts || []).map((cost: any, i: number) => (
+                    <div key={i} className="flex justify-between py-3 border-b last:border-none">
+                      <span className="text-slate-700">{cost.type || cost.name}</span>
+                      <span className="font-semibold">{formatFrom(cost.amount, cost.currency || 'VND')}</span>
+                    </div>
+                  ))}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
 
-          {isRegistered && (
-            <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-xl flex items-center gap-3">
-              <CheckCircle className="w-5 h-5 text-white" />
-              <span className="font-medium text-white">Bạn đã đăng ký chương trình này</span>
-            </div>
-          )}
+            {/* System Cost */}
+            <AccordionItem value="system">
+              <AccordionTrigger className="text-lg font-semibold">
+                Chi phí theo hệ {selectedVisaType}
+              </AccordionTrigger>
+              <AccordionContent>
+                {currentVisaSystem ? (
+                  <div className="space-y-4">
+                    {currentVisaSystem.tuitionRange && (
+                      <div className="flex justify-between">
+                        <span>Học phí</span>
+                        <span>{formatFrom(currentVisaSystem.tuitionRange.min, 'KRW')} - {formatFrom(currentVisaSystem.tuitionRange.max, 'KRW')}</span>
+                      </div>
+                    )}
+                    {currentVisaSystem.tuitionPerTerm && (
+                      <div className="flex justify-between">
+                        <span>Học phí mỗi kỳ</span>
+                        <span>{formatFrom(currentVisaSystem.tuitionPerTerm, 'KRW')}</span>
+                      </div>
+                    )}
+                  </div>
+                ) : <p className="text-slate-500">Chưa có dữ liệu chi phí cho hệ này</p>}
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* Optional Addons */}
+            <AccordionItem value="optional">
+              <AccordionTrigger className="text-lg font-semibold">Phí tùy chọn</AccordionTrigger>
+              <AccordionContent>
+                {/* Scholarship */}
+                <div className="mb-6 p-4 bg-amber-50 rounded-2xl">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={topikLevel > 0}
+                      onChange={(e) => setTopikLevel(e.target.checked ? 3 : 0)}
+                    />
+                    <span className="font-medium">Áp dụng học bổng TOPIK</span>
+                  </label>
+                  {topikLevel > 0 && (
+                    <select 
+                      value={topikLevel}
+                      onChange={(e) => setTopikLevel(Number(e.target.value))}
+                      className="mt-3 w-full p-3 border rounded-xl"
+                    >
+                      {[1,2,3,4,5,6].map(l => (
+                        <option key={l} value={l}>TOPIK {l} — Giảm {(l*15 > 100 ? 100 : l*15)}%</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+
+          {/* Tổng chi phí */}
+          <div className="mt-12 pt-8 border-t">
+            <TotalWithConversions 
+              amount={totalCost}
+              baseCurrency={currency}
+              label="Tổng chi phí ước tính"
+              className="shadow-xl"
+            />
+          </div>
         </div>
+
+        {/* Nút đăng ký */}
+        {!isRegistered && user?.role === 'student' && (
+          <Button 
+            onClick={handleRegister}
+            size="lg"
+            className="w-full py-7 text-lg font-semibold rounded-2xl bg-gradient-to-r from-[#003AB7] to-blue-600 hover:from-[#002A8F]"
+          >
+            <CheckCircle className="mr-3 w-5 h-5" />
+            Đăng ký tư vấn ngay
+          </Button>
+        )}
       </div>
     </div>
   );

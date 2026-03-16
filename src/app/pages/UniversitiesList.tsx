@@ -7,7 +7,7 @@ import { supabase } from '../../config/supabase';
 import { useApp, University } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { useCurrency, Currency } from '../context/CurrencyContext';
-import EditUniversityModal from '../components/EditUniversityModalNew';
+import EditUniversityModal from '../components/EditUniversityModal';
 import ImportUniversitiesModal from '../components/ImportUniversitiesModal';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
@@ -22,87 +22,120 @@ import {
   TableRow,
 } from '../components/ui/table';
 
-// Inline cost calculation to avoid import issues
+// Inline cost calculation using new schema
 interface SimpleCostCalculation {
-  amount: number;
-  currency: string;
+  vndTotal: number; // Fixed base in VND
+  krwTotal: number; // Variable costs in KRW
+  display: string; // Formatted display string
   systemsIncluded: string[];
 }
 
 function calculateSimpleUniversityCost(university: any): SimpleCostCalculation {
-  // Calculate total from legacy fields
-  const generalTuition = university.generalTuition || 0;
-  const visaFee = university.visaFee || 0;
-  const accommodationFee = university.accommodationFee || 0;
-  const insuranceFee = university.insuranceFee || 0;
+  // Default base costs in VND (hoc_tieng + phi_tu_van + phi_trung_tam + ve_may_bay)
+  // 13M + 39M + 11M + 8M = 71M VND
+  const koreanData = university?.koreanData;
   
-  // Calculate additional fees
-  let additionalFeesTotal = 0;
-  if (university.additionalFees && Array.isArray(university.additionalFees)) {
-    additionalFeesTotal = university.additionalFees.reduce((sum: number, fee: any) => sum + (fee.amount || 0), 0);
-  }
+  // Get common fees VND from new schema or use defaults
+  const commonFeesVND = koreanData?.commonFeesVND || [
+    { id: 'hoc_tieng', amount: 13000000 },
+    { id: 'phi_tu_van', amount: 39000000 },
+    { id: 'phi_trung_tam', amount: 11000000 },
+    { id: 've_may_bay', amount: 8000000 },
+  ];
   
-  // Calculate systems-based costs if available
-  let systemsTotal = 0;
-  let systemsIncluded: string[] = [];
+  // Calculate fixed VND base (exclude KTX VN as it's optional)
+  let vndTotal = 0;
+  commonFeesVND.forEach((fee: any) => {
+    if (fee.id !== 'ktx_vn' && !fee.optional) {
+      vndTotal += fee.amount || 0;
+    }
+  });
   
-  if (university.systems && Array.isArray(university.systems)) {
-    const availableSystems = university.systems.filter((system: any) => system.available);
-    systemsIncluded = availableSystems.map((system: any) => system.code);
-    
-    availableSystems.forEach((system: any) => {
-      if (system.fees && Array.isArray(system.fees)) {
-        system.fees.forEach((fee: any) => {
-          let feeAmount = 0;
-          
-          switch (fee.type) {
-            case 'fixed':
-              feeAmount = fee.base_value || 0;
-              break;
-            case 'optional':
-              if (fee.required || fee.default_selected) {
-                feeAmount = fee.base_value || 0;
-              }
-              break;
-            case 'optional_multiple':
-            case 'variable_time':
-              const defaultOption = fee.options?.find((opt: any) => opt.id === fee.default_selected) || fee.options?.[0];
-              if (defaultOption) {
-                feeAmount = defaultOption.value || 0;
-              }
-              break;
-            case 'percentage':
-              const defaultCondition = fee.conditions?.[0];
-              if (defaultCondition) {
-                feeAmount = -((fee.base_value || 0) * (defaultCondition.percentage || 0)) / 100;
-              }
-              break;
-          }
-          
-          systemsTotal += feeAmount;
-        });
+  // If no new data, fallback to legacy calculation
+  if (vndTotal === 0 && university.fixedCosts) {
+    university.fixedCosts.forEach((cost: any) => {
+      const isScholarship = cost.category === 'scholarship' || cost.type?.toLowerCase().includes('học bổng');
+      if (!isScholarship && cost.currency !== 'KRW') {
+        vndTotal += cost.amount || 0;
       }
     });
   }
   
-  // Use systems-based calculation if available, otherwise use legacy
-  const totalAmount = systemsTotal > 0 ? systemsTotal : (generalTuition + visaFee + accommodationFee + insuranceFee + additionalFeesTotal);
+  // Default to 71M if still zero
+  if (vndTotal === 0) {
+    vndTotal = 71000000;
+  }
+  
+  // Calculate KRW costs for D4-1 (default system)
+  let krwTotal = 0;
+  const systemsIncluded: string[] = [];
+  
+  // Try new schema first - visaSystemsDetail
+  if (koreanData?.visaSystemsDetail?.['D4-1']?.available) {
+    const d4_1 = koreanData.visaSystemsDetail['D4-1'];
+    krwTotal += d4_1.applyFeeKRW || 0;
+    krwTotal += d4_1.enrollmentFeeKRW || 0;
+    krwTotal += d4_1.invoiceKRWPerYear || 0;
+    
+    // Add cheapest KTX option
+    const ktxOptions = d4_1.ktxOptions || [];
+    if (ktxOptions.length > 0) {
+      const cheapestKTX = ktxOptions.reduce((min: number, opt: any) => 
+        opt.priceKRWPerKy < min ? opt.priceKRWPerKy : min, 
+        ktxOptions[0]?.priceKRWPerKy || 0
+      );
+      krwTotal += cheapestKTX;
+    }
+    
+    // Add sổ tiết kiệm (financial requirement)
+    const soTietKiemOptions = d4_1.financialRequirement?.soTietKiemOptions || [];
+    if (soTietKiemOptions.length > 0) {
+      const cheapestSoTietKiem = soTietKiemOptions.reduce((min: number, opt: any) => 
+        opt.amountKRW < min ? opt.amountKRW : min, 
+        soTietKiemOptions[0]?.amountKRW || 0
+      );
+      krwTotal += cheapestSoTietKiem;
+    }
+    
+    systemsIncluded.push('D4-1');
+  }
+  
+  // Fallback to legacy visaSystems
+  if (krwTotal === 0 && koreanData?.visaSystems) {
+    const d4_1_legacy = koreanData.visaSystems.find((s: any) => s.visaType === 'D4-1' && s.available !== false);
+    if (d4_1_legacy) {
+      krwTotal += d4_1_legacy.applicationFee || 0;
+      krwTotal += d4_1_legacy.enrollmentFee || 0;
+      krwTotal += d4_1_legacy.tuitionPerTerm || 0;
+      krwTotal += d4_1_legacy.tuitionRange?.max || 0;
+      systemsIncluded.push('D4-1');
+    }
+  }
+  
+  // Format display string
+  const formatNumber = (num: number) => num.toLocaleString('vi-VN');
+  const display = krwTotal > 0 
+    ? `${formatNumber(vndTotal)}đ + ${formatNumber(krwTotal)} KRW`
+    : `${formatNumber(vndTotal)}đ`;
   
   return {
-    amount: totalAmount,
-    currency: 'VND',
+    vndTotal,
+    krwTotal,
+    display,
     systemsIncluded
   };
 }
 
 function generateSimpleCostTooltip(cost: SimpleCostCalculation): string {
-  let tooltip = `Estimated Total Cost: ${cost.amount.toLocaleString()} VND\n\n`;
-  
-  if (cost.systemsIncluded.length > 0) {
-    tooltip += `Systems: ${cost.systemsIncluded.join(', ')}\n`;
+  let tooltip = `Tổng chi phí ước tính:\n`;
+  tooltip += `• VNĐ: ${cost.vndTotal.toLocaleString('vi-VN')}đ\n`;
+  if (cost.krwTotal > 0) {
+    tooltip += `• KRW: ${cost.krwTotal.toLocaleString('vi-VN')} KRW\n`;
   }
   
-  tooltip += `Currency: ${cost.currency}`;
+  if (cost.systemsIncluded.length > 0) {
+    tooltip += `\nHệ thống: ${cost.systemsIncluded.join(', ')}`;
+  }
   
   return tooltip;
 }
@@ -211,8 +244,9 @@ export default function UniversitiesList() {
         console.error(`Error calculating cost for ${university.name}:`, err);
         // Set default cost calculation
         calculations.set(university.id, {
-          amount: 0,
-          currency: 'VND',
+          vndTotal: 0,
+          krwTotal: 0,
+          display: '—',
           systemsIncluded: []
         });
       }
@@ -244,10 +278,10 @@ export default function UniversitiesList() {
       });
     }
     
-    // Sort by cost
+    // Sort by cost (use vndTotal for sorting)
     filtered.sort((a, b) => {
-      const costA = costCalculations.get(a.id)?.amount || 0;
-      const costB = costCalculations.get(b.id)?.amount || 0;
+      const costA = costCalculations.get(a.id)?.vndTotal || 0;
+      const costB = costCalculations.get(b.id)?.vndTotal || 0;
       return sortOrder === 'asc' ? costA - costB : costB - costA;
     });
     
@@ -308,22 +342,29 @@ export default function UniversitiesList() {
         console.error('Error creating university:', error);
         toast.error('Lỗi khi thêm trường: ' + (error.message || 'Không xác định'));
       }
-    } else if (activeUniversity && data.id) {
-      // Update existing university
+    } else if (activeUniversity) {
+      // Update existing university - use activeUniversity.id as fallback
+      const universityId = data.id || activeUniversity.id;
+      if (!universityId) {
+        toast.error('Không xác định được ID trường cần cập nhật');
+        return;
+      }
+      
       try {
         const updateData = {
           ...data,
+          id: universityId,
           updated_at: new Date().toISOString(),
         };
         
         const { error } = await supabase
           .from('universities')
           .update(updateData)
-          .eq('id', data.id);
+          .eq('id', universityId);
           
         if (error) throw error;
         
-        updateUniversity(data.id, updateData);
+        updateUniversity(universityId, updateData);
         toast.success('Đã cập nhật thông tin trường');
       } catch (error: any) {
         console.error('Error updating university:', error);
@@ -406,34 +447,53 @@ export default function UniversitiesList() {
         )}
       </div>
 
-      <Card className="hidden lg:block">
-        <CardContent className="p-0">
+      <Card className="hidden lg:block overflow-hidden">
+        <CardContent className="p-0 overflow-x-auto">
           <Table className="min-w-full table-fixed">
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[220px]">Tên trường</TableHead>
+                <TableHead className="w-[220px] sticky left-0 bg-slate-50 z-10">Tên trường</TableHead>
                 <TableHead className="w-[220px]">Tên tiếng Hàn</TableHead>
                 <TableHead className="w-[130px]">Quốc gia</TableHead>
                 <TableHead className="w-[160px]">Khu vực</TableHead>
+
+                {/* Dynamic Fixed Cost Columns */}
+                {getAllFixedCostTypes(filteredUniversities).map((costType) => (
+                  <TableHead key={`header-${costType}`} className="text-right w-[140px]">
+                    {costType}
+                  </TableHead>
+                ))}
+
                 <TableHead className="text-right w-[180px] cursor-pointer hover:bg-slate-100" onClick={handleSort}>
                   <div className="flex items-center justify-end gap-2">
                     <Calculator className="w-4 h-4" />
-                    Tổng chi phí ước tính
+                    Tổng
                     <SortIcon />
                   </div>
                 </TableHead>
-                {isAdmin && <TableHead className="text-center w-[140px]">Thao tác</TableHead>}
+                {isAdmin && <TableHead className="text-center w-[140px] sticky right-0 bg-slate-50 z-10">Thao tác</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredUniversities.map((uni) => {
                 const cost = costCalculations.get(uni.id);
+                const costTypes = getAllFixedCostTypes(filteredUniversities);
                 return (
                   <TableRow key={uni.id}>
-                    <TableCell className="font-semibold text-slate-900 truncate">{uni.name}</TableCell>
+                    <TableCell className="font-semibold text-slate-900 truncate sticky left-0 bg-white z-10">{uni.name}</TableCell>
                     <TableCell className="truncate">{uni.koreanName || '—'}</TableCell>
                     <TableCell>{uni.country || 'South Korea'}</TableCell>
                     <TableCell className="truncate">{uni.region || uni.koreanData?.address || '—'}</TableCell>
+
+                    {/* Dynamic Fixed Cost Cells */}
+                    {costTypes.map((costType) => {
+                      const costValue = uni.fixedCosts?.find(c => c.type === costType)?.amount || 0;
+                      return (
+                        <TableCell key={`${uni.id}-${costType}`} className="text-right">
+                          <span className="text-sm">{formatFrom(costValue, uni.fixedCosts?.find(c => c.type === costType)?.currency || 'VND')}</span>
+                        </TableCell>
+                      );
+                    })}
 
                     <TableCell className="text-right">
                       <Tooltip>
@@ -441,12 +501,12 @@ export default function UniversitiesList() {
                           <div className="flex items-center justify-end gap-2 cursor-help">
                             <DollarSign className="w-4 h-4 text-slate-400" />
                             <div>
-                              <div className="font-semibold text-blue-600">
-                                {formatFrom(cost?.amount || 0, 'VND')}
+                              <div className="font-semibold text-blue-600 text-sm">
+                                {cost?.display || '—'}
                               </div>
                               {(cost?.systemsIncluded.length || 0) > 0 && (
-                                <div className="text-xs text-slate-600">
-                                  {cost?.systemsIncluded.join(', ') || ''}
+                                <div className="text-xs text-slate-500">
+                                  {cost?.systemsIncluded.join(', ')}
                                 </div>
                               )}
                             </div>
@@ -454,13 +514,13 @@ export default function UniversitiesList() {
                         </TooltipTrigger>
                         <TooltipContent className="max-w-xs">
                           <pre className="text-xs whitespace-pre-wrap">
-                            {generateSimpleCostTooltip(cost || { amount: 0, currency: 'VND', systemsIncluded: [] })}
+                            {generateSimpleCostTooltip(cost || { vndTotal: 0, krwTotal: 0, display: '—', systemsIncluded: [] })}
                           </pre>
                         </TooltipContent>
                       </Tooltip>
                     </TableCell>
                     {isAdmin && (
-                      <TableCell>
+                      <TableCell className="sticky right-0 bg-white z-10">
                         <div className="flex items-center justify-center gap-2">
                           <Button
                             variant="outline"
@@ -488,6 +548,7 @@ export default function UniversitiesList() {
       <div className="lg:hidden space-y-4">
         {filteredUniversities.map((uni) => {
           const cost = costCalculations.get(uni.id);
+          const costTypes = getAllFixedCostTypes(filteredUniversities);
           return (
             <Card key={uni.id}>
               <CardHeader>
@@ -498,18 +559,29 @@ export default function UniversitiesList() {
                 <div className="flex justify-between"><span>Quốc gia</span><span>{uni.country}</span></div>
                 <div className="flex justify-between"><span>Khu vực</span><span>{uni.region || uni.koreanData?.address || '—'}</span></div>
 
-                <div className="flex justify-between font-semibold">
+                {/* Dynamic Fixed Costs for Mobile */}
+                {costTypes.map((costType) => {
+                  const costValue = uni.fixedCosts?.find(c => c.type === costType)?.amount || 0;
+                  return (
+                    <div key={`mobile-${uni.id}-${costType}`} className="flex justify-between">
+                      <span>{costType}</span>
+                      <span className="font-semibold">{formatFrom(costValue, uni.fixedCosts?.find(c => c.type === costType)?.currency || 'VND')}</span>
+                    </div>
+                  );
+                })}
+
+                <div className="flex justify-between font-semibold border-t pt-2">
                   <span>Tổng chi phí ước tính</span>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div className="flex items-center gap-2 cursor-help">
                         <DollarSign className="w-4 h-4 text-slate-400" />
-                        <span className="text-blue-600">{formatFrom(cost?.amount || 0, 'VND')}</span>
+                        <span className="text-blue-600">{cost?.display || '—'}</span>
                       </div>
                     </TooltipTrigger>
                     <TooltipContent className="max-w-xs">
                       <pre className="text-xs whitespace-pre-wrap">
-                        {generateSimpleCostTooltip(cost || { amount: 0, currency: 'VND', systemsIncluded: [] })}
+                        {generateSimpleCostTooltip(cost || { vndTotal: 0, krwTotal: 0, display: '—', systemsIncluded: [] })}
                       </pre>
                     </TooltipContent>
                   </Tooltip>

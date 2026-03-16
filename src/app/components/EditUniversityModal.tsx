@@ -1,82 +1,105 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Controller, useFieldArray, useForm } from 'react-hook-form';
-import { Plus, Trash2 } from 'lucide-react';
+import { Controller, useForm } from 'react-hook-form';
+import { Plus, Trash2, ChevronDown, ChevronUp, Calculator, Save, X } from 'lucide-react';
 import { toast } from 'sonner';
-
-import type { University } from '../context/AppContext';
+import type { University } from '../../types/university';
 import { useCurrency } from '../context/CurrencyContext';
 import type { Currency } from '../context/CurrencyContext';
-import PriceInput from './PriceInput';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Textarea } from './ui/textarea';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
+import { Switch } from './ui/switch';
+import { Checkbox } from './ui/checkbox';
+import { Card, CardContent, CardHeader } from './ui/card';
+import { Badge } from './ui/badge';
+import { cn } from '../../utils/cn';
 
-const countWords = (text: string) =>
-  text.trim().length === 0 ? 0 : text.trim().split(/\s+/).filter(Boolean).length;
-
-const feeSchema = z.object({
-  type: z.string().min(1, 'Vui lòng nhập loại phí'),
-  amount: z.number().min(0, 'Số tiền phải là số không âm'),
-});
-
-// ✅ FIX 2: currency must be a valid Currency union type, not plain string
 const CURRENCY_VALUES = ['VND', 'KRW', 'USD', 'JPY', 'CNY'] as const;
+const VISA_TYPES = ['D4-1', 'D2-1', 'D2-2', 'D2-3', 'D2-6'] as const;
 
-const fixedCostSchema = z.object({
-  type: z.string().min(1, 'Vui lòng nhập loại phí'),
-  amount: z.number().min(0, 'Số tiền phải là số không âm'),
-  currency: z.enum(CURRENCY_VALUES).optional(),
+const FEE_TYPE_OPTIONS = [
+  { value: 'system_cost', label: 'Chi phí hệ' },
+  { value: 'consultation', label: 'Phí tư vấn' },
+  { value: 'application', label: 'Phí apply' },
+  { value: 'visa', label: 'Phí visa' },
+  { value: 'accommodation', label: 'Chỗ ở' },
+  { value: 'insurance', label: 'Bảo hiểm' },
+  { value: 'scholarship', label: 'Học bổng' },
+  { value: 'flight', label: 'Vé máy bay' },
+  { value: 'savings', label: 'Sổ tiết kiệm' },
+  { value: 'other', label: 'Khác' },
+] as const;
+
+const feeRowSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().min(1, 'Vui lòng nhập tên phí'),
+  type: z.enum(['system_cost', 'consultation', 'application', 'visa', 'accommodation', 'insurance', 'scholarship', 'flight', 'savings', 'other']),
+  amount: z.number().min(0),
+  currency: z.enum(CURRENCY_VALUES).default('VND'),
+  appliesToSystems: z.array(z.string()).default([]),
+  note: z.string().optional(),
 });
 
-// ✅ FIX 3 & 5: Add 'type' field to addonSchema so Controller name is valid
-const addonSchema = z.object({
-  id: z.string(),
-  name: z.string().min(1, 'Vui lòng nhập tên phí'),
-  amount: z.number().optional(),
-  type: z.string().optional(),
+const visaSystemSchema = z.object({
+  visaType: z.enum(VISA_TYPES),
+  visaName: z.string().min(1),
+  description: z.string().optional(),
+  available: z.boolean().default(false),
+  fees: z.array(feeRowSchema).default([]),
+  tuitionPerTerm: z.number().min(0).default(0),
+  tuitionRangeMin: z.number().min(0).default(0),
+  tuitionRangeMax: z.number().min(0).default(0),
+  applicationFee: z.number().min(0).default(0),
+  enrollmentFee: z.number().min(0).default(0),
 });
 
 const formSchema = z.object({
   name: z.string().min(2, 'Tên trường phải có ít nhất 2 ký tự'),
   koreanName: z.string().optional(),
   region: z.string().optional(),
-  topTier: z.enum(['Top1', 'Top2', 'Top3']),
-  country: z.string().min(1),
-  overview: z.string().optional().superRefine((value, ctx) => {
-    if (!value) return;
-    const total = countWords(value);
-    if (total > 250) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: `Mô tả không được vượt quá 250 từ (hiện tại: ${total} từ)`,
-      });
-    }
-  }),
-  generalTuition: z.number().min(0).optional(),
-  visaFee: z.number().min(0).optional(),
-  accommodationFee: z.number().min(0).optional(),
-  insuranceFee: z.number().min(0).optional(),
-  additionalFees: z.array(feeSchema).optional(),
-  isKorean: z.boolean().optional(),
-  selectedVisaType: z.string().optional(),
-  fixedCosts: z.array(fixedCostSchema).optional(),
-  optionalAddons: z.array(addonSchema).optional(),
+  topTier: z.enum(['Top1', 'Top2', 'Top3']).default('Top2'),
+  overview: z.string().max(250, 'Mô tả tối đa 250 từ').optional(),
+  visaSystems: z.array(visaSystemSchema).default([]),
+  fixedCosts: z.array(feeRowSchema).default([]),
+  // New schema fields
+  commonFeesVND: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    amount: z.number(),
+    amountPerMonth: z.number().optional(),
+    note: z.string().optional(),
+    editable: z.boolean(),
+    optional: z.boolean().optional(),
+    subItems: z.array(z.string()).optional(),
+  })).default([]),
+  supportPolicies: z.array(z.string()).default([]),
+  refundPolicy: z.string().optional(),
+  admissionsType: z.string().optional(),
+  jobOpportunities: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
+type FeeRow = z.infer<typeof feeRowSchema>;
+type VisaSystemForm = z.infer<typeof visaSystemSchema>;
 
 type EditUniversityModalProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  university?: University;
-  onSave: (data: Partial<University>) => void;
+  university: University | null | undefined;
+  onSave: (university: Partial<University>) => void | Promise<void>;
+};
+
+const VISA_TYPE_LABELS: Record<string, string> = {
+  'D4-1': 'D4-1 (Tiếng Hàn)',
+  'D2-1': 'D2-1 (Chuẩn bị)',
+  'D2-2': 'D2-2 (Đại học)',
+  'D2-3': 'D2-3 (Sau đại học)',
+  'D2-6': 'D2-6 (Nâng cao)',
 };
 
 export default function EditUniversityModal({
@@ -85,768 +108,862 @@ export default function EditUniversityModal({
   university,
   onSave,
 }: EditUniversityModalProps) {
-  const { currency, formatFrom, convertAmount } = useCurrency();
+  const { formatFrom, convertAmount } = useCurrency();
   const isEditMode = !!university;
-  const [selectedVisaType, setSelectedVisaType] = useState<string | null>(null);
-  const [enabledVisaSystems, setEnabledVisaSystems] = useState<Set<string>>(new Set());
+  const [openSystems, setOpenSystems] = useState<string[]>([]);
 
-  const ALL_VISA_OPTIONS = [
-    { type: 'D4-1' as const, label: 'D4-1', name: '(Tiếng Hàn)', description: 'Korean Language Program' },
-    { type: 'D2-1' as const, label: 'D2-1', name: '(Chuẩn bị)', description: 'University Preparation' },
-    { type: 'D2-2' as const, label: 'D2-2', name: '(Đại học)', description: 'Undergraduate' },
-    { type: 'D2-3' as const, label: 'D2-3', name: '(Sau đại học)', description: 'Graduate' },
-    { type: 'D2-6' as const, label: 'D2-6', name: '(Nâng cao)', description: 'Advanced' },
-  ];
+  const defaultValues: FormValues = useMemo(() => {
+    const existingSystems = university?.koreanData?.visaSystems || [];
+    
+    const baseSystems: VisaSystemForm[] = VISA_TYPES.map(visaType => {
+      const existing = existingSystems.find(v => v.visaType === visaType);
+      
+      return {
+        visaType,
+        visaName: existing?.visaName || VISA_TYPE_LABELS[visaType],
+        description: existing?.description || '',
+        available: existing ? true : false,
+        fees: [],
+        tuitionPerTerm: existing?.tuitionPerTerm || 0,
+        tuitionRangeMin: existing?.tuitionRange?.min || 0,
+        tuitionRangeMax: existing?.tuitionRange?.max || 0,
+        applicationFee: existing?.applicationFee || 0,
+        enrollmentFee: existing?.enrollmentFee || 0,
+      };
+    });
 
-  const defaultValues: FormValues = useMemo(
-    () => ({
+    const fixedCosts: FeeRow[] = (university?.fixedCosts || []).map((cost, idx) => {
+      // Determine fee type from cost data - preserve if exists, otherwise infer from type field
+      let feeType: FeeRow['type'] = 'other';
+      const costType = (cost.type || '').toLowerCase();
+      if (costType.includes('học bổng') || costType.includes('scholarship')) feeType = 'scholarship';
+      else if (costType.includes('chỗ ở') || costType.includes('ở') || costType.includes('dorm') || costType.includes('accommodation')) feeType = 'accommodation';
+      else if (costType.includes('tư vấn') || costType.includes('consultation')) feeType = 'consultation';
+      else if (costType.includes('apply') || costType.includes('application')) feeType = 'application';
+      else if (costType.includes('visa')) feeType = 'visa';
+      else if (costType.includes('bảo hiểm') || costType.includes('insurance')) feeType = 'insurance';
+      else if (costType.includes('vé máy bay') || costType.includes('flight')) feeType = 'flight';
+      else if (costType.includes('sổ tiết kiệm') || costType.includes('savings')) feeType = 'savings';
+      else if (cost.category) {
+        // Map from category if available
+        const categoryMap: Record<string, FeeRow['type']> = {
+          'scholarship': 'scholarship',
+          'accommodation': 'accommodation',
+          'consultation': 'consultation',
+          'application': 'application',
+          'visa': 'visa',
+          'insurance': 'insurance',
+          'flight': 'flight',
+          'savings': 'savings',
+        };
+        feeType = categoryMap[cost.category] || 'other';
+      }
+      
+      return {
+        id: `fixed-${idx}`,
+        name: cost.type || 'Phí cố định',
+        type: feeType,
+        amount: cost.amount || 0,
+        currency: (cost.currency as any) || 'VND',
+        appliesToSystems: VISA_TYPES as unknown as string[],
+        note: cost.description || '',
+      };
+    });
+
+    (university?.optionalAddons || []).forEach((addon, idx) => {
+      const typeMap: Record<string, any> = {
+        'dorm-vn': 'accommodation',
+        'dorm-kr': 'accommodation',
+        'savings': 'savings',
+        'flight': 'flight',
+        'scholarship': 'scholarship',
+        'group': 'other',
+        'other': 'other',
+      };
+      
+      fixedCosts.push({
+        id: `addon-${idx}`,
+        name: addon.name || addon.nameVi || 'Phí tùy chọn',
+        type: typeMap[addon.type] || 'other',
+        amount: addon.amount || 0,
+        currency: (addon.currency as any) || 'VND',
+        appliesToSystems: addon.visaType || VISA_TYPES as unknown as string[],
+        note: addon.conditional || '',
+      });
+    });
+
+    // Initialize commonFeesVND from new schema or create defaults
+    const commonFeesVND = university?.koreanData?.commonFeesVND || [
+      { id: 'hoc_tieng', name: 'Học tiếng Hàn', amount: 13000000, note: 'Học từ 0 lên TOPIK 2 + Tài khoản E-Learning', editable: true },
+      { id: 'phi_tu_van', name: 'Phí tư vấn & xử lý hồ sơ', amount: 39000000, editable: true },
+      { id: 'phi_trung_tam', name: 'Phí trung tâm thu hộ', amount: 11000000, subItems: ['Phí công chứng', 'Tem vàng', 'Tem tím', 'Xin visa', 'Khám sức khoẻ', 'Ship hồ sơ (VN)', 'Ship hồ sơ (HQ)', 'Đưa đón HQ', 'Tìm KTX'], editable: true },
+      { id: 've_may_bay', name: 'Vé máy bay 1 chiều', amount: 8000000, note: 'Bao gồm 40kg ký gửi', optional: true, editable: true },
+      { id: 'ktx_vn', name: 'KTX tại Việt Nam', amount: 0, amountPerMonth: 800000, note: 'Học viên chọn số tháng', optional: true, editable: true },
+    ];
+
+    return {
       name: university?.name || '',
       koreanName: university?.koreanName || '',
-      region: university?.region || university?.koreanData?.address || '',
-      topTier: (university?.topTier || university?.koreanData?.topTier || 'Top2') as FormValues['topTier'],
-      country: university?.country || 'South Korea',
-      overview: university?.overview || '',
-      isKorean: university?.koreanData?.isKoreanUniversity ?? true,
-      selectedVisaType: university?.koreanData?.visaSystems?.[0]?.visaType || 'D4-1',
-      generalTuition: university?.generalTuition || 0,
-      visaFee: university?.visaFee || 0,
-      accommodationFee: university?.accommodationFee || 0,
-      insuranceFee: university?.insuranceFee || 0,
-      additionalFees: university?.additionalFees?.length ? university.additionalFees : [],
-      fixedCosts: (university?.fixedCosts || []).map(c => ({
-        ...c,
-        // ✅ FIX 2: cast currency to the enum type
-        currency: (c.currency as (typeof CURRENCY_VALUES)[number] | undefined) ?? 'VND',
-      })),
-      optionalAddons: (university?.optionalAddons || []).map(addon => ({
-        id: addon.id,
-        name: addon.name,
-        amount: addon.amount,
-        type: addon.type || 'other',
-      })),
-    }),
-    [university]
-  );
+      region: university?.region || '',
+      topTier: (university?.koreanData?.topTier || 'Top2') as 'Top1' | 'Top2' | 'Top3',
+      overview: university?.overview || university?.description || '',
+      visaSystems: baseSystems,
+      fixedCosts,
+      // New fields
+      commonFeesVND,
+      supportPolicies: university?.koreanData?.supportPolicies || ['Đón sân bay', 'Hỗ trợ CCCD nước ngoài', 'Chuyển đổi visa'],
+      refundPolicy: university?.koreanData?.refundPolicy || 'Linh hoạt: hoàn về TK học viên, trung tâm hoặc người ủy quyền',
+      admissionsType: university?.koreanData?.admissionsType || 'Xét hồ sơ + Phỏng vấn',
+      jobOpportunities: university?.koreanData?.jobOpportunities || '',
+    };
+  }, [university]);
 
-  const {
-    control,
-    handleSubmit,
-    reset,
-    watch,
-    formState: { errors, isSubmitting },
-  } = useForm<FormValues>({
+  const { control, handleSubmit, reset, watch, setValue, formState: { isSubmitting } } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues,
-    mode: 'onBlur',
   });
 
-  const { fields: additionalFeeFields, append: appendAdditional, remove: removeAdditional } = useFieldArray({
-    control,
-    name: 'additionalFees',
-  });
+  const visaSystems = watch('visaSystems') || [];
+  const fixedCosts = watch('fixedCosts') || [];
+  const commonFeesVND = watch('commonFeesVND') || [];
+  const supportPolicies = watch('supportPolicies') || [];
+  const refundPolicy = watch('refundPolicy') || '';
+  const admissionsType = watch('admissionsType') || '';
+  const jobOpportunities = watch('jobOpportunities') || '';
 
-  const { fields: fixedCostFields, append: appendFixedCost, remove: removeFixedCost } = useFieldArray({
-    control,
-    name: 'fixedCosts',
-  });
+  // Helper to update common fee amount
+  const updateCommonFeeAmount = (feeId: string, amount: number) => {
+    const newFees = commonFeesVND.map(fee => 
+      fee.id === feeId ? { ...fee, amount } : fee
+    );
+    setValue('commonFeesVND', newFees);
+  };
 
-  const { fields: addonFields, append: appendAddon, remove: removeAddon } = useFieldArray({
-    control,
-    name: 'optionalAddons',
-  });
-
-  const isKorean = watch('isKorean') ?? true;
-  const overviewValue = watch('overview') || '';
-  const overviewCount = countWords(overviewValue);
-  const selectedVisa = watch('selectedVisaType') || 'D4-1';
-
-  const fixedCostsSnapshot = watch('fixedCosts') || [];
-  const fixedCostsTotal = useMemo(
-    () => fixedCostsSnapshot.reduce((sum, cost) => {
-      // ✅ FIX 1: cast cost.currency to Currency before passing to convertAmount
-      const src = (cost?.currency as Currency | undefined) || 'VND';
-      const converted = convertAmount(cost?.amount || 0, currency, src);
-      return sum + converted;
-    }, 0),
-    [fixedCostsSnapshot, currency, convertAmount]
-  );
-
-  const optionalAddonsSnapshot = watch('optionalAddons') || [];
-  const addonsCostsTotal = useMemo(
-    () => optionalAddonsSnapshot.reduce((sum, addon) => sum + (addon?.amount || 0), 0),
-    [optionalAddonsSnapshot]
-  );
-
-  const additionalFeesSnapshot = watch('additionalFees') || [];
-  const additionalFeesTotal = useMemo(
-    () => additionalFeesSnapshot.reduce((sum, fee) => sum + (fee?.amount || 0), 0),
-    [additionalFeesSnapshot]
-  );
-
-  const currentVisaSystems = university?.koreanData?.visaSystems || [];
-  const selectedVisaSystem = currentVisaSystems.find(v => v.visaType === selectedVisa);
-
-  const visaSystemCostTotal = useMemo(() => {
-    if (!selectedVisaSystem) return 0;
-    let total = 0;
-    if (selectedVisaSystem.tuitionPerTerm) total += selectedVisaSystem.tuitionPerTerm;
-    if (selectedVisaSystem.tuitionRange?.max) total += selectedVisaSystem.tuitionRange.max;
-    if (selectedVisaSystem.applicationFee) total += selectedVisaSystem.applicationFee;
-    if (selectedVisaSystem.enrollmentFee) total += selectedVisaSystem.enrollmentFee;
-    if (selectedVisaSystem.baseYearlyFee) total += selectedVisaSystem.baseYearlyFee;
-    return convertAmount(total, currency, 'KRW');
-  }, [selectedVisaSystem, currency, convertAmount]);
-
-  const totalCost = useMemo(() => {
-    if (isKorean && selectedVisaSystem) {
-      return fixedCostsTotal + visaSystemCostTotal + addonsCostsTotal;
-    }
-    const traditional =
-      (watch('generalTuition') || 0) +
-      (watch('visaFee') || 0) +
-      (watch('accommodationFee') || 0) +
-      (watch('insuranceFee') || 0) +
-      additionalFeesTotal;
-    return traditional;
-  }, [isKorean, selectedVisaSystem, fixedCostsTotal, visaSystemCostTotal, addonsCostsTotal, additionalFeesTotal, watch]);
+  // Helper to update common fee note
+  const updateCommonFeeNote = (feeId: string, note: string) => {
+    const newFees = commonFeesVND.map(fee => 
+      fee.id === feeId ? { ...fee, note } : fee
+    );
+    setValue('commonFeesVND', newFees);
+  };
 
   useEffect(() => {
     if (open) {
       reset(defaultValues);
-      setSelectedVisaType(defaultValues.selectedVisaType || 'D4-1');
-      setEnabledVisaSystems(new Set(currentVisaSystems.map(v => v.visaType)));
+      // Auto-expand all available visa systems when modal opens
+      const availableSystems = defaultValues.visaSystems
+        .filter(s => s.available)
+        .map(s => s.visaType);
+      setOpenSystems(availableSystems);
     }
-  }, [open, defaultValues, reset, currentVisaSystems]);
+  }, [open, defaultValues, reset]);
 
-  const handleSave = handleSubmit((values) => {
-    const topVisaLabel = values.topTier === 'Top1' ? 'Top 1' : values.topTier === 'Top2' ? 'Top 2' : 'Top 3';
-    const enabledVisaSystemsData = currentVisaSystems.filter(vs => enabledVisaSystems.has(vs.visaType));
+  const updateSystem = (index: number, data: Partial<VisaSystemForm>) => {
+    const current = visaSystems[index];
+    const updated = { ...current, ...data };
+    const newSystems = [...visaSystems];
+    newSystems[index] = updated;
+    setValue('visaSystems', newSystems);
+  };
+
+  const toggleSystemAvailable = (systemIndex: number, checked: boolean) => {
+    const system = visaSystems[systemIndex];
+    updateSystem(systemIndex, { available: checked });
+    if (checked) {
+      // Auto-expand when made available
+      setOpenSystems(prev => [...prev, system.visaType]);
+    } else {
+      // Collapse when made unavailable
+      setOpenSystems(prev => prev.filter(code => code !== system.visaType));
+    }
+  };
+
+  const addSystemFee = (systemIndex: number) => {
+    const system = visaSystems[systemIndex];
+    const newFee: FeeRow = {
+      id: `sys-fee-${Date.now()}`,
+      name: '',
+      type: 'system_cost',
+      amount: 0,
+      currency: 'VND',
+      appliesToSystems: [system.visaType],
+      note: '',
+    };
+    updateSystem(systemIndex, {
+      fees: [...(system.fees || []), newFee],
+    });
+  };
+
+  const removeSystemFee = (systemIndex: number, feeIndex: number) => {
+    const system = visaSystems[systemIndex];
+    const newFees = [...(system.fees || [])];
+    newFees.splice(feeIndex, 1);
+    updateSystem(systemIndex, { fees: newFees });
+  };
+
+  const updateSystemFee = (systemIndex: number, feeIndex: number, updates: Partial<FeeRow>) => {
+    const system = visaSystems[systemIndex];
+    const newFees = [...(system.fees || [])];
+    newFees[feeIndex] = { ...newFees[feeIndex], ...updates };
+    updateSystem(systemIndex, { fees: newFees });
+  };
+
+  const addFixedCost = () => {
+    const newFee: FeeRow = {
+      id: `fixed-${Date.now()}`,
+      name: '',
+      type: 'other',
+      amount: 0,
+      currency: 'VND',
+      appliesToSystems: VISA_TYPES as unknown as string[],
+      note: '',
+    };
+    setValue('fixedCosts', [...fixedCosts, newFee]);
+  };
+
+  const removeFixedCost = (index: number) => {
+    const newCosts = [...fixedCosts];
+    newCosts.splice(index, 1);
+    setValue('fixedCosts', newCosts);
+  };
+
+  const updateFixedCost = (index: number, updates: Partial<FeeRow>) => {
+    const newCosts = [...fixedCosts];
+    newCosts[index] = { ...newCosts[index], ...updates };
+    setValue('fixedCosts', newCosts);
+  };
+
+  const totalCost = useMemo(() => {
+    let total = 0;
+    
+    visaSystems.forEach(system => {
+      if (!system.available) return;
+      
+      if (system.tuitionPerTerm) {
+        total += convertAmount(system.tuitionPerTerm, 'VND', 'KRW');
+      }
+      if (system.applicationFee) {
+        total += convertAmount(system.applicationFee, 'VND', 'KRW');
+      }
+      if (system.enrollmentFee) {
+        total += convertAmount(system.enrollmentFee, 'VND', 'KRW');
+      }
+      
+      (system.fees || []).forEach(fee => {
+        if (fee.type !== 'scholarship') {
+          total += convertAmount(fee.amount, 'VND', fee.currency as Currency);
+        }
+      });
+    });
+    
+    fixedCosts.forEach(fee => {
+      if (fee.type !== 'scholarship') {
+        total += convertAmount(fee.amount, 'VND', fee.currency as Currency);
+      }
+    });
+    
+    return total;
+  }, [visaSystems, fixedCosts, convertAmount]);
+
+  const onSubmit = handleSubmit(async (values) => {
+    const fixedCostsData: University['fixedCosts'] = [];
+    const optionalAddons: University['optionalAddons'] = [];
+    
+    values.fixedCosts.forEach(fee => {
+      const typeMap: Record<string, any> = {
+        'consultation': 'other',
+        'application': 'other',
+        'visa': 'other',
+        'accommodation': 'dorm-vn',
+        'insurance': 'other',
+        'scholarship': 'scholarship',
+        'flight': 'other',
+        'savings': 'other',
+        'other': 'other',
+        'system_cost': 'other',
+      };
+      
+      if (fee.type === 'consultation' || fee.type === 'application' || fee.type === 'visa' || fee.type === 'insurance') {
+        fixedCostsData.push({
+          type: fee.name,
+          amount: fee.amount,
+          currency: fee.currency as Currency,
+          description: fee.note,
+        });
+      } else {
+        optionalAddons.push({
+          id: fee.id || `addon-${Date.now()}`,
+          name: fee.name,
+          nameVi: fee.name,
+          type: typeMap[fee.type] || 'other',
+          amount: fee.amount,
+          currency: fee.currency,
+          selectable: true,
+          visaType: fee.appliesToSystems,
+          conditional: fee.note,
+        });
+      }
+    });
+
+    const visaSystemsData = values.visaSystems
+      .filter(s => s.available)
+      .map(s => ({
+        visaType: s.visaType as 'D4-1' | 'D2-1' | 'D2-2' | 'D2-3' | 'D2-6',
+        visaName: s.visaName,
+        description: s.description,
+        available: true,
+        tuitionPerTerm: s.tuitionPerTerm,
+        tuitionRange: s.tuitionRangeMin || s.tuitionRangeMax 
+          ? { min: s.tuitionRangeMin || 0, max: s.tuitionRangeMax || 0 }
+          : undefined,
+        applicationFee: s.applicationFee,
+        enrollmentFee: s.enrollmentFee,
+      }));
 
     const payload: Partial<University> = {
+      id: university?.id,
       name: values.name,
       koreanName: values.koreanName,
       region: values.region,
-      topTier: values.topTier,
       country: 'South Korea',
-      overview: values.overview || '',
+      overview: values.overview,
+      fixedCosts: fixedCostsData,
+      optionalAddons,
       koreanData: {
-        ...(university?.koreanData || { isKoreanUniversity: true }),
-        isKoreanUniversity: isKorean ?? true,
-        address: values.region || university?.koreanData?.address,
+        isKoreanUniversity: true,
+        ...(university?.koreanData || {}),
         topTier: values.topTier,
-        topVisa: topVisaLabel,
-        visaSystems: enabledVisaSystemsData.length > 0 ? enabledVisaSystemsData : undefined,
+        address: values.region,
+        visaSystems: visaSystemsData,
+        // New schema fields
+        commonFeesVND: values.commonFeesVND,
+        supportPolicies: values.supportPolicies,
+        refundPolicy: values.refundPolicy,
+        admissionsType: values.admissionsType,
+        jobOpportunities: values.jobOpportunities,
       },
     };
 
-    if (isKorean) {
-      // ✅ FIX 2: cast currency field when saving
-      payload.fixedCosts = (values.fixedCosts || []).map(c => ({
-        ...c,
-        currency: c.currency as Currency | undefined,
-      }));
-      payload.optionalAddons = (values.optionalAddons || []).map(addon => ({
-        id: addon.id,
-        name: addon.name,
-        nameVi: addon.name,
-        type: (addon.type || 'other') as 'dorm-vn' | 'dorm-kr' | 'flight' | 'savings' | 'scholarship' | 'group' | 'other',
-        amount: addon.amount,
-        selectable: true,
-      }));
-    } else {
-      payload.generalTuition = values.generalTuition || 0;
-      payload.visaFee = values.visaFee || 0;
-      payload.accommodationFee = values.accommodationFee || 0;
-      payload.insuranceFee = values.insuranceFee || 0;
-      payload.additionalFees = values.additionalFees || [];
-    }
-
-    onSave(payload);
+    await onSave(payload);
     onOpenChange(false);
-    toast.success(isEditMode ? 'Đã cập nhật trường' : 'Đã thêm trường');
+    toast.success(isEditMode ? 'Đã cập nhật trường' : 'Đã thêm trường mới');
   });
-
-  const allVisaLabels: Record<string, { label: string; name: string }> = {
-    'D4-1': { label: 'D4-1', name: '(Tiếng Hàn)' },
-    'D2-1': { label: 'D2-1', name: '(Chuẩn bị)' },
-    'D2-2': { label: 'D2-2', name: '(Đại học)' },
-    'D2-3': { label: 'D2-3', name: '(Sau đại học)' },
-    'D2-6': { label: 'D2-6', name: '(Nâng cao)' },
-  };
-
-  const visaSystemButtons = currentVisaSystems
-    .map(vs => ({
-      type: vs.visaType,
-      ...allVisaLabels[vs.visaType] || { label: vs.visaType, name: '' }
-    }))
-    .sort((a, b) =>
-      ['D4-1', 'D2-1', 'D2-2', 'D2-3', 'D2-6'].indexOf(a.type) -
-      ['D4-1', 'D2-1', 'D2-2', 'D2-3', 'D2-6'].indexOf(b.type)
-    );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{isEditMode ? 'Chỉnh sửa trường' : 'Thêm trường mới'}</DialogTitle>
-          <DialogDescription>
-            Dữ liệu lưu trữ theo VND. Hiển thị theo {currency}.
+      <DialogContent className="!max-w-full !w-[95vw] !max-h-[95vh] !p-0 overflow-hidden flex flex-col">
+        <DialogHeader className="px-8 py-6 border-b bg-slate-50 sticky top-0 z-20 flex-shrink-0">
+          <DialogTitle className="text-2xl font-bold">Chỉnh sửa trường đại học Hàn Quốc</DialogTitle>
+          <DialogDescription className="text-base mt-1">
+            Quản lý hệ visa và chi phí. Toggle Available/Non-available cho mỗi hệ
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSave} className="space-y-6">
-          {/* Basic Information */}
-          <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-slate-900">Thông tin cơ bản</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Tên trường</Label>
-                <Controller
-                  control={control}
-                  name="name"
-                  render={({ field }) => (
-                    <Input id="name" {...field} placeholder="Ajou University" aria-invalid={!!errors.name} />
-                  )}
-                />
-                {errors.name && <p className="text-xs text-red-600">{errors.name.message}</p>}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="koreanName">Tên tiếng Hàn</Label>
-                <Controller
-                  control={control}
-                  name="koreanName"
-                  render={({ field }) => (
-                    <Input id="koreanName" {...field} placeholder="아주대학교" />
-                  )}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="region">Khu vực</Label>
-                <Controller
-                  control={control}
-                  name="region"
-                  render={({ field }) => (
-                    <Input id="region" {...field} placeholder="Seoul, Busan..." />
-                  )}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Top Tier</Label>
-                <Controller
-                  control={control}
-                  name="topTier"
-                  render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Chọn hạng" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Top1">Top 1</SelectItem>
-                        <SelectItem value="Top2">Top 2</SelectItem>
-                        <SelectItem value="Top3">Top 3 (Hạn chế visa)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="country">Quốc gia</Label>
-                <Controller
-                  control={control}
-                  name="country"
-                  render={({ field }) => <Input id="country" {...field} disabled />}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label>Mô tả (tối đa 250 từ)</Label>
-                <span className={`text-xs font-semibold ${overviewCount > 250 ? 'text-red-600' : 'text-slate-500'}`}>
-                  {overviewCount} / 250
-                </span>
-              </div>
-              <Controller
-                control={control}
-                name="overview"
-                render={({ field }) => (
-                  <Textarea
-                    {...field}
-                    rows={4}
-                    placeholder="Mô tả ngắn về trường, chương trình, ưu điểm..."
-                    aria-invalid={!!errors.overview}
+        <form id="university-form" onSubmit={onSubmit} className="px-8 py-6 space-y-8 overflow-y-auto flex-1">
+          
+          {/* Thông tin cơ bản */}
+          <Card className="shadow-md">
+            <CardHeader className="bg-blue-50 border-b py-4">
+              <h3 className="font-bold text-xl text-slate-800">Thông tin cơ bản</h3>
+            </CardHeader>
+            <CardContent className="p-6 space-y-6">
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label className="text-base font-semibold">Tên trường</Label>
+                  <Controller 
+                    name="name" 
+                    control={control} 
+                    render={({ field }) => <Input {...field} className="h-12 text-base" />} 
                   />
-                )}
-              />
-              {errors.overview && <p className="text-xs text-red-600">{errors.overview.message}</p>}
-            </div>
-          </div>
-
-          {/* Korean University Cost Management */}
-          {isKorean && (
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold text-slate-900">Quản lý chi phí (Đại học Hàn)</h3>
-
-              {/* Visa System Selector */}
-              <div className="space-y-3">
-                <Label>Hệ Visa Có Sẵn (Chọn những hệ bạn muốn cung cấp)</Label>
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-                  {ALL_VISA_OPTIONS.map((visa) => (
-                    <button
-                      key={visa.type}
-                      type="button"
-                      onClick={() => {
-                        const newSet = new Set(enabledVisaSystems);
-                        if (newSet.has(visa.type)) {
-                          newSet.delete(visa.type);
-                          if (selectedVisa === visa.type) {
-                            setSelectedVisaType(Array.from(newSet)[0] || null);
-                          }
-                        } else {
-                          newSet.add(visa.type);
-                        }
-                        setEnabledVisaSystems(newSet);
-                      }}
-                      className={`px-3 py-3 rounded-lg text-xs font-semibold transition-all border-2 ${
-                        enabledVisaSystems.has(visa.type)
-                          ? 'bg-primary text-white border-primary'
-                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:border-primary/50 hover:bg-slate-100'
-                      }`}
-                    >
-                      <div className="font-bold">{visa.label}</div>
-                      <div className="text-[10px] font-normal opacity-75 mt-1">{visa.name}</div>
-                    </button>
-                  ))}
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-base font-semibold">Tên tiếng Hàn</Label>
+                  <Controller 
+                    name="koreanName" 
+                    control={control} 
+                    render={({ field }) => <Input {...field} className="h-12 text-base" />} 
+                  />
                 </div>
               </div>
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label className="text-base font-semibold">Khu vực</Label>
+                  <Controller 
+                    name="region" 
+                    control={control} 
+                    render={({ field }) => <Input {...field} className="h-12 text-base" />} 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-base font-semibold">Top Tier</Label>
+                  <Controller 
+                    name="topTier" 
+                    control={control} 
+                    render={({ field }) => (
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger className="h-12 text-base">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Top1">Top 1</SelectItem>
+                          <SelectItem value="Top2">Top 2</SelectItem>
+                          <SelectItem value="Top3">Top 3</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )} 
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-base font-semibold">Mô tả (tối đa 250 từ)</Label>
+                <Controller 
+                  name="overview" 
+                  control={control} 
+                  render={({ field }) => <Textarea {...field} rows={3} className="text-base resize-none" />} 
+                />
+              </div>
+            </CardContent>
+          </Card>
 
-              {/* Three-Section Cost Manager */}
-              <Accordion type="single" collapsible className="space-y-3">
-                {/* Section 1: Fixed Costs */}
-                <AccordionItem value="fixed-costs" className="border border-slate-200 rounded-lg px-4">
-                  <AccordionTrigger className="hover:no-underline">
-                    <div className="flex items-center justify-between w-full">
-                      <span className="font-semibold">Chi phí cố định</span>
-                      <span className="text-sm text-slate-500">{formatFrom(fixedCostsTotal, 'VND')}</span>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="space-y-4 pt-4">
-                    {fixedCostFields.length === 0 && (
-                      <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-3 text-sm text-slate-500">
-                        Chưa có chi phí cố định. Nhấn "+ Thêm" để bắt đầu.
-                      </div>
+          {/* Hệ thống Visa & Chi phí */}
+          <Card className="shadow-md">
+            <CardHeader className="bg-blue-50 border-b py-4">
+              <h3 className="font-bold text-xl text-slate-800">Hệ thống Visa & Chi phí</h3>
+            </CardHeader>
+            <CardContent className="p-6 space-y-6">
+              
+              {/* 5 Visa Buttons with Toggle */}
+              <div className="flex flex-wrap gap-4">
+                {visaSystems.map((system, systemIndex) => (
+                  <div 
+                    key={system.visaType}
+                    className={cn(
+                      "flex items-center gap-3 px-5 py-4 rounded-xl border-2 transition-all",
+                      system.available 
+                        ? 'bg-blue-50 border-blue-400 shadow-md' 
+                        : 'bg-slate-100 border-slate-200 opacity-70'
                     )}
+                  >
+                    <span className={cn(
+                      "font-bold text-xl",
+                      system.available ? 'text-blue-700' : 'text-slate-500'
+                    )}>
+                      {system.visaType}
+                    </span>
+                    
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={system.available}
+                        onCheckedChange={(checked) => toggleSystemAvailable(systemIndex, checked)}
+                        className="data-[state=checked]:bg-blue-600"
+                      />
+                      <span className={cn(
+                        "text-sm font-medium min-w-[100px]",
+                        system.available ? 'text-blue-700' : 'text-slate-500'
+                      )}>
+                        {system.available ? 'Available' : 'Non-available'}
+                      </span>
+                    </div>
+                    
+                    {system.available && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        onClick={() => {
+                          setOpenSystems(prev => 
+                            prev.includes(system.visaType) 
+                              ? prev.filter(code => code !== system.visaType)
+                              : [...prev, system.visaType]
+                          );
+                        }}
+                      >
+                        {openSystems.includes(system.visaType) ? (
+                          <ChevronUp className="w-5 h-5 text-blue-600" />
+                        ) : (
+                          <ChevronDown className="w-5 h-5 text-blue-600" />
+                        )}
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
 
-                    {fixedCostFields.map((field, index) => (
-                      <div key={field.id} className="grid grid-cols-1 md:grid-cols-[1.5fr_1fr_1fr_auto] gap-3 items-end p-3 bg-slate-50 rounded-lg">
-                        <div className="space-y-2">
-                          <Label className="text-xs">Loại phí</Label>
-                          <Controller
-                            control={control}
-                            name={`fixedCosts.${index}.type`}
-                            render={({ field }) => (
-                              <Input {...field} placeholder="Phí tư vấn, phí môi giới..." className="text-sm" />
-                            )}
-                          />
-                        </div>
+              {/* Expanded System Form */}
+              {visaSystems.map((system, systemIndex) => {
+                if (!system.available || !openSystems.includes(system.visaType)) return null;
+                
+                return (
+                  <div key={system.visaType} className="border-2 border-blue-200 rounded-xl p-6 bg-blue-50/30">
+                    <div className="flex items-center gap-3 mb-6">
+                      <Badge className="bg-blue-600 text-white text-lg px-4 py-1">
+                        {system.visaType}
+                      </Badge>
+                      <h4 className="font-bold text-xl text-slate-800">
+                        Chi phí theo hệ {system.visaType}
+                      </h4>
+                    </div>
+                    
+                    <div className="grid grid-cols-3 gap-4 mb-6">
+                      <div className="space-y-2">
+                        <Label className="text-sm font-semibold">Học phí/kỳ (KRW)</Label>
+                        <Input 
+                          type="number" 
+                          value={system.tuitionPerTerm}
+                          onChange={(e) => updateSystem(systemIndex, { tuitionPerTerm: Number(e.target.value) })}
+                          className="h-11"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-sm font-semibold">Phí đơn (KRW)</Label>
+                        <Input 
+                          type="number" 
+                          value={system.applicationFee}
+                          onChange={(e) => updateSystem(systemIndex, { applicationFee: Number(e.target.value) })}
+                          className="h-11"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-sm font-semibold">Phí nhập học (KRW)</Label>
+                        <Input 
+                          type="number" 
+                          value={system.enrollmentFee}
+                          onChange={(e) => updateSystem(systemIndex, { enrollmentFee: Number(e.target.value) })}
+                          className="h-11"
+                        />
+                      </div>
+                    </div>
 
-                        <div className="space-y-2">
-                          <Label className="text-xs">Số tiền</Label>
-                          <Controller
-                            control={control}
-                            name={`fixedCosts.${index}.amount`}
-                            render={({ field }) => (
-                              <Input
-                                type="number"
-                                {...field}
-                                onChange={e => field.onChange(Number(e.target.value))}
-                                placeholder="0"
-                                className="text-sm"
-                              />
-                            )}
-                          />
-                        </div>
+                    <div className="grid grid-cols-2 gap-4 mb-6">
+                      <div className="space-y-2">
+                        <Label className="text-sm font-semibold">Học phí tối thiểu (KRW)</Label>
+                        <Input 
+                          type="number" 
+                          value={system.tuitionRangeMin}
+                          onChange={(e) => updateSystem(systemIndex, { tuitionRangeMin: Number(e.target.value) })}
+                          className="h-11"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-sm font-semibold">Học phí tối đa (KRW)</Label>
+                        <Input 
+                          type="number" 
+                          value={system.tuitionRangeMax}
+                          onChange={(e) => updateSystem(systemIndex, { tuitionRangeMax: Number(e.target.value) })}
+                          className="h-11"
+                        />
+                      </div>
+                    </div>
 
-                        <div className="space-y-2">
-                          <Label className="text-xs">Tiền tệ</Label>
-                          {/* ✅ FIX 2: Use string value from enum */}
-                          <Controller
-                            control={control}
-                            name={`fixedCosts.${index}.currency`}
-                            render={({ field }) => (
-                              <Select
-                                value={field.value || 'VND'}
-                                onValueChange={(val) => field.onChange(val as (typeof CURRENCY_VALUES)[number])}
-                              >
-                                <SelectTrigger className="text-sm">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="VND">VND</SelectItem>
-                                  <SelectItem value="KRW">KRW</SelectItem>
-                                  <SelectItem value="USD">USD</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            )}
-                          />
-                        </div>
-
-                        <Button type="button" variant="ghost" size="icon" onClick={() => removeFixedCost(index)}>
-                          <Trash2 className="w-4 h-4" />
+                    {/* Fees for this system */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h5 className="font-bold text-lg text-slate-700">Danh sách phí cho hệ {system.visaType}</h5>
+                        <Button type="button" size="sm" onClick={() => addSystemFee(systemIndex)} className="bg-blue-600 hover:bg-blue-700">
+                          <Plus className="w-4 h-4 mr-1" /> Thêm phí
                         </Button>
                       </div>
-                    ))}
 
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => appendFixedCost({ type: '', amount: 0, currency: 'VND' })}
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Thêm chi phí cố định
-                    </Button>
-                  </AccordionContent>
-                </AccordionItem>
-
-                {/* Section 2: System-Specific Costs */}
-                <AccordionItem value="system-costs" className="border border-slate-200 rounded-lg px-4">
-                  <AccordionTrigger className="hover:no-underline">
-                    <div className="flex items-center justify-between w-full">
-                      <span className="font-semibold">Chi phí theo hệ ({selectedVisa})</span>
-                      <span className="text-sm text-slate-500">{formatFrom(visaSystemCostTotal, 'VND')}</span>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="space-y-4 pt-4">
-                    {selectedVisaSystem ? (
-                      <div className="space-y-3 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                        <p className="text-sm font-semibold text-slate-900">
-                          {selectedVisaSystem.visaName || selectedVisaSystem.description}
-                        </p>
-                        {selectedVisaSystem.tuitionPerTerm && (
-                          <div className="flex justify-between text-sm">
-                            <span className="text-slate-700">Tuition/Term:</span>
-                            <span className="font-semibold">{formatFrom(selectedVisaSystem.tuitionPerTerm, 'VND', 'KRW')}</span>
+                      {system.fees && system.fees.length > 0 ? (
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-12 gap-3 text-sm font-semibold text-slate-700 px-3 py-2 bg-slate-100 rounded-lg">
+                            <div className="col-span-3">Tên phí</div>
+                            <div className="col-span-2">Loại phí</div>
+                            <div className="col-span-2">Số tiền</div>
+                            <div className="col-span-4">Hệ áp dụng</div>
+                            <div className="col-span-1"></div>
                           </div>
-                        )}
-                        {selectedVisaSystem.tuitionRange && (
-                          <div className="flex justify-between text-sm">
-                            <span className="text-slate-700">Tuition Range:</span>
-                            <span className="font-semibold">
-                              {formatFrom(selectedVisaSystem.tuitionRange.min, 'VND', 'KRW')} - {formatFrom(selectedVisaSystem.tuitionRange.max, 'VND', 'KRW')}
-                            </span>
-                          </div>
-                        )}
-                        {selectedVisaSystem.applicationFee && (
-                          <div className="flex justify-between text-sm">
-                            <span className="text-slate-700">Application Fee:</span>
-                            <span className="font-semibold">{formatFrom(selectedVisaSystem.applicationFee, 'VND', 'KRW')}</span>
-                          </div>
-                        )}
-                        {selectedVisaSystem.enrollmentFee && (
-                          <div className="flex justify-between text-sm">
-                            <span className="text-slate-700">Enrollment Fee:</span>
-                            <span className="font-semibold">{formatFrom(selectedVisaSystem.enrollmentFee, 'VND', 'KRW')}</span>
-                          </div>
-                        )}
-                        {selectedVisaSystem.baseYearlyFee && (
-                          <div className="flex justify-between text-sm">
-                            <span className="text-slate-700">Base Yearly Fee:</span>
-                            <span className="font-semibold">{formatFrom(selectedVisaSystem.baseYearlyFee, 'VND', 'KRW')}</span>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-3 text-sm text-slate-500">
-                        Hệ visa này chưa có dữ liệu chi phí.
-                      </div>
-                    )}
-                  </AccordionContent>
-                </AccordionItem>
-
-                {/* Section 3: Optional Add-ons */}
-                <AccordionItem value="addons" className="border border-slate-200 rounded-lg px-4">
-                  <AccordionTrigger className="hover:no-underline">
-                    <div className="flex items-center justify-between w-full">
-                      <span className="font-semibold">Phí tùy chọn</span>
-                      <span className="text-sm text-slate-500">{formatFrom(addonsCostsTotal, 'VND')}</span>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="space-y-4 pt-4">
-                    <p className="text-xs text-slate-600 bg-blue-50 border border-blue-200 rounded p-2">
-                      Phí tùy chọn có thể là KTX, vé máy bay, học bổng hoặc các loại phí khác.
-                    </p>
-
-                    {addonFields.length === 0 && (
-                      <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-3 text-sm text-slate-500">
-                        Chưa có phí tùy chọn. Nhấn "+ Thêm" để thêm.
-                      </div>
-                    )}
-
-                    {addonFields.map((field, index) => (
-                      <div key={field.id} className="space-y-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          <div className="space-y-2">
-                            <Label className="text-xs">Loại phí</Label>
-                            {/* ✅ FIX 3 & 4: name is now valid since 'type' is in addonSchema; value cast to string */}
-                            <Controller
-                              control={control}
-                              name={`optionalAddons.${index}.type`}
-                              render={({ field }) => (
-                                <Select
-                                  value={String(field.value || 'other')}
-                                  onValueChange={field.onChange}
-                                >
-                                  <SelectTrigger className="text-sm">
+                          
+                          {system.fees.map((fee, feeIndex) => (
+                            <div key={fee.id || feeIndex} className="grid grid-cols-12 gap-3 items-start bg-white p-3 rounded-lg border border-slate-200">
+                              <div className="col-span-3">
+                                <Input 
+                                  value={fee.name} 
+                                  onChange={(e) => updateSystemFee(systemIndex, feeIndex, { name: e.target.value })}
+                                  placeholder="Tên phí"
+                                  className="h-10 text-sm"
+                                />
+                              </div>
+                              <div className="col-span-2">
+                                <Select value={fee.type} onValueChange={(v) => updateSystemFee(systemIndex, feeIndex, { type: v as any })}>
+                                  <SelectTrigger className="h-10 text-sm">
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="other">Khác</SelectItem>
-                                    <SelectItem value="dorm-vn">KTX Việt Nam</SelectItem>
-                                    <SelectItem value="dorm-kr">KTX Hàn Quốc</SelectItem>
-                                    <SelectItem value="flight">Vé máy bay</SelectItem>
-                                    <SelectItem value="savings">Sổ tiết kiệm</SelectItem>
-                                    <SelectItem value="scholarship">Học bổng</SelectItem>
+                                    {FEE_TYPE_OPTIONS.map(opt => (
+                                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                    ))}
                                   </SelectContent>
                                 </Select>
-                              )}
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label className="text-xs">Tên phí</Label>
-                            <Controller
-                              control={control}
-                              name={`optionalAddons.${index}.name`}
-                              render={({ field }) => (
-                                <Input {...field} placeholder="VD: KTX 4-người, Vé Hà Nội..." className="text-sm" />
-                              )}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-end">
-                          <div className="space-y-2">
-                            <Label className="text-xs">Số tiền (VND)</Label>
-                            <Controller
-                              control={control}
-                              name={`optionalAddons.${index}.amount`}
-                              render={({ field }) => (
-                                <Input
-                                  type="number"
-                                  {...field}
-                                  onChange={e => field.onChange(Number(e.target.value))}
-                                  placeholder="0"
-                                  className="text-sm"
+                              </div>
+                              <div className="col-span-2 flex gap-1">
+                                <Input 
+                                  type="number" 
+                                  value={fee.amount} 
+                                  onChange={(e) => updateSystemFee(systemIndex, feeIndex, { amount: Number(e.target.value) })}
+                                  className="h-10 text-sm flex-1"
                                 />
-                              )}
-                            />
-                          </div>
+                                <Select value={fee.currency} onValueChange={(v) => updateSystemFee(systemIndex, feeIndex, { currency: v as any })}>
+                                  <SelectTrigger className="h-10 text-sm w-16">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {CURRENCY_VALUES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="col-span-4">
+                                <div className="flex flex-wrap gap-2">
+                                  {VISA_TYPES.map(visaType => (
+                                    <label key={visaType} className="flex items-center gap-1 text-xs bg-slate-100 px-2 py-1 rounded border cursor-pointer hover:bg-slate-200">
+                                      <Checkbox 
+                                        checked={fee.appliesToSystems?.includes(visaType)}
+                                        onCheckedChange={(checked) => {
+                                          const current = fee.appliesToSystems || [];
+                                          const updated = checked ? [...current, visaType] : current.filter(v => v !== visaType);
+                                          updateSystemFee(systemIndex, feeIndex, { appliesToSystems: updated });
+                                        }}
+                                        className="w-3 h-3"
+                                      />
+                                      <span>{visaType}</span>
+                                    </label>
+                                  ))}
+                                </div>
+                              </div>
+                              <div className="col-span-1 flex justify-end">
+                                <Button type="button" variant="ghost" size="sm" onClick={() => removeSystemFee(systemIndex, feeIndex)} className="h-8 w-8 p-0">
+                                  <Trash2 className="w-4 h-4 text-red-500" />
+                                </Button>
+                              </div>
+                              <div className="col-span-12">
+                                <Input 
+                                  value={fee.note || ''} 
+                                  onChange={(e) => updateSystemFee(systemIndex, feeIndex, { note: e.target.value })}
+                                  placeholder="Ghi chú"
+                                  className="h-9 text-sm"
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-slate-500 text-sm italic">Chưa có phí nào cho hệ này</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
 
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="text-red-600 hover:text-red-700"
-                            onClick={() => removeAddon(index)}
-                          >
-                            <Trash2 className="w-4 h-4 mr-1" />
-                            Xóa
-                          </Button>
+          {/* Danh sách phí chung */}
+          <Card className="shadow-md">
+            <CardHeader className="bg-slate-50 border-b py-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-xl text-slate-800">Danh sách phí chung</h3>
+                <Button type="button" size="sm" variant="outline" onClick={addFixedCost}>
+                  <Plus className="w-4 h-4 mr-1" /> Thêm phí
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6">
+              {fixedCosts.length > 0 ? (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-12 gap-3 text-sm font-semibold text-slate-700 px-3 py-2 bg-slate-100 rounded-lg">
+                    <div className="col-span-3">Tên phí</div>
+                    <div className="col-span-2">Loại phí</div>
+                    <div className="col-span-2">Số tiền</div>
+                    <div className="col-span-4">Hệ áp dụng</div>
+                    <div className="col-span-1"></div>
+                  </div>
+                  
+                  {fixedCosts.map((fee, index) => (
+                    <div key={fee.id || index} className="grid grid-cols-12 gap-3 items-start bg-white p-3 rounded-lg border border-slate-200">
+                      <div className="col-span-3">
+                        <Input 
+                          value={fee.name} 
+                          onChange={(e) => updateFixedCost(index, { name: e.target.value })}
+                          placeholder="Tên phí"
+                          className="h-10 text-sm"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <Select value={fee.type} onValueChange={(v) => updateFixedCost(index, { type: v as any })}>
+                          <SelectTrigger className="h-10 text-sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {FEE_TYPE_OPTIONS.map(opt => (
+                              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="col-span-2 flex gap-1">
+                        <Input 
+                          type="number" 
+                          value={fee.amount} 
+                          onChange={(e) => updateFixedCost(index, { amount: Number(e.target.value) })}
+                          className="h-10 text-sm flex-1"
+                        />
+                        <Select value={fee.currency} onValueChange={(v) => updateFixedCost(index, { currency: v as any })}>
+                          <SelectTrigger className="h-10 text-sm w-16">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {CURRENCY_VALUES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="col-span-4">
+                        <div className="flex flex-wrap gap-2">
+                          {VISA_TYPES.map(visaType => (
+                            <label key={visaType} className="flex items-center gap-1 text-xs bg-slate-100 px-2 py-1 rounded border cursor-pointer hover:bg-slate-200">
+                              <Checkbox 
+                                checked={fee.appliesToSystems?.includes(visaType)}
+                                onCheckedChange={(checked) => {
+                                  const current = fee.appliesToSystems || [];
+                                  const updated = checked ? [...current, visaType] : current.filter(v => v !== visaType);
+                                  updateFixedCost(index, { appliesToSystems: updated });
+                                }}
+                                className="w-3 h-3"
+                              />
+                              <span>{visaType}</span>
+                            </label>
+                          ))}
                         </div>
                       </div>
-                    ))}
+                      <div className="col-span-1 flex justify-end">
+                        <Button type="button" variant="ghost" size="sm" onClick={() => removeFixedCost(index)} className="h-8 w-8 p-0">
+                          <Trash2 className="w-4 h-4 text-red-500" />
+                        </Button>
+                      </div>
+                      <div className="col-span-12">
+                        <Input 
+                          value={fee.note || ''} 
+                          onChange={(e) => updateFixedCost(index, { note: e.target.value })}
+                          placeholder="Ghi chú"
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-slate-500 text-sm italic">Chưa có phí chung nào</p>
+              )}
+            </CardContent>
+          </Card>
 
-                    {/* ✅ FIX 5: 'type' is now valid in appendAddon since schema includes it */}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => appendAddon({ id: Date.now().toString(), name: '', type: 'other', amount: 0 })}
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Thêm phí tùy chọn
-                    </Button>
-                  </AccordionContent>
-                </AccordionItem>
-              </Accordion>
+          {/* Section 3: Thông tin chung */}
+          <Card className="shadow-md">
+            <CardHeader className="bg-emerald-50 border-b py-4">
+              <h3 className="font-bold text-xl text-slate-800">Thông tin chung</h3>
+            </CardHeader>
+            <CardContent className="p-6 space-y-6">
+              {/* Việc làm thêm */}
+              <div className="space-y-2">
+                <Label className="text-base font-semibold">Việc làm thêm</Label>
+                <Controller 
+                  name="jobOpportunities" 
+                  control={control} 
+                  render={({ field }) => (
+                    <Textarea 
+                      {...field} 
+                      rows={3} 
+                      placeholder="Mô tả cơ hội việc làm thêm cho sinh viên..."
+                      className="text-base resize-none" 
+                    />
+                  )} 
+                />
+              </div>
 
-              {/* Total Cost Summary */}
-              <div className="rounded-lg border border-slate-200 bg-gradient-to-r from-blue-50 to-slate-50 p-4 mt-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-700">Chi phí cố định:</span>
-                    <span className="font-semibold">{formatFrom(fixedCostsTotal, 'VND')}</span>
+              {/* Chính sách hỗ trợ */}
+              <div className="space-y-2">
+                <Label className="text-base font-semibold">Chính sách hỗ trợ (mỗi dòng một chính sách)</Label>
+                <Controller 
+                  name="supportPolicies" 
+                  control={control} 
+                  render={({ field }) => (
+                    <Textarea 
+                      value={field.value?.join('\n') || ''}
+                      onChange={(e) => field.onChange(e.target.value.split('\n').filter(Boolean))}
+                      rows={4} 
+                      placeholder="Đón sân bay
+Hỗ trợ CCCD nước ngoài
+Chuyển đổi visa"
+                      className="text-base resize-none" 
+                    />
+                  )} 
+                />
+              </div>
+
+              {/* Chính sách hoàn tiền */}
+              <div className="space-y-2">
+                <Label className="text-base font-semibold">Chính sách hoàn tiền</Label>
+                <Controller 
+                  name="refundPolicy" 
+                  control={control} 
+                  render={({ field }) => (
+                    <Input 
+                      {...field} 
+                      placeholder="Linh hoạt: hoàn về TK học viên, trung tâm hoặc người ủy quyền"
+                      className="h-12 text-base" 
+                    />
+                  )} 
+                />
+              </div>
+
+              {/* Hình thức xét tuyển */}
+              <div className="space-y-2">
+                <Label className="text-base font-semibold">Hình thức xét tuyển</Label>
+                <Controller 
+                  name="admissionsType" 
+                  control={control} 
+                  render={({ field }) => (
+                    <Input 
+                      {...field} 
+                      placeholder="Xét hồ sơ + Phỏng vấn"
+                      className="h-12 text-base" 
+                    />
+                  )} 
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Total Summary */}
+          <Card className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-xl">
+            <CardContent className="py-6 px-8">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="bg-white/20 p-3 rounded-xl">
+                    <Calculator className="w-8 h-8" />
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-700">Chi phí hệ ({selectedVisa}):</span>
-                    <span className="font-semibold">{formatFrom(visaSystemCostTotal, 'VND')}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-700">Phí tùy chọn:</span>
-                    <span className="font-semibold">{formatFrom(addonsCostsTotal, 'VND')}</span>
-                  </div>
-                  <div className="border-t border-slate-200 pt-2 mt-2 flex justify-between text-base font-bold">
-                    <span>Tổng:</span>
-                    <span className="text-primary">{formatFrom(totalCost, 'VND')}</span>
+                  <div>
+                    <span className="text-lg text-blue-100 block">Tổng chi phí ước tính</span>
+                    <span className="text-sm text-blue-200">(Các hệ Available + Phí chung)</span>
                   </div>
                 </div>
-              </div>
-            </div>
-          )}
-
-          {/* Traditional Cost Management */}
-          {!isKorean && (
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold text-slate-900">Chi phí ({currency})</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Controller
-                  control={control}
-                  name="generalTuition"
-                  render={({ field }) => (
-                    <PriceInput label="Học phí" value={field.value || 0} onChange={field.onChange} error={errors.generalTuition?.message} />
-                  )}
-                />
-                <Controller
-                  control={control}
-                  name="visaFee"
-                  render={({ field }) => (
-                    <PriceInput label="Phí visa" value={field.value || 0} onChange={field.onChange} error={errors.visaFee?.message} />
-                  )}
-                />
-                <Controller
-                  control={control}
-                  name="accommodationFee"
-                  render={({ field }) => (
-                    <PriceInput label="Lưu trú" value={field.value || 0} onChange={field.onChange} error={errors.accommodationFee?.message} />
-                  )}
-                />
-                <Controller
-                  control={control}
-                  name="insuranceFee"
-                  render={({ field }) => (
-                    <PriceInput label="Bảo hiểm" value={field.value || 0} onChange={field.onChange} error={errors.insuranceFee?.message} />
-                  )}
-                />
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label>Phí bổ sung</Label>
-                  <Button type="button" size="sm" onClick={() => appendAdditional({ type: '', amount: 0 })}>
-                    <Plus />
-                    Thêm phí
-                  </Button>
-                </div>
-
-                {additionalFeeFields.length === 0 && (
-                  <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
-                    Chưa có phí bổ sung.
-                  </div>
-                )}
-
-                {additionalFeeFields.map((field, index) => (
-                  <div key={field.id} className="grid grid-cols-1 md:grid-cols-[1.2fr_1fr_auto] gap-3 items-end">
-                    <div className="space-y-2">
-                      <Label>Loại phí</Label>
-                      <Controller
-                        control={control}
-                        name={`additionalFees.${index}.type`}
-                        render={({ field }) => (
-                          <Input {...field} placeholder="Phí hồ sơ, phí nhập học..." />
-                        )}
-                      />
-                    </div>
-                    <div>
-                      <Controller
-                        control={control}
-                        name={`additionalFees.${index}.amount`}
-                        render={({ field }) => (
-                          <PriceInput
-                            label="Số tiền"
-                            value={field.value}
-                            onChange={field.onChange}
-                            error={errors.additionalFees?.[index]?.amount?.message}
-                          />
-                        )}
-                      />
-                    </div>
-                    <Button type="button" variant="ghost" size="icon" onClick={() => removeAdditional(index)}>
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                ))}
-
-                {additionalFeeFields.length > 0 && (
-                  <div className="rounded-lg border border-slate-200 overflow-hidden">
-                    <div className="bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-600 uppercase">
-                      Bảng phí bổ sung
-                    </div>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Loại phí</TableHead>
-                          <TableHead className="text-right">Số tiền</TableHead>
-                          <TableHead className="text-right">Xóa</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {additionalFeeFields.map((fee, index) => (
-                          <TableRow key={fee.id}>
-                            <TableCell className="text-slate-700">
-                              {additionalFeesSnapshot[index]?.type || '—'}
-                            </TableCell>
-                            <TableCell className="text-right font-semibold text-slate-900">
-                              {formatFrom(additionalFeesSnapshot[index]?.amount || 0, 'VND')}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => removeAdditional(index)}
-                                aria-label="Xóa phí"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                        <TableRow className="bg-slate-50">
-                          <TableCell className="font-semibold text-slate-800">Tổng phí bổ sung</TableCell>
-                          <TableCell className="text-right font-bold text-slate-900">
-                            {formatFrom(additionalFeesTotal, 'VND')}
-                          </TableCell>
-                          <TableCell />
-                        </TableRow>
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </div>
-
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                <div className="text-right">
-                  <div className="text-sm text-slate-600 mb-1">Tổng chi phí</div>
-                  <div className="text-2xl font-bold text-primary">{formatFrom(totalCost, 'VND')}</div>
+                <div className="text-4xl font-bold">
+                  {formatFrom(totalCost)}
                 </div>
               </div>
-            </div>
-          )}
+            </CardContent>
+          </Card>
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
-              Hủy
-            </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isEditMode ? 'Lưu thay đổi' : 'Thêm trường'}
-            </Button>
-          </DialogFooter>
         </form>
+
+        <DialogFooter className="px-8 py-6 border-t bg-slate-50 gap-3 sticky bottom-0 z-20 flex-shrink-0">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} size="lg" className="px-6">
+            <X className="w-4 h-4 mr-2" /> Hủy
+          </Button>
+          <Button type="submit" form="university-form" disabled={isSubmitting} size="lg" className="bg-blue-600 hover:bg-blue-700 px-8">
+            <Save className="w-4 h-4 mr-2" />
+            {isEditMode ? 'Lưu thay đổi' : 'Thêm trường'}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
