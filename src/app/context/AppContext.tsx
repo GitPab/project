@@ -32,8 +32,11 @@ interface AppContextType {
   universities: University[];
   setUniversities: (updater: (prev: University[]) => University[]) => void;
   updateUniversity: (id: string, updates: Partial<University>) => void;
+  fetchUniversity: (id: string) => Promise<University | null>;
   addUniversities: (universities: University[]) => void;
+  updateUniversitiesList: (updater: (prev: University[]) => University[]) => void;
   registrations: Registration[];
+  setRegistrations: (updater: (prev: Registration[]) => Registration[]) => void;
   registerForUniversity: (universityId: string, selectedFees?: {
     visa: boolean;
     accommodation: boolean;
@@ -92,6 +95,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setUniversities(prev =>
       prev.map(uni => uni.id === id ? { ...uni, ...updates } : uni)
     );
+  };
+
+  const fetchUniversity = async (id: string) => {
+    try {
+      const response = await fetch(`/api/universities/${id}`);
+      const data = await response.json();
+      
+      // Update the specific university in the list
+      updateUniversity(id, data);
+      
+      return data;
+    } catch (error) {
+      console.error('Error fetching university:', error);
+      return null;
+    }
   };
 
   const addUniversities = (universities: University[]) => {
@@ -203,8 +221,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         universities,
         setUniversities: updateUniversitiesList,
         updateUniversity,
+        fetchUniversity,
         addUniversities,
+        updateUniversitiesList,
         registrations,
+        setRegistrations,
         registerForUniversity,
         updateRegistration,
         studentProgress,

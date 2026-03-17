@@ -1,34 +1,32 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '../lib/supabase';
 import { useLanguage } from '../context/LanguageContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
+import { Table, TableBody, TableCell, TableHead, TableRow } from './ui/table';
 import { Badge } from './ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { 
-  Search, 
-  Filter, 
-  TrendingUp, 
-  TrendingDown, 
-  DollarSign, 
+import {
+  Search,
+  Filter,
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
   RefreshCw,
   Info,
   Calculator,
-  University,
+  University as UniversityIcon,
   MapPin,
   Star
 } from 'lucide-react';
-import type { University } from '../types/university';
-import { calculateUniversityEstimatedCost, formatCostDisplay, generateCostTooltip, type EstimatedTotalCost } from '../utils/costCalculations';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import type { University } from '../../types/university';
+import { calculateUniversityEstimatedCost, formatCostDisplay, generateCostTooltip, type EstimatedTotalCost } from '../../utils/costCalculations';
+import { getMaxScholarship, getMinGPA, getCheapestKTX, getLowestTuition, getPerks, getVisaSystemLabel } from '../../utils/universityPerks';
+import { TOP_TIERS, getTierColor, getTierBg } from '../../constants/topTiers';
+import TierTab from './TierTab';
 
 interface UniversitiesListEnhancedProps {
   onUniversitySelect?: (university: University) => void;
@@ -48,8 +46,8 @@ export default function UniversitiesListEnhanced({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCountry, setSelectedCountry] = useState<string>('all');
-  const [selectedTier, setSelectedTier] = useState<string>('all');
+  const [activeTier, setActiveTier] = useState<string>('all');
+  const [activePerk, setActivePerk] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'name' | 'cost' | 'ranking'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [costCalculations, setCostCalculations] = useState<Map<string, EstimatedTotalCost>>(new Map());
@@ -67,21 +65,21 @@ export default function UniversitiesListEnhanced({
         event: '*',
         schema: 'public',
         table: 'universities'
-      }, (payload) => {
+      }, (payload: { new: University }) => {
         if (payload.new) {
-          setUniversities(prev => {
+          setUniversities((prev: University[]) => {
             const index = prev.findIndex(u => u.id === payload.new.id);
             if (index >= 0) {
               const updated = [...prev];
-              updated[index] = payload.new as University;
+              updated[index] = payload.new;
               return updated;
             } else {
-              return [...prev, payload.new as University];
+              return [...prev, payload.new];
             }
           });
           
           // Recalculate costs for updated university
-          recalculateCosts([payload.new as University]);
+          recalculateCosts([payload.new]);
         }
       })
       .subscribe();
@@ -144,26 +142,46 @@ export default function UniversitiesListEnhanced({
     setCostCalculations(calculations);
   };
 
+  // Perk filter definitions
+  const PERK_FILTERS = [
+    { key: 'all', label: 'Tất cả' },
+    { key: 'hb100', label: '🎓 HB 100%', match: (u: University) => getMaxScholarship(u) === 100 },
+    { key: 'hb50', label: '🎓 HB 50%+', match: (u: University) => getMaxScholarship(u) >= 50 },
+    { key: 'gpa65', label: '📋 GPA ≤ 6.5', match: (u: University) => getMinGPA(u) <= 6.5 },
+    { key: 'ktx', label: '🏠 Có KTX rẻ', match: (u: University) => getCheapestKTX(u) !== null },
+    { key: 'vl', label: '💼 Việc làm', match: (u: University) => !!u.koreanData?.jobOpportunities || !!u.koreanData?.workOpportunity },
+    { key: 'seoul', label: '📍 Seoul', match: (u: University) => u.koreanData?.address?.toLowerCase().includes('seoul') || false }
+  ];
+
   // Filter and sort universities
   const filteredUniversities = useMemo(() => {
     let filtered = universities.filter(university => {
+      // Tier filter (Korean universities only)
+      if (!university.koreanData?.isKoreanUniversity) return false;
+
+      if (activeTier !== 'all') {
+        const tierMatch = activeTier === '1' && university.koreanData?.topTier === 'Top1' ||
+          activeTier === '2' && university.koreanData?.topTier === 'Top2' ||
+          activeTier === '3' && university.koreanData?.topTier === 'Top3';
+        if (!tierMatch) return false;
+      }
+
+      // Perk filter
+      if (activePerk !== 'all') {
+        const perkDef = PERK_FILTERS.find(p => p.key === activePerk);
+        if (perkDef && !perkDef.match(university)) return false;
+      }
+
       // Search filter
-      const matchesSearch = searchTerm === '' || 
-        university.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        university.koreanName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        university.country.toLowerCase().includes(searchTerm.toLowerCase());
+      if (searchTerm) {
+        const q = searchTerm.toLowerCase();
+        const searchable = [university.name, university.koreanName, university.koreanData?.address]
+          .join(' ')
+          .toLowerCase();
+        if (!searchable.includes(q)) return false;
+      }
 
-      // Country filter
-      const matchesCountry = selectedCountry === 'all' || university.country === selectedCountry;
-
-      // Tier filter
-      const matchesTier = selectedTier === 'all' || 
-        (selectedTier === 'top1' && university.topTier === 'Top1') ||
-        (selectedTier === 'top2' && university.topTier === 'Top2') ||
-        (selectedTier === 'top3' && university.topTier === 'Top3') ||
-        (selectedTier === 'regular' && !university.topTier);
-
-      return matchesSearch && matchesCountry && matchesTier;
+      return true;
     });
 
     // Sort
@@ -180,8 +198,8 @@ export default function UniversitiesListEnhanced({
           comparison = costA - costB;
           break;
         case 'ranking':
-          const rankA = a.worldRanking || Infinity;
-          const rankB = b.worldRanking || Infinity;
+          const rankA = a.koreanData?.koreanRanking ? parseInt(a.koreanData.koreanRanking) : Infinity;
+          const rankB = b.koreanData?.koreanRanking ? parseInt(b.koreanData.koreanRanking) : Infinity;
           comparison = rankA - rankB;
           break;
       }
@@ -190,12 +208,20 @@ export default function UniversitiesListEnhanced({
     });
 
     return filtered;
-  }, [universities, searchTerm, selectedCountry, selectedTier, sortBy, sortOrder, costCalculations]);
+  }, [universities, searchTerm, activeTier, activePerk, sortBy, sortOrder, costCalculations]);
 
-  // Get unique countries for filter
-  const countries = useMemo(() => {
-    const uniqueCountries = [...new Set(universities.map(u => u.country))];
-    return uniqueCountries.sort();
+  // Get tier counts
+  const tierCounts = useMemo(() => {
+    const counts = { all: universities.length, '1': 0, '2': 0, '3': 0 };
+    universities.forEach(uni => {
+      if (uni.koreanData?.isKoreanUniversity) {
+        counts.all++;
+        if (uni.koreanData?.topTier === 'Top1') counts['1']++;
+        else if (uni.koreanData?.topTier === 'Top2') counts['2']++;
+        else if (uni.koreanData?.topTier === 'Top3') counts['3']++;
+      }
+    });
+    return counts;
   }, [universities]);
 
   // Handle sorting
@@ -227,17 +253,23 @@ export default function UniversitiesListEnhanced({
   };
 
   // Get tier badge
-  const getTierBadge = (university: University) => {
-    switch (university.topTier) {
-      case 'Top1':
-        return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">Top 1</Badge>;
-      case 'Top2':
-        return <Badge className="bg-blue-100 text-blue-800 border-blue-200">Top 2</Badge>;
-      case 'Top3':
-        return <Badge className="bg-green-100 text-green-800 border-green-200">Top 3</Badge>;
-      default:
-        return null;
-    }
+  const getTierBadge = (tier: string | undefined) => {
+    if (!tier) return null;
+    const tierKey = tier === 'Top1' ? '1' : tier === 'Top2' ? '2' : tier === 'Top3' ? '3' : null;
+    if (!tierKey) return null;
+
+    const tierData = TOP_TIERS[tierKey];
+    return (
+      <Badge
+        style={{
+          backgroundColor: tierData.bg,
+          color: tierData.color,
+          border: `1px solid ${tierData.color}`
+        }}
+      >
+        {tierData.label}
+      </Badge>
+    );
   };
 
   const labels = {
@@ -351,7 +383,7 @@ export default function UniversitiesListEnhanced({
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
-              <University className="w-5 h-5" />
+              <UniversityIcon className="w-5 h-5" />
               {t.title}
             </CardTitle>
             <Button onClick={loadUniversities} variant="outline" size="sm">
@@ -361,163 +393,258 @@ export default function UniversitiesListEnhanced({
           </div>
         </CardHeader>
         <CardContent>
-          {/* Filters */}
-          <div className="flex flex-wrap gap-4 mb-6">
-            <div className="flex-1 min-w-[200px]">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-                <Input
-                  placeholder={t.searchPlaceholder}
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
+          {/* Search bar */}
+          <div className="mb-6">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+              <Input
+                placeholder={language === 'vi' ? 'Tìm kiếm trường...' : 'Search universities...'}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
             </div>
-            <Select value={selectedCountry} onValueChange={setSelectedCountry}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder={t.country} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t.all}</SelectItem>
-                {countries.map(country => (
-                  <SelectItem key={country} value={country}>
-                    <div className="flex items-center gap-2">
-                      <MapPin className="w-4 h-4" />
-                      {country}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={selectedTier} onValueChange={setSelectedTier}>
-              <SelectTrigger className="w-[120px]">
-                <SelectValue placeholder={t.tier} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t.all}</SelectItem>
-                <SelectItem value="top1">{t.top1}</SelectItem>
-                <SelectItem value="top2">{t.top2}</SelectItem>
-                <SelectItem value="top3">{t.top3}</SelectItem>
-                <SelectItem value="regular">{t.regular}</SelectItem>
-              </SelectContent>
-            </Select>
+          </div>
+
+          {/* Tier tabs (primary navigation) */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
+            <TierTab
+              active={activeTier === 'all'}
+              onClick={() => setActiveTier('all')}
+              icon="☰"
+              label={language === 'vi' ? 'Tất cả' : 'All'}
+              count={tierCounts.all}
+              colorClass="gray"
+            />
+            <TierTab
+              active={activeTier === '1'}
+              onClick={() => setActiveTier('1')}
+              icon={TOP_TIERS['1'].icon}
+              label={TOP_TIERS['1'].label}
+              count={tierCounts['1']}
+              description={TOP_TIERS['1'].description}
+              colorClass="blue"
+            />
+            <TierTab
+              active={activeTier === '2'}
+              onClick={() => setActiveTier('2')}
+              icon={TOP_TIERS['2'].icon}
+              label={TOP_TIERS['2'].label}
+              count={tierCounts['2']}
+              description={TOP_TIERS['2'].description}
+              colorClass="green"
+            />
+            <TierTab
+              active={activeTier === '3'}
+              onClick={() => setActiveTier('3')}
+              icon={TOP_TIERS['3'].icon}
+              label={TOP_TIERS['3'].label}
+              count={tierCounts['3']}
+              description={TOP_TIERS['3'].description}
+              colorClass="red"
+            />
+          </div>
+
+          {/* Top 3 warning banner */}
+          {activeTier === '3' && TOP_TIERS['3'].warning && (
+            <div
+              style={{
+                background: TOP_TIERS['3'].bg,
+                border: `0.5px solid #F7C1C1`,
+                borderRadius: 8,
+                padding: '8px 12px',
+                fontSize: 12,
+                color: TOP_TIERS['3'].color,
+                marginBottom: 8
+              }}
+            >
+              {TOP_TIERS['3'].warning}
+            </div>
+          )}
+
+          {/* Perk filter bar */}
+          <div style={{ display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 12, paddingBottom: 4 }}>
+            {PERK_FILTERS.map(perk => (
+              <button
+                key={perk.key}
+                onClick={() => setActivePerk(perk.key)}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '20px',
+                  border: '1px solid #E5E7EB',
+                  backgroundColor: activePerk === perk.key ? '#003AB7' : '#FFFFFF',
+                  color: activePerk === perk.key ? '#FFFFFF' : '#6B7280',
+                  fontSize: '12px',
+                  fontWeight: activePerk === perk.key ? 600 : 500,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.2s'
+                }}
+              >
+                {perk.label}
+              </button>
+            ))}
           </div>
 
           {/* Results count */}
-          <div className="text-sm text-slate-600 mb-4">
-            {filteredUniversities.length} {language === 'vi' ? 'trường được tìm thấy' : language === 'ko' ? '개 대학교를 찾았습니다' : 'universities found'}
+          <div style={{ fontSize: '13px', color: '#6B7280', marginBottom: 12, fontWeight: 500 }}>
+            {filteredUniversities.length} trường · {activeTier === 'all' ? '3 cấp độ visa' : `Top ${activeTier}`}
+            {activePerk !== 'all' && ` · ${PERK_FILTERS.find(p => p.key === activePerk)?.label}`}
           </div>
 
           {/* Universities Table */}
           <div className="border rounded-lg overflow-hidden" style={{ maxHeight }}>
             <Table>
-              <TableHeader className="bg-slate-50 sticky top-0">
+              <TableHead className="bg-slate-50 sticky top-0">
                 <TableRow>
                   <TableHead className="w-[300px]">
                     <Button
                       variant="ghost"
                       onClick={() => handleSort('name')}
-                      className="p-0 h-auto font-semibold"
+                      className="p-0 h-auto font-semibold text-left"
                     >
-                      {t.name}
+                      {language === 'vi' ? 'Tên trường' : 'University'}
                       {sortBy === 'name' && (
-                        sortOrder === 'asc' ? <TrendingUp className="w-4 h-4 ml-1" /> : <TrendingDown className="w-4 h-4 ml-1" />
+                        sortOrder === 'asc' ? <TrendingUp className="w-4 h-4 ml-1 inline" /> : <TrendingDown className="w-4 h-4 ml-1 inline" />
                       )}
                     </Button>
+                  </TableHead>
+                  <TableHead className="w-[180px]">
+                    {language === 'vi' ? 'Học phí thấp nhất' : 'Lowest Tuition'}
                   </TableHead>
                   <TableHead className="w-[200px]">
-                    <Button
-                      variant="ghost"
-                      onClick={() => handleSort('cost')}
-                      className="p-0 h-auto font-semibold"
-                    >
-                      <div className="flex items-center gap-1">
-                        <Calculator className="w-4 h-4" />
-                        {t.estimatedCost}
-                      </div>
-                      {sortBy === 'cost' && (
-                        sortOrder === 'asc' ? <TrendingUp className="w-4 h-4 ml-1" /> : <TrendingDown className="w-4 h-4 ml-1" />
-                      )}
-                    </Button>
+                    {language === 'vi' ? 'Ưu đãi nổi bật' : 'Featured Perks'}
                   </TableHead>
-                  <TableHead className="w-[120px]">{t.countryColumn}</TableHead>
-                  <TableHead className="w-[100px]">{t.tierColumn}</TableHead>
-                  {showActions && <TableHead className="w-[120px] text-right">{t.actions}</TableHead>}
+                  <TableHead className="w-[180px]">
+                    {language === 'vi' ? 'Học bổng tốt nhất' : 'Scholarship'}
+                  </TableHead>
+                  {showActions && <TableHead className="w-[120px] text-right">{language === 'vi' ? 'Thao tác' : 'Actions'}</TableHead>}
                 </TableRow>
-              </TableHeader>
+              </TableHead>
               <TableBody>
                 {filteredUniversities.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={showActions ? 5 : 4} className="text-center py-8 text-slate-600">
-                      {t.noResults}
+                      {language === 'vi' ? 'Không tìm thấy trường nào' : 'No universities found'}
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredUniversities.map((university) => {
-                    const costDisplay = getCostDisplay(university);
-                    const costTooltip = getCostTooltip(university);
-                    
+                    const maxScholarship = getMaxScholarship(university);
+                    const minGPA = getMinGPA(university);
+                    const perks = getPerks(university);
+                    const lowestTuition = getLowestTuition(university);
+                    const isTop3 = university.koreanData?.topTier === 'Top3';
+
                     return (
                       <TableRow key={university.id} className="hover:bg-slate-50">
+                        {/* Column 1: Tên trường */}
                         <TableCell>
                           <div>
-                            <div className="font-medium text-slate-900">{university.name}</div>
+                            <div className="font-semibold text-slate-900 flex items-center gap-2">
+                              {university.name}
+                              {getTierBadge(university.koreanData?.topTier)}
+                            </div>
                             {university.koreanName && (
-                              <div className="text-sm text-slate-600">{university.koreanName}</div>
+                              <div className="text-xs text-slate-600 mt-1">{university.koreanName}</div>
                             )}
-                            {university.ranking && (
-                              <div className="text-xs text-slate-500 mt-1">
-                                {language === 'vi' ? 'Xếp hạng: ' : language === 'ko' ? '순위: ' : 'Ranking: '}{university.ranking}
+                            {university.koreanData?.address && (
+                              <div className="text-xs text-slate-500 flex items-center gap-1 mt-1">
+                                <MapPin className="w-3 h-3" />
+                                {university.koreanData.address}
                               </div>
                             )}
                           </div>
                         </TableCell>
+
+                        {/* Column 2: Học phí thấp nhất */}
                         <TableCell>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="flex items-center gap-2 cursor-help">
-                                <DollarSign className="w-4 h-4 text-slate-400" />
-                                <div>
-                                  <div className="font-semibold text-blue-600">
-                                    {costDisplay.amount}
-                                  </div>
-                                  {costDisplay.hasRange && (
-                                    <div className="text-xs text-slate-600">
-                                      {costDisplay.minAmount} - {costDisplay.maxAmount}
-                                    </div>
-                                  )}
-                                </div>
+                          {lowestTuition ? (
+                            <div>
+                              <div className="font-semibold text-blue-600">
+                                {(lowestTuition.amount / 1000).toFixed(0)}K ₩
                               </div>
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs">
-                              <pre className="text-xs whitespace-pre-wrap">{costTooltip}</pre>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <MapPin className="w-4 h-4 text-slate-400" />
-                            {university.country}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            {getTierBadge(university)}
-                            {university.worldRanking && (
                               <div className="text-xs text-slate-600">
-                                #{university.worldRanking}
+                                {getVisaSystemLabel(lowestTuition.visaSystem)}/kỳ
                               </div>
-                            )}
+                              {!isTop3 && (
+                                <div style={{ color: minGPA <= 6.5 ? '#10B981' : '#9CA3AF', fontSize: '11px', marginTop: '4px' }}>
+                                  {minGPA <= 6.5 ? `✓ GPA ${minGPA}` : `GPA ${minGPA}`}
+                                </div>
+                              )}
+                              {isTop3 && (
+                                <div style={{ color: '#A32D2D', fontSize: '11px', marginTop: '4px', fontWeight: 500 }}>
+                                  — Hạn chế visa
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="text-slate-400">—</div>
+                          )}
+                        </TableCell>
+
+                        {/* Column 3: Ưu đãi nổi bật */}
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {perks.slice(0, 4).map((perk, idx) => (
+                              <Badge
+                                key={idx}
+                                variant="outline"
+                                style={{ fontSize: '11px', padding: '2px 8px' }}
+                              >
+                                {perk.label}
+                              </Badge>
+                            ))}
                           </div>
                         </TableCell>
+
+                        {/* Column 4: Học bổng tốt nhất */}
+                        <TableCell>
+                          {maxScholarship > 0 ? (
+                            <div>
+                              <div
+                                style={{
+                                  width: '100%',
+                                  height: '8px',
+                                  backgroundColor: '#E5E7EB',
+                                  borderRadius: '4px',
+                                  overflow: 'hidden',
+                                  marginBottom: '4px'
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    width: `${maxScholarship}%`,
+                                    height: '100%',
+                                    backgroundColor:
+                                      maxScholarship === 100
+                                        ? '#639922'
+                                        : maxScholarship >= 50
+                                          ? '#EF9F27'
+                                          : '#E5E7EB'
+                                  }}
+                                />
+                              </div>
+                              <div style={{ fontSize: '12px', fontWeight: 600, color: '#1F2937' }}>
+                                {maxScholarship}%
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-slate-400" style={{ fontSize: '12px' }}>
+                              —
+                            </div>
+                          )}
+                        </TableCell>
+
+                        {/* Column 5: Thao tác */}
                         {showActions && (
                           <TableCell className="text-right">
                             <Button
                               onClick={() => onUniversitySelect?.(university)}
-                              className="bg-[#003AB7] hover:bg-[#002A8F]"
+                              className="bg-[#003AB7] hover:bg-[#002A8F] text-white"
+                              style={{ fontSize: '12px', padding: '6px 12px' }}
                             >
-                              {t.view}
+                              {language === 'vi' ? 'Xem' : 'View'}
                             </Button>
                           </TableCell>
                         )}

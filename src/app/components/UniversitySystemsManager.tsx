@@ -13,8 +13,8 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './
 import { Separator } from './ui/separator';
 import { Alert, AlertDescription } from './ui/alert';
 import PriceInput from './PriceInput';
-import type { UniversitySystem, FlexibleFee, FeeType, TimeUnit, FeeOption, FeeCondition } from '../types/fees';
-import type { University } from '../types/university';
+import type { University as UniversityType, UniversitySystem } from '../../types/university';
+import type { FeeType, TimeUnit, FeeOption, FeeCondition, FlexibleFee } from '../../types/fees';
 
 // Validation schemas
 const systemSchema = z.object({
@@ -65,7 +65,7 @@ const SYSTEM_CODES = [
 ];
 
 interface UniversitySystemsManagerProps {
-  university: University;
+  university: UniversityType;
   systems: UniversitySystem[];
   onChange: (systems: UniversitySystem[]) => void;
   onError?: (error: string) => void;
@@ -73,7 +73,7 @@ interface UniversitySystemsManagerProps {
 }
 
 export default function UniversitySystemsManager({ 
-  university, 
+  university: UniversityType, 
   systems, 
   onChange, 
   onError, 
@@ -154,7 +154,7 @@ export default function UniversitySystemsManager({
     const updatedSystems = [...systems];
     updatedSystems[systemIndex] = {
       ...updatedSystems[systemIndex],
-      fees: updatedSystems[systemIndex].fees.filter((_, i) => i !== feeIndex)
+      fees: updatedSystems[systemIndex].fees.filter((_: any, i: number) => i !== feeIndex)
     };
     onChange(updatedSystems);
   }, [systems, onChange]);
@@ -212,7 +212,7 @@ export default function UniversitySystemsManager({
         <div>
           <h3 className="text-lg font-semibold">Hệ thống học phí</h3>
           <p className="text-sm text-slate-600">
-            Quản lý các hệ thống và học phí cho trường {university.name}
+            Quản lý các hệ thống và học phí cho trường {university?.name || 'Chưa có tên'}
           </p>
         </div>
         <Button onClick={addSystem} className="bg-[#003AB7] hover:bg-[#002A8F]">
