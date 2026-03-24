@@ -3,35 +3,18 @@ import { ChevronDown, ChevronUp, Plane, Home, BookOpen, Wallet, GraduationCap, P
 import { Badge } from './ui/badge';
 import type { University, KoreanUniversityData, VisaSystemDetail, CommonFeeVND, CalculatedCosts, KTXOption, FinancialRequirementOption } from '../../types/university';
 import { useCurrency } from '../context/CurrencyContext';
+import { TOPIK_DISCOUNT_LEVELS, DEFAULT_COMMON_FEES, EXCHANGE_RATES } from '../../constants/scholarships';
 import { VISA_SYSTEMS } from '../../constants/visaSystems';
 
 interface CostCalculatorProps {
   university: University;
 }
 
-// Default common fees if not specified
-const DEFAULT_COMMON_FEES: CommonFeeVND[] = [
-  { id: 'hoc_tieng', name: 'Học tiếng Hàn', amount: 13000000, note: 'Học từ 0 lên TOPIK 2 + Tài khoản E-Learning', editable: true },
-  { id: 'phi_tu_van', name: 'Phí tư vấn & xử lý hồ sơ', amount: 39000000, note: '', editable: true },
-  { id: 'phi_trung_tam', name: 'Phí trung tâm thu hộ', amount: 11000000, subItems: ['Phí công chứng', 'Tem vàng', 'Tem tím', 'Xin visa', 'Khám sức khoẻ', 'Ship hồ sơ (VN)', 'Ship hồ sơ (HQ)', 'Đưa đón HQ', 'Tìm KTX'], editable: true },
-  { id: 've_may_bay', name: 'Vé máy bay 1 chiều', amount: 8000000, note: 'Bao gồm 40kg ký gửi', optional: true, editable: true },
-  { id: 'ktx_vn', name: 'KTX tại Việt Nam', amount: 0, amountPerMonth: 800000, note: 'Học viên chọn số tháng', optional: true, editable: true },
-];
+// Imported from constants - using DEFAULT_COMMON_FEES from scholarships.ts
 
-// Default TOPIK scholarship discounts
-const DEFAULT_TOPIK_DISCOUNTS = [
-  { level: 0, discount: 0 },
-  { level: 1, discount: 0 },
-  { level: 2, discount: 0 },
-  { level: 3, discount: 30 },
-  { level: 4, discount: 50 },
-  { level: 5, discount: 70 },
-  { level: 6, discount: 100 },
-];
+// Imported from constants - using TOPIK_DISCOUNT_LEVELS from scholarships.ts
 
-// Exchange rates (should be fetched from API in production)
-const KRW_TO_VND = 20; // 1 KRW = 20 VND
-const USD_TO_VND = 25000; // 1 USD = 25,000 VND
+// Imported from constants - using EXCHANGE_RATES from scholarships.ts
 
 export default function CostCalculator({ university }: CostCalculatorProps) {
   const { formatFrom } = useCurrency();
@@ -42,11 +25,9 @@ export default function CostCalculator({ university }: CostCalculatorProps) {
   const visaSystemsDetail = (koreanData as any)?.visa_systems || (koreanData as any)?.visaSystemsDetail || {};
 
   // All visa systems from shared constant
-  const ALL_VISA_SYSTEM_IDS = VISA_SYSTEMS.map(v => v.id);
-
   // Build labels from shared VISA_SYSTEMS
   const VISA_LABELS = Object.fromEntries(
-    VISA_SYSTEMS.map(v => [v.id, v.name])
+    VISA_SYSTEMS.map(v => [v.key, v.name])
   );
   
   // Get available visa systems
@@ -54,7 +35,10 @@ export default function CostCalculator({ university }: CostCalculatorProps) {
     const systems: string[] = [];
     if (visaSystemsDetail) {
       Object.entries(visaSystemsDetail as Record<string, VisaSystemDetail>).forEach(([code, system]: [string, VisaSystemDetail]) => {
-        if (system.available) {
+        if (!system.available) return;
+        if (code === 'D2-3') {
+          systems.push('D2-3M', 'D2-3P');
+        } else {
           systems.push(code);
         }
       });
@@ -62,7 +46,12 @@ export default function CostCalculator({ university }: CostCalculatorProps) {
     // Fallback to legacy data
     if (systems.length === 0 && koreanData?.visaSystems) {
       koreanData.visaSystems.forEach((v: any) => {
-        if (v.available !== false) systems.push(v.visaType);
+        if (v.available === false) return;
+        if (v.visaType === 'D2-3') {
+          systems.push('D2-3M', 'D2-3P');
+        } else {
+          systems.push(v.visaType);
+        }
       });
     }
     return systems;
@@ -78,12 +67,13 @@ export default function CostCalculator({ university }: CostCalculatorProps) {
   const [expandedSubItems, setExpandedSubItems] = useState<Record<string, boolean>>({});
   
   // Get current visa system data
-  const currentVisaSystem: VisaSystemDetail | undefined = visaSystemsDetail?.[selectedVisa] || {
+  const mappedVisaKey = (selectedVisa === 'D2-3M' || selectedVisa === 'D2-3P') ? 'D2-3' : selectedVisa;
+  const currentVisaSystem: VisaSystemDetail | undefined = visaSystemsDetail?.[mappedVisaKey] || {
     available: true,
     invoiceKRWPerYear: 5800000,
     applyFeeKRW: 100000,
     enrollmentFeeKRW: 0,
-    scholarships: DEFAULT_TOPIK_DISCOUNTS.filter(d => d.level >= 3).map(d => ({
+    scholarships: TOPIK_DISCOUNT_LEVELS.filter(d => d.level >= 3).map(d => ({
       condition: `TOPIK ${d.level}`,
       discountPct: d.discount,
       topikLevel: d.level,
@@ -105,13 +95,13 @@ export default function CostCalculator({ university }: CostCalculatorProps) {
   // Calculate costs
   const calculatedCosts: CalculatedCosts = useMemo(() => {
     // VND Fees
-    const hocTieng = commonFees.find((f: CommonFeeVND) => f.id === 'hoc_tieng')?.amount || 13000000;
-    const phiTuVan = commonFees.find((f: CommonFeeVND) => f.id === 'phi_tu_van')?.amount || 39000000;
-    const phiTrungTam = commonFees.find((f: CommonFeeVND) => f.id === 'phi_trung_tam')?.amount || 11000000;
-    const veMayBay = includeFlight ? (commonFees.find((f: CommonFeeVND) => f.id === 've_may_bay')?.amount || 8000000) : 0;
-    const ktxVN = ktxVNMonths > 0 
-      ? ktxVNMonths * (commonFees.find((f: CommonFeeVND) => f.id === 'ktx_vn')?.amountPerMonth || 800000)
-      : 0;
+  const hocTieng = commonFees.find((f: CommonFeeVND) => f.id === 'hoc_tieng')?.amount || DEFAULT_COMMON_FEES.find(f => f.id === 'hoc_tieng')!.amount;
+  const phiTuVan = commonFees.find((f: CommonFeeVND) => f.id === 'phi_tu_van')?.amount || DEFAULT_COMMON_FEES.find(f => f.id === 'phi_tu_van')!.amount;
+  const phiTrungTam = commonFees.find((f: CommonFeeVND) => f.id === 'phi_trung_tam')?.amount || DEFAULT_COMMON_FEES.find(f => f.id === 'phi_trung_tam')!.amount;
+  const veMayBay = includeFlight ? (commonFees.find((f: CommonFeeVND) => f.id === 've_may_bay')?.amount || DEFAULT_COMMON_FEES.find(f => f.id === 've_may_bay')!.amount) : 0;
+  const ktxVN = ktxVNMonths > 0 
+    ? ktxVNMonths * (commonFees.find((f: CommonFeeVND) => f.id === 'ktx_vn')?.amountPerMonth || DEFAULT_COMMON_FEES.find(f => f.id === 'ktx_vn')!.amountPerMonth)
+    : 0;
     
     const totalVND = hocTieng + phiTuVan + phiTrungTam + veMayBay + ktxVN;
     
@@ -121,7 +111,7 @@ export default function CostCalculator({ university }: CostCalculatorProps) {
     const invoice = currentVisaSystem?.invoiceKRWPerYear || 0;
     
     // Scholarship calculation
-    const scholarshipDiscount = DEFAULT_TOPIK_DISCOUNTS.find((d: { level: number; discount: number }) => d.level === topikLevel)?.discount || 0;
+    const scholarshipDiscount = TOPIK_DISCOUNT_LEVELS.find(d => d.level === topikLevel)?.discount || 0;
     const hocBong = scholarshipDiscount > 0 ? -Math.round((invoice * scholarshipDiscount) / 100) : 0;
     
     // KTX HQ
@@ -135,8 +125,8 @@ export default function CostCalculator({ university }: CostCalculatorProps) {
     const totalKRW = applyFee + enrollmentFee + invoice + hocBong + ktxHQ + soTietKiem;
     
     // USD conversion (approximate)
-    const totalVNDinUSD = totalVND / USD_TO_VND;
-    const totalKRWinUSD = (totalKRW * KRW_TO_VND) / USD_TO_VND;
+    const totalVNDinUSD = totalVND / EXCHANGE_RATES.USD_TO_VND;
+    const totalKRWinUSD = (totalKRW * EXCHANGE_RATES.KRW_TO_VND) / EXCHANGE_RATES.USD_TO_VND;
     const approximateUSD = totalVNDinUSD + totalKRWinUSD;
     
     return {
@@ -196,46 +186,32 @@ export default function CostCalculator({ university }: CostCalculatorProps) {
               <BookOpen className="inline w-4 h-4 mr-1" /> Hệ du học
             </label>
             <div className="flex flex-wrap gap-2">
-              {ALL_VISA_SYSTEM_IDS.map(visaType => {
-                const isAvailable = availableVisaSystems.includes(visaType);
-                
+              {VISA_SYSTEMS.map((visa) => {
+                const isAvailable = availableVisaSystems.includes(visa.key);
+                const isSelected = selectedVisa === visa.key;
+
                 return (
                   <button
-                    key={visaType}
-                    onClick={() => isAvailable && handleVisaChange(visaType)}
+                    key={visa.key}
                     disabled={!isAvailable}
+                    onClick={() => isAvailable && handleVisaChange(visa.key)}
                     className={`px-4 py-2 rounded-xl font-medium transition-all relative ${
-                      selectedVisa === visaType
+                      isSelected
                         ? 'bg-[#003AB7] text-white border-[#003AB7] shadow-lg'
                         : isAvailable
                         ? 'bg-white border-slate-200 hover:border-[#003AB7]/50 hover:bg-slate-50'
                         : 'bg-slate-100 border-slate-200 opacity-45 cursor-not-allowed'
                     }`}
                   >
-                    {/* Available tabs show green dot and sub-label */}
-                    {isAvailable && (
-                      <>
-                        <div className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-500 rounded-full" />
-                        <div className="text-xs text-slate-500 mt-1">
-                          {VISA_LABELS[visaType]}
-                        </div>
-                      </>
-                    )}
-                    
-                    {/* Non-available tabs show strike-through and "Không có" */}
-                    {!isAvailable && (
-                      <>
-                        <span className="line-through">{visaType}</span>
-                        <div className="text-xs text-red-500 mt-1">
-                          Không có
-                        </div>
-                      </>
-                    )}
-                    
-                    {/* Always show visa type */}
                     <span className={isAvailable ? '' : 'opacity-60'}>
-                      {visaType}
+                      {visa.label}
                     </span>
+                    <div className={`text-xs mt-1 ${isSelected ? 'text-white/70' : isAvailable ? 'text-slate-500' : 'text-red-500'}`}>
+                      {isAvailable ? VISA_LABELS[visa.key] : 'Không có'}
+                    </div>
+                    {isAvailable && (
+                      <div className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-500 rounded-full" />
+                    )}
                   </button>
                 );
               })}
@@ -253,14 +229,11 @@ export default function CostCalculator({ university }: CostCalculatorProps) {
               className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#003AB7] focus:border-transparent"
             >
               <option value={0}>Chưa có TOPIK</option>
-              {[1, 2, 3, 4, 5, 6].map(level => {
-                const discount = DEFAULT_TOPIK_DISCOUNTS.find(d => d.level === level)?.discount || 0;
-                return (
-                  <option key={level} value={level}>
-                    TOPIK {level}{discount > 0 ? ` — Giảm ${discount}% học phí` : ''}
-                  </option>
-                );
-              })}
+              {TOPIK_DISCOUNT_LEVELS.slice(1).map(({level, discount}) => (
+                <option key={level} value={level}>
+                  TOPIK {level}{discount > 0 ? ` — Giảm ${discount}% học phí` : ''}
+                </option>
+              ))}
             </select>
             {calculatedCosts.scholarshipApplied && (
               <p className="mt-2 text-sm text-emerald-600 font-medium">
@@ -316,9 +289,9 @@ export default function CostCalculator({ university }: CostCalculatorProps) {
               className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#003AB7] focus:border-transparent"
             >
               <option value={0}>Không ở KTX</option>
-              {[1, 2, 3, 4, 5, 6].map(months => (
-                <option key={months} value={months}>
-                  {months} tháng — {formatFrom(months * 800000, 'VND')}
+              {TOPIK_DISCOUNT_LEVELS.slice(1).map(({level}) => (
+                <option key={level} value={level}>
+                  {level} tháng — {formatFrom(level * DEFAULT_COMMON_FEES.find(f => f.id === 'ktx_vn')!.amountPerMonth!, 'VND')}
                 </option>
               ))}
             </select>
@@ -346,7 +319,7 @@ export default function CostCalculator({ university }: CostCalculatorProps) {
             </h3>
             
             <div className="space-y-3">
-              {commonFees.filter((f: CommonFeeVND) => !f.optional || (f.id === 've_may_bay' && includeFlight) || (f.id === 'ktx_vn' && ktxVNMonths > 0)).map((fee: CommonFeeVND) => (
+              {DEFAULT_COMMON_FEES.filter((f: any) => !f.optional || (f.id === 've_may_bay' && includeFlight) || (f.id === 'ktx_vn' && ktxVNMonths > 0)).map((fee: any) => (
                 <div key={fee.id} className="flex justify-between items-start py-2">
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
@@ -360,36 +333,33 @@ export default function CostCalculator({ university }: CostCalculatorProps) {
                         </button>
                       )}
                     </div>
-                    {fee.note && <p className="text-xs text-slate-500 mt-0.5">{fee.note}</p>}
-                    
-                    {/* Sub-items */}
-                    {fee.subItems && expandedSubItems[fee.id] && (
-                      <div className="mt-2 ml-4 space-y-1">
-                        {fee.subItems.map((item: string, idx: number) => (
-                          <div key={idx} className="flex items-center gap-2 text-sm text-slate-600">
-                            <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full" />
-                            {item}
+                    {fee.note && (
+                      <p className="text-xs text-slate-500 mt-1">{fee.note}</p>
+                    )}
+                    {fee.subItems && fee.subItems.length > 0 && expandedSubItems[fee.id] && (
+                      <div className="mt-2 pl-4 space-y-1">
+                        {fee.subItems.map((subItem: string, idx: number) => (
+                          <div key={idx} className="text-xs text-slate-600 flex items-center gap-1">
+                            <div className="w-1 h-1 bg-slate-400 rounded-full"></div>
+                            {subItem}
                           </div>
                         ))}
                       </div>
                     )}
                   </div>
-                  <span className="font-semibold text-slate-800">
-                    {fee.id === 'ktx_vn' && ktxVNMonths > 0
-                      ? formatFrom(ktxVNMonths * (fee.amountPerMonth || 0), 'VND')
-                      : formatFrom(fee.amount || 0, 'VND')
-                    }
+                  <span className="font-medium text-slate-800">
+                    {formatFrom(fee.amount, 'VND')}
                   </span>
                 </div>
               ))}
-              
-              <div className="pt-4 border-t border-emerald-200">
-                <div className="flex justify-between items-center">
-                  <span className="font-bold text-emerald-800">Tổng phí VNĐ</span>
-                  <span className="text-xl font-bold text-emerald-700">
-                    {formatFrom(calculatedCosts.totalVND, 'VND')}
-                  </span>
-                </div>
+            </div>
+            
+            <div className="pt-4 border-t border-emerald-200">
+              <div className="flex justify-between items-center">
+                <span className="font-bold text-emerald-800">Tổng phí VNĐ</span>
+                <span className="text-xl font-bold text-emerald-700">
+                  {formatFrom(calculatedCosts.totalVND, 'VND')}
+                </span>
               </div>
             </div>
           </div>

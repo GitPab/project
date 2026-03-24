@@ -3,6 +3,8 @@ import { supabase } from '../config/supabase';
 import type { FlexibleFee, FeeOption, FeeCondition } from '../types/fees';
 import type { UniversitySystem } from '../types/university';
 
+const LOAD_SELECTIONS_ERROR = 'Failed to load fee selections';
+
 interface UseFeesResult {
   fees: FlexibleFee[];
   loading: boolean;
@@ -47,7 +49,6 @@ export function useFees(universityId?: string): UseFeesResult {
   const [timeValues, setTimeValues] = useState<Record<string, number>>({});
   const [optionalFees, setOptionalFees] = useState<Record<string, boolean>>({});
 
-  // Fetch fees from Supabase
   const fetchFees = useCallback(async () => {
     if (!universityId) return;
 
@@ -68,31 +69,24 @@ export function useFees(universityId?: string): UseFeesResult {
       if (data?.systems && Array.isArray(data.systems)) {
         setAvailableSystems(data.systems);
         
-        // Get all fees from available systems
         const allFees: FlexibleFee[] = [];
         const defaults: Record<string, any> = {};
         const timeDefaults: Record<string, number> = {};
         const optionalDefaults: Record<string, boolean> = {};
         
         data.systems.forEach((system: UniversitySystem) => {
-          // Add fees from this system
           if (system.fees && Array.isArray(system.fees)) {
             system.fees.forEach((fee: FlexibleFee) => {
-              // Add system context to fee
               const feeWithSystem = {
                 ...fee,
-                // Prefix fee ID with system code for uniqueness
                 id: `${system.code}_${fee.id}`,
-                // Store original ID
                 originalId: fee.id,
-                // Store system code for filtering
                 applies_to: [system.code],
                 systemCode: system.code,
                 systemName: system.name,
               };
               allFees.push(feeWithSystem);
               
-              // Initialize default selections
               if (fee.default_selected) {
                 if (fee.type === 'optional_multiple' || fee.type === 'variable_time') {
                   defaults[feeWithSystem.id] = fee.default_selected as string;
@@ -126,7 +120,6 @@ export function useFees(universityId?: string): UseFeesResult {
     }
   }, [universityId]);
 
-  // Setup real-time subscription for systems changes
   useEffect(() => {
     if (!universityId) return;
 
@@ -145,7 +138,6 @@ export function useFees(universityId?: string): UseFeesResult {
             const newSystems = payload.new.systems as UniversitySystem[];
             setAvailableSystems(newSystems);
             
-            // Re-extract fees from updated systems
             const allFees: FlexibleFee[] = [];
             newSystems.forEach((system: UniversitySystem) => {
               if (system.fees && Array.isArray(system.fees)) {
@@ -172,14 +164,11 @@ export function useFees(universityId?: string): UseFeesResult {
     };
   }, [universityId]);
 
-  // Initial fetch
   useEffect(() => {
     fetchFees();
   }, [fetchFees]);
 
-  // Calculate total costs
   const calculation = useCallback(() => {
-    // Filter fees by selected visa type
     const applicableFees = fees.filter(fee => 
       !selectedVisaType || 
       !fee.applies_to || 
@@ -225,7 +214,6 @@ export function useFees(universityId?: string): UseFeesResult {
           break;
       }
 
-      // Apply time-based calculations
       if (fee.time_unit && timeValues[fee.id]) {
         const multiplier = timeValues[fee.id];
         feeAmount = feeAmount * multiplier;
@@ -274,7 +262,6 @@ export function useFees(universityId?: string): UseFeesResult {
   };
 }
 
-// Helper function to save fee selections to Supabase
 export async function saveFeeSelections(
   trackingCode: string,
   universityId: string,
@@ -287,7 +274,6 @@ export async function saveFeeSelections(
   }
 ) {
   try {
-    // Check if record exists first
     const { data: existing } = await (supabase as any)
       .from('student_fee_selections')
       .select('id')
@@ -304,7 +290,6 @@ export async function saveFeeSelections(
 
     let error;
     if (existing) {
-      // Update existing
       const result = await (supabase as any)
         .from('student_fee_selections')
         .update(recordData)
@@ -312,7 +297,6 @@ export async function saveFeeSelections(
         .eq('university_id', universityId);
       error = result.error;
     } else {
-      // Insert new
       const result = await (supabase as any)
         .from('student_fee_selections')
         .insert({ ...recordData, created_at: new Date().toISOString() });
@@ -332,7 +316,6 @@ export async function saveFeeSelections(
   }
 }
 
-// Helper function to load saved fee selections
 export async function loadFeeSelections(trackingCode: string, universityId: string) {
   try {
     const { data, error } = await (supabase as any)
@@ -342,13 +325,15 @@ export async function loadFeeSelections(trackingCode: string, universityId: stri
       .eq('university_id', universityId)
       .single();
 
-    if (error && error.code !== 'PGRST116') { // PGRST116 = not found
+    if (error && error.code !== 'PGRST116') {
       throw new Error(error.message || 'Failed to load');
     }
 
     return data?.selections || null;
   } catch (error) {
-    console.error('Failed to load fee selections:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error(LOAD_SELECTIONS_ERROR, error);
+    }
     return null;
   }
 }

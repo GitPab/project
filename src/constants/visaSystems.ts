@@ -1,102 +1,100 @@
-/**
- * Shared visa systems constant used across the application
- * This ensures consistency between:
- * - CostInputForm (admin cost configuration)
- * - EditUniversityModal (admin university editing)
- * - UniversityDetail (student visa selection)
- */
-
-export interface VisaSystemOption {
-  id: string;
+﻿export type VisaSystemConfig = {
+  key: string;
   label: string;
   name: string;
   description: string;
-  defaultAvailable?: boolean;
-}
+  default_apply_fee: number;
+  default_enrollment_fee: number;
+  popular?: boolean;
+  best_scholarship?: boolean;
+  invoice_unit?: 'per_ky' | 'flat' | 'per_year';
+};
 
-export const VISA_SYSTEMS: VisaSystemOption[] = [
+export const VISA_SYSTEMS: VisaSystemConfig[] = [
   {
-    id: 'D4-1',
+    key: 'D4-1',
     label: 'D4-1',
     name: 'Hệ tiếng',
     description: 'Học tiếng Hàn tại trường',
-    defaultAvailable: true,
+    default_apply_fee: 100000,
+    default_enrollment_fee: 0,
+    popular: true
   },
   {
-    id: 'D4-2',
-    label: 'D4-2',
-    name: 'Dự bị',
-    description: 'Dự bị trước khi vào đại học',
-    defaultAvailable: false,
-  },
-  {
-    id: 'D2-1',
+    key: 'D2-1',
     label: 'D2-1',
-    name: 'Dự bị ĐH',
-    description: 'Dự bị đại học chính quy',
-    defaultAvailable: false,
+    name: 'Dự bị',
+    description: 'Dự bị đại học tổng quát',
+    default_apply_fee: 0,
+    default_enrollment_fee: 0
   },
   {
-    id: 'D2-2',
+    key: 'D2-2',
     label: 'D2-2',
     name: 'Đại học',
-    description: 'Cử nhân chính quy',
-    defaultAvailable: true,
+    description: 'Hệ đại học chính quy',
+    default_apply_fee: 150000,
+    default_enrollment_fee: 0,
+    best_scholarship: true
   },
   {
-    id: 'D2-3',
+    key: 'D2-3M',
     label: 'D2-3',
     name: 'Thạc sĩ',
-    description: 'Cao học / thạc sĩ',
-    defaultAvailable: true,
+    description: "Sau đại học – Master's degree",
+    default_apply_fee: 100000,
+    default_enrollment_fee: 900000
   },
   {
-    id: 'D2-4',
-    label: 'D2-4',
+    key: 'D2-3P',
+    label: 'D2-3',
     name: 'Tiến sĩ',
-    description: 'Nghiên cứu sinh tiến sĩ',
-    defaultAvailable: false,
+    description: 'Sau đại học – Doctoral degree',
+    default_apply_fee: 100000,
+    default_enrollment_fee: 0
   },
   {
-    id: 'D2-5',
-    label: 'D2-5',
-    name: 'Nghiên cứu sinh',
-    description: 'Research student',
-    defaultAvailable: false,
-  },
-  {
-    id: 'D2-6',
+    key: 'D2-6',
     label: 'D2-6',
-    name: 'Trao đổi',
-    description: 'Exchange program',
-    defaultAvailable: false,
+    name: 'Nghiên cứu sinh',
+    description: 'Research student – không lấy bằng',
+    default_apply_fee: 0,
+    default_enrollment_fee: 0
   },
   {
-    id: 'D2-7',
-    label: 'D2-7',
-    name: 'Ngắn hạn',
-    description: 'Short-term program',
-    defaultAvailable: false,
+    key: 'D2-6E',
+    label: 'Trao đổi',
+    name: 'Trao đổi',
+    description: 'Sinh viên trao đổi quốc tế (1–2 kỳ)',
+    invoice_unit: 'per_ky',
+    default_apply_fee: 0,
+    default_enrollment_fee: 0
   },
+  {
+    key: 'D2-8',
+    label: 'Ngắn hạn',
+    name: 'Ngắn hạn',
+    description: 'Chương trình dưới 6 tháng',
+    invoice_unit: 'flat',
+    default_apply_fee: 0,
+    default_enrollment_fee: 0
+  }
 ];
 
-/**
- * Get visa system by ID
- */
-export const getVisaSystem = (id: string): VisaSystemOption | undefined => {
-  return VISA_SYSTEMS.find(v => v.id === id);
-};
+export const defaultVisaSystemEntry = (key: string) => ({
+  available: false,
+  invoice_krw: 0,
+  apply_fee_krw: VISA_SYSTEMS.find(v => v.key === key)?.default_apply_fee ?? 0,
+  enrollment_fee_krw: VISA_SYSTEMS.find(v => v.key === key)?.default_enrollment_fee ?? 0,
+  scholarships: [],
+  ktx_options: [],
+  so_tiet_kiem_options: []
+});
 
-/**
- * Get visa system label/name by ID
- */
-export const getVisaLabel = (id: string): string => {
-  return VISA_SYSTEMS.find(v => v.id === id)?.name ?? id;
-};
-
-/**
- * Get all visa system IDs
- */
-export const getVisaSystemIds = (): string[] => {
-  return VISA_SYSTEMS.map(v => v.id);
+export const initAllVisaSystems = () => {
+  const result: Record<string, ReturnType<typeof defaultVisaSystemEntry>> = {};
+  VISA_SYSTEMS.forEach(v => {
+    result[v.key] = defaultVisaSystemEntry(v.key);
+  });
+  return result;
 };

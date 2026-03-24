@@ -1,0 +1,51 @@
+@import url("https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap");
+@import "tailwindcss/preflight";
+@tailwind utilities;
+
+/* Custom CSS Variables for Primary Colors */
+:root {
+  --primary: #003AB7;
+  --primary-foreground: #ffffff;
+  --primary-hover: #002A8F;
+}
+
+/* Apply primary colors to Tailwind utilities */
+.bg-primary {
+  background-color: var(--primary);
+}
+
+.text-primary {
+  color: var(--primary);
+}
+
+.border-primary {
+  border-color: var(--primary);
+}
+
+.hover\:bg-primary:hover {
+  background-color: var(--primary-hover);
+}
+
+/* Fix for any layout issues */
+body {
+  font-family: "Sora", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Ensure proper spacing and layout */
+.min-h-screen {
+  min-height: 100vh;
+}
+
+/* Fix admin dashboard specific styles */
+.admin-dashboard {
+  padding: 1rem;
+}
+
+.stat-card {
+  transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+}

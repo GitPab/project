@@ -62,7 +62,51 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 // Use only Korean universities from the provided CSV Top1/Top2/Top3 lists
-const allUniversitiesData = topUniversities;
+const normalizeTier = (raw: any): 'Top1' | 'Top2' | 'Top3' => {
+  const s = String(raw ?? '').toLowerCase().replace(/\s/g, '');
+  if (s.includes('top3') || s === '3') return 'Top3';
+  if (s.includes('top2') || s === '2') return 'Top2';
+  if (s.includes('top1') || s === '1') return 'Top1';
+  return 'Top1'; // Default to Top1
+};
+
+const parseMaybeJson = <T,>(value: any, fallback: T): T => {
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value) as T;
+    } catch {
+      return fallback;
+    }
+  }
+  return (value ?? fallback) as T;
+};
+
+const parseUniversity = (u: any): University => {
+  const normalizedTier = normalizeTier(u?.top_tier ?? u?.koreanData?.topTier ?? u?.topTier);
+  const visaSystems = parseMaybeJson<Record<string, any>>(u?.visa_systems, {});
+  const admission = parseMaybeJson<Record<string, any>>(u?.admission ?? u?.koreanData?.admission, u?.koreanData?.admission ?? {});
+  const majors = parseMaybeJson<string[]>(u?.majors ?? u?.koreanData?.majors, u?.koreanData?.majors ?? []);
+  const costConfig = parseMaybeJson<any>(u?.cost_config ?? u?.koreanData?.cost_config, u?.koreanData?.cost_config ?? null);
+
+  return {
+    ...u,
+    visa_systems: visaSystems ?? {},
+    admission,
+    majors,
+    cost_config: costConfig,
+    top_tier: normalizedTier,
+    koreanData: {
+      ...(u?.koreanData || { isKoreanUniversity: true }),
+      topTier: normalizedTier,
+      admission,
+      majors,
+      cost_config: costConfig,
+      visaSystemsDetail: u?.koreanData?.visaSystemsDetail,
+    },
+  };
+};
+
+const allUniversitiesData = topUniversities.map(parseUniversity);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -93,7 +137,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const updateUniversity = (id: string, updates: Partial<University>) => {
     setUniversities(prev =>
-      prev.map(uni => uni.id === id ? { ...uni, ...updates } : uni)
+      prev.map(uni => uni.id === id ? parseUniversity({ ...uni, ...updates }) : uni)
     );
   };
 
@@ -101,11 +145,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const response = await fetch(`/api/universities/${id}`);
       const data = await response.json();
+      const parsed = parseUniversity(data);
       
       // Update the specific university in the list
-      updateUniversity(id, data);
+      updateUniversity(id, parsed);
       
-      return data;
+      return parsed;
     } catch (error) {
       console.error('Error fetching university:', error);
       return null;
@@ -113,11 +158,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const addUniversities = (universities: University[]) => {
-    setUniversities(prev => [...prev, ...universities]);
+    setUniversities(prev => [...prev, ...universities.map(parseUniversity)]);
   };
 
   const updateUniversitiesList = (updater: (prev: University[]) => University[]) => {
-    setUniversities(prev => updater(prev));
+    setUniversities(prev => updater(prev).map(parseUniversity));
   };
 
   const registerForUniversity = (universityId: string, selectedFees?: {

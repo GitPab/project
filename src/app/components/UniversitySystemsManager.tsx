@@ -15,10 +15,13 @@ import { Alert, AlertDescription } from './ui/alert';
 import PriceInput from './PriceInput';
 import type { University as UniversityType, UniversitySystem } from '../../types/university';
 import type { FeeType, TimeUnit, FeeOption, FeeCondition, FlexibleFee } from '../../types/fees';
+import { VISA_SYSTEMS } from '../../constants/visaSystems';
 
 // Validation schemas
+const VISA_SYSTEM_KEYS = VISA_SYSTEMS.map(system => system.key) as [string, ...string[]];
+
 const systemSchema = z.object({
-  code: z.enum(['D4-1', 'D2-1', 'D2-2', 'D2-3', 'D2-6']),
+  code: z.enum(VISA_SYSTEM_KEYS),
   name: z.string().min(1, 'Tên hệ không được để trống'),
   nameVi: z.string().optional(),
   nameKo: z.string().optional(),
@@ -56,13 +59,14 @@ const TIME_UNITS = [
   { value: 'one_time', label: 'Một lần' },
 ];
 
-const SYSTEM_CODES = [
-  { value: 'D4-1', label: 'D4-1', description: 'Chương trình tiếng Hàn' },
-  { value: 'D2-1', label: 'D2-1', description: 'Chương trình chuẩn bị' },
-  { value: 'D2-2', label: 'D2-2', description: 'Chương trình đại học' },
-  { value: 'D2-3', label: 'D2-3', description: 'Chương trình sau đại học' },
-  { value: 'D2-6', label: 'D2-6', description: 'Chương trình nâng cao' },
-];
+const SYSTEM_CODES = VISA_SYSTEMS.map(system => {
+  const label = system.label === system.name ? system.label : `${system.label} · ${system.name}`;
+  return {
+    value: system.key,
+    label,
+    description: system.description
+  };
+});
 
 interface UniversitySystemsManagerProps {
   university: UniversityType;
@@ -73,7 +77,7 @@ interface UniversitySystemsManagerProps {
 }
 
 export default function UniversitySystemsManager({ 
-  university: UniversityType, 
+  university, 
   systems, 
   onChange, 
   onError, 
@@ -443,6 +447,7 @@ export default function UniversitySystemsManager({
                           <div>
                             <Label>Giá trị *</Label>
                             <PriceInput
+                              label="Giá trị"
                               value={fee.base_value}
                               onChange={(value) => updateFee(systemIndex, feeIndex, 'base_value', value)}
                               id={`fee-value-${fee.id}`}
@@ -529,6 +534,7 @@ export default function UniversitySystemsManager({
                                     <div>
                                       <Label>Giá trị</Label>
                                       <PriceInput
+                                        label="Giá trị"
                                         value={option.value}
                                         onChange={(value) => {
                                           const newOptions = [...(fee.options || [])];
@@ -657,3 +663,4 @@ export default function UniversitySystemsManager({
     </div>
   );
 }
+

@@ -22,7 +22,7 @@ export default function StudentHome() {
   const filteredUniversities = universities.filter(uni =>
     uni.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     uni.country.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    uni.tagline.toLowerCase().includes(searchTerm.toLowerCase())
+    (uni.tagline || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   // Paginate results

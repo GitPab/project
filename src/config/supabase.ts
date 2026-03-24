@@ -38,8 +38,7 @@
  * - Only ADMIN can UPDATE/DELETE
  */
 
-// For production: import { createClient } from '@supabase/supabase-js'
-// For now: Mock implementation that uses localStorage fallback
+const PARSE_ERROR_MESSAGE = 'Failed to parse tracking code from localStorage';
 
 interface TrackingCodeRecord {
   id: string;
@@ -59,8 +58,6 @@ interface TrackingCodeRecord {
   updated_at: string;
 }
 
-// Mock Supabase client for development
-// In production, replace with real Supabase client
 const mockSupabaseClient = {
   isConfigured: false,
 
@@ -70,7 +67,6 @@ const mockSupabaseClient = {
     return !!(url && key);
   },
 
-  // Fallback: localStorage-based tracking codes (for development)
   getStorageKey: (code: string) => `tracking_code_${code}`,
 
   getAllCodesInStorage: (): TrackingCodeRecord[] => {
@@ -82,7 +78,9 @@ const mockSupabaseClient = {
           const code = JSON.parse(value);
           codes.push(code);
         } catch (e) {
-          console.error('Failed to parse tracking code from localStorage:', key);
+          if (process.env.NODE_ENV === 'development') {
+            console.error(PARSE_ERROR_MESSAGE, key);
+          }
         }
       }
     }
@@ -105,18 +103,13 @@ const mockSupabaseClient = {
     localStorage.removeItem(mockSupabaseClient.getStorageKey(code));
   },
   
-  // Realtime channel support
   channel: (name: string) => {
     return {
       on: (event: string, config: any, callback: any) => {
-        // Mock implementation - just return chainable object
         return {
           subscribe: () => {
-            console.log(`Mock subscribe to channel: ${name}`);
             return {
-              unsubscribe: () => {
-                console.log(`Mock unsubscribe from channel: ${name}`);
-              }
+              unsubscribe: () => {}
             };
           }
         };
@@ -129,13 +122,22 @@ const mockSupabaseClient = {
     };
   },
   
-  // Database query support
+  removeChannel: () => {
+    return {
+      unsubscribe: () => {}
+    };
+  },
+  
   from: (table: string) => {
     return {
       select: (columns?: string) => ({
         eq: (column: string, value: any) => ({
           single: () => Promise.resolve({ data: null, error: null }),
           order: () => Promise.resolve({ data: [], error: null }),
+          eq: (column: string, value: any) => ({
+            single: () => Promise.resolve({ data: null, error: null }),
+            order: () => Promise.resolve({ data: [], error: null }),
+          }),
         }),
         order: () => Promise.resolve({ data: [], error: null }),
       }),
@@ -146,6 +148,7 @@ const mockSupabaseClient = {
       delete: () => ({
         eq: (column: string, value: any) => Promise.resolve({ error: null, data: null }),
       }),
+      upsert: (data: any) => Promise.resolve({ error: null, data: null }),
     };
   },
 };
@@ -163,13 +166,3 @@ export const supabase = mockSupabaseClient;
 export const isSupabaseConfigured = (): boolean => {
   return supabase.checkConfiguration();
 };
-
-/**
- * Note: When Supabase is configured, replace this with:
- * import { createClient } from '@supabase/supabase-js';
- *
- * export const supabase = createClient(
- *   import.meta.env.VITE_SUPABASE_URL!,
- *   import.meta.env.VITE_SUPABASE_ANON_KEY!
- * );
- */

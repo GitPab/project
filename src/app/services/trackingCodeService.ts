@@ -6,6 +6,13 @@
 import { supabase } from '@/config/supabase';
 import type { TrackingCode, TrackingCodePayload } from '@/types/tracking';
 
+const ERROR_CHECKING_UNIQUENESS = 'Error checking code uniqueness';
+const ERROR_SAVING_CODE = 'Error saving tracking code';
+const ERROR_RETRIEVING_CODE = 'Error retrieving tracking code';
+const ERROR_UPDATING_CODE = 'Error updating tracking code';
+const ERROR_RETRIEVING_ALL_CODES = 'Error retrieving all tracking codes';
+const ERROR_SEARCHING_CODES = 'Error searching tracking codes';
+
 /**
  * Convert snake_case storage format to camelCase TrackingCode interface
  */
@@ -62,7 +69,6 @@ export const generateTrackingCode = (): string => {
   const mm = String(date.getMonth() + 1).padStart(2, '0');
   const dd = String(date.getDate()).padStart(2, '0');
 
-  // Generate 6 random alphanumeric characters
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let randomPart = '';
   for (let i = 0; i < 6; i++) {
@@ -77,17 +83,15 @@ export const generateTrackingCode = (): string => {
  */
 export const isCodeUnique = async (code: string): Promise<boolean> => {
   try {
-    // Check localStorage first
     const existing = supabase.getFromStorage(code);
     if (existing) {
       return false;
     }
-
-    // If Supabase is configured, check database
-    // This will be implemented when Supabase is set up
     return true;
   } catch (error) {
-    console.error('Error checking code uniqueness:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error(ERROR_CHECKING_UNIQUENESS, error);
+    }
     return false;
   }
 };
@@ -135,19 +139,14 @@ export const saveTrackingCode = async (payload: TrackingCodePayload): Promise<Tr
       updatedAt: new Date().toISOString(),
     };
 
-    // Convert to storage format and save
     const storageFormat = convertToStorageFormat(trackingCode);
     supabase.saveToStorage(storageFormat as any);
 
-    // TODO: When Supabase is configured, use:
-    // const { data, error } = await supabase
-    //   .from('tracking_codes')
-    //   .insert([storageFormat]);
-    // if (error) throw error;
-
     return trackingCode;
   } catch (error) {
-    console.error('Error saving tracking code:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error(ERROR_SAVING_CODE, error);
+    }
     return null;
   }
 };
@@ -157,24 +156,15 @@ export const saveTrackingCode = async (payload: TrackingCodePayload): Promise<Tr
  */
 export const getTrackingCode = async (code: string): Promise<TrackingCode | null> => {
   try {
-    // Check localStorage first
     const stored = supabase.getFromStorage(code);
     if (stored) {
       return convertToTrackingCode(stored);
     }
-
-    // TODO: When Supabase is configured, use:
-    // const { data, error } = await supabase
-    //   .from('tracking_codes')
-    //   .select('*')
-    //   .eq('code', code)
-    //   .single();
-    // if (error) throw error;
-    // return convertToTrackingCode(data);
-
     return null;
   } catch (error) {
-    console.error('Error retrieving tracking code:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error(ERROR_RETRIEVING_CODE, error);
+    }
     return null;
   }
 };
@@ -199,17 +189,11 @@ export const updateTrackingCodeStatus = async (
     };
 
     supabase.saveToStorage(updated);
-
-    // TODO: When Supabase is configured, use:
-    // const { data, error } = await supabase
-    //   .from('tracking_codes')
-    //   .update({ status, updated_at: new Date().toISOString() })
-    //   .eq('code', code);
-    // if (error) throw error;
-
     return convertToTrackingCode(updated);
   } catch (error) {
-    console.error('Error updating tracking code:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error(ERROR_UPDATING_CODE, error);
+    }
     return null;
   }
 };
@@ -219,20 +203,12 @@ export const updateTrackingCodeStatus = async (
  */
 export const getAllTrackingCodes = async (): Promise<TrackingCode[]> => {
   try {
-    // Get from localStorage
     const codes = supabase.getAllCodesInStorage();
-
-    // TODO: When Supabase is configured, use:
-    // const { data, error } = await supabase
-    //   .from('tracking_codes')
-    //   .select('*')
-    //   .order('created_at', { ascending: false });
-    // if (error) throw error;
-    // return data.map(convertToTrackingCode);
-
     return codes.map(convertToTrackingCode);
   } catch (error) {
-    console.error('Error retrieving all tracking codes:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error(ERROR_RETRIEVING_ALL_CODES, error);
+    }
     return [];
   }
 };
@@ -243,21 +219,13 @@ export const getAllTrackingCodes = async (): Promise<TrackingCode[]> => {
 export const searchTrackingCodesByEmail = async (email: string): Promise<TrackingCode[]> => {
   try {
     const codes = supabase.getAllCodesInStorage();
-    const filtered = codes
+    return codes
       .filter((code) => code.student_email.toLowerCase().includes(email.toLowerCase()))
       .map(convertToTrackingCode);
-
-    // TODO: When Supabase is configured, use:
-    // const { data, error } = await supabase
-    //   .from('tracking_codes')
-    //   .select('*')
-    //   .ilike('student_email', `%${email}%`);
-    // if (error) throw error;
-    // return data.map(convertToTrackingCode);
-
-    return filtered;
   } catch (error) {
-    console.error('Error searching tracking codes:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error(ERROR_SEARCHING_CODES, error);
+    }
     return [];
   }
 };
@@ -266,9 +234,7 @@ export const searchTrackingCodesByEmail = async (email: string): Promise<Trackin
  * Format tracking code for display
  */
 export const formatTrackingCode = (code: string): string => {
-  // Format: SACMA-YYYYMMDD-XXXXXX -> SACMA-YYYY-MM-DD-XXXXXX (for readability)
   if (code.length === 22) {
-    // SACMA-YYYYMMDD-XXXXXX
     return `${code.substring(0, 5)}-${code.substring(5, 9)}-${code.substring(9, 11)}-${code.substring(11, 13)}-${code.substring(14)}`;
   }
   return code;

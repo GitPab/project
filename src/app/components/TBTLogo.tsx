@@ -38,18 +38,13 @@ export default function TBTLogo({ size = 'md', variant = 'full', className = '' 
           className="w-full h-full object-contain"
           style={{ display: 'block' }}
           onLoad={(e) => {
-            console.log('✅ TBT Logo loaded successfully');
             const target = e.target as HTMLImageElement;
             target.style.display = 'block';
           }}
           onError={(e) => {
-            console.error('❌ TBT Logo failed to load, checking fallback...');
-            // Try alternative path
             const target = e.target as HTMLImageElement;
             target.src = './img/tbt-logo.png';
             target.onerror = () => {
-              console.error('❌ Both paths failed, using text fallback');
-              // Final fallback to text if both paths fail
               target.style.display = 'none';
               const parent = target.parentElement;
               if (parent) {

@@ -26,21 +26,21 @@ export default function RegistrationModal({
     visa: true,
     accommodation: true,
     insurance: true,
-    additional: university.additionalFees.map(() => true)
+    additional: (university.additionalFees || []).map(() => true)
   });
 
   if (!isOpen) return null;
 
   const calculateTotal = () => {
-    let total = university.generalTuition; // Always included
+    let total = university.generalTuition || 0; // Always included
     
-    if (selectedFees.visa) total += university.visaFee;
-    if (selectedFees.accommodation) total += university.accommodationFee;
-    if (selectedFees.insurance) total += university.insuranceFee;
+    if (selectedFees.visa) total += university.visaFee || 0;
+    if (selectedFees.accommodation) total += university.accommodationFee || 0;
+    if (selectedFees.insurance) total += university.insuranceFee || 0;
     
     selectedFees.additional.forEach((selected, index) => {
       if (selected) {
-        total += university.additionalFees[index].amount;
+        total += (university.additionalFees || [])[index]?.amount || 0;
       }
     });
     
@@ -100,7 +100,7 @@ export default function RegistrationModal({
               </div>
               <div className="flex items-center gap-3">
                 <p className="text-lg font-bold text-blue-600">
-                  {formatFrom(university.generalTuition, 'VND')}
+                  {formatFrom(university.generalTuition || 0, 'VND')}
                 </p>
                 <input
                   type="checkbox"
@@ -127,14 +127,14 @@ export default function RegistrationModal({
                 </div>
                 <div>
                   <p className="font-semibold text-slate-900">Phí visa</p>
-                  <p className="text-sm text-slate-600">Visa application fee</p>
+                  <span className="text-xs text-gray-500">(~ {((calculateTotal() / 23000)).toFixed(0)} USD)</span>
                 </div>
               </div>
               <div className="flex items-center gap-3">
                 <p className={`text-lg font-bold ${
                   selectedFees.visa ? 'text-green-600' : 'text-slate-900'
                 }`}>
-                  {formatFrom(university.visaFee, 'VND')}
+                  {formatFrom(university.visaFee || 0, 'VND')}
                 </p>
                 <input
                   type="checkbox"
@@ -171,7 +171,7 @@ export default function RegistrationModal({
                 <p className={`text-lg font-bold ${
                   selectedFees.accommodation ? 'text-green-600' : 'text-slate-900'
                 }`}>
-                  {formatFrom(university.accommodationFee, 'VND')}
+                  {formatFrom(university.accommodationFee || 0, 'VND')}
                 </p>
                 <input
                   type="checkbox"
@@ -208,7 +208,7 @@ export default function RegistrationModal({
                 <p className={`text-lg font-bold ${
                   selectedFees.insurance ? 'text-green-600' : 'text-slate-900'
                 }`}>
-                  {formatFrom(university.insuranceFee, 'VND')}
+                  {formatFrom(university.insuranceFee || 0, 'VND')}
                 </p>
                 <input
                   type="checkbox"
@@ -223,7 +223,7 @@ export default function RegistrationModal({
             </div>
 
             {/* Additional Fees */}
-            {university.additionalFees.map((fee, index) => (
+            {(university.additionalFees || []).map((fee, index) => (
               <div 
                 key={index}
                 className={`flex items-center justify-between p-4 border-2 rounded-lg transition-all ${
@@ -249,7 +249,7 @@ export default function RegistrationModal({
                   <p className={`text-lg font-bold ${
                     selectedFees.additional[index] ? 'text-green-600' : 'text-slate-900'
                   }`}>
-                    {formatFrom(fee.amount, 'VND')}
+                    {calculateTotal().toLocaleString()} VND
                   </p>
                   <input
                     type="checkbox"

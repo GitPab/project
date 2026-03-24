@@ -3,18 +3,21 @@ import { createHashRouter, Navigate } from 'react-router';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import AdminDashboard from './pages/AdminDashboard';
-import UniversitiesList from './pages/UniversitiesList';
 import UniversityInfo from './pages/UniversityInfo';
 import AdminRegistrations from './pages/AdminRegistrations';
 import StudentMonitoring from './pages/StudentMonitoring';
 import StudentHome from './pages/StudentHome';
 import UniversityDetail from './pages/UniversityDetail';
+import UniversityDetailRedesigned from './pages/UniversityDetailRedesigned';
+import UniversityDetailAdmin from './pages/UniversityDetailAdmin';
 import MyCosts from './pages/MyCosts';
 import ProgressTracker from './pages/ProgressTracker';
 import StudentOnboarding from './pages/StudentOnboarding';
 import PublicOnboarding from './pages/PublicOnboarding';
 import StudentTracking from './pages/StudentTracking';
 import StudentLookup from './pages/StudentLookup';
+import UniversitiesListEnhancedRedesigned from './components/UniversitiesListEnhancedRedesigned';
+import StudentUniversityList from './components/StudentUniversityList';
 import RouteError from './components/RouteError';
 
 export const router = createHashRouter([
@@ -26,6 +29,11 @@ export const router = createHashRouter([
   {
     path: '/universities',
     Component: UniversityInfo,
+    errorElement: <RouteError />
+  },
+  {
+    path: '/university/:id',
+    Component: UniversityDetailRedesigned,
     errorElement: <RouteError />
   },
   {
@@ -58,11 +66,11 @@ export const router = createHashRouter([
       },
       {
         path: 'universities',
-        Component: UniversitiesList
+        Component: UniversitiesListEnhancedRedesigned
       },
       {
         path: 'university/:id',
-        Component: UniversityDetail
+        Component: UniversityDetailAdmin
       },
       {
         path: 'students',
@@ -89,11 +97,11 @@ export const router = createHashRouter([
       },
       {
         path: 'universities',
-        Component: UniversitiesList
+        Component: StudentUniversityList
       },
       {
         path: 'university/:id',
-        Component: UniversityDetail
+        Component: UniversityDetailRedesigned
       },
       {
         path: 'my-costs',

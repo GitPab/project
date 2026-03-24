@@ -1,17 +1,21 @@
-# Design Update to Figma Plan - Progress Tracker
+# Cleanup Phases TODO - Phases 1-3 Complete, Phase 4 In Progress
 
-## Pending Steps
-- [ ] 1. Update theme.css with Figma colors/radius (extract from Figma data/images)
-- [ ] 2. Refactor PublicOnboarding.tsx to match Figma 'Home' frame (hero banner, form, TOP 3 unis, recommendations)
-- [ ] 3. Update Layout.tsx for Figma header (add banner slider if needed)
-- [ ] 4. Enhance UniversitiesList.tsx / SchoolCard.tsx for Figma university grid/list
-- [ ] 5. Update UniversityDetailKorean.tsx for 'Thông tin trường' frame
-- [ ] 6. Download Figma images to public/img/ using ImageWithFallback
-- [ ] 7. Test responsive design across devices
-- [ ] 8. Run `npm run dev` and verify
+## ✅ PHASES 1-3 COMPLETE
+- [x] Phase 1: Debug Cleanup (console.logs, constants, interfaces)
+- [x] Phase 2: Error Handling (dev-only logs, error constants)
+- [x] Phase 3: Constants Extraction (scholarships.ts created)
 
-## Completed
-(none yet)
+## 🔄 CURRENT: Phase 4 - Performance Optimizations
+1. [x] Complete Phase 3 fixes (import constants in CostCalculator.tsx ✅, CostInputForm.tsx, replace duplicates)
+2. [ ] Add memoization to expensive components (useMemo/useCallback in CostCalculator, forms)
+3. [ ] Batch state updates in forms (use useDeferredValue or batch hooks)
+4. [ ] Extract inline callbacks to named functions
+5. [ ] Optimize array operations (.filter/map chains)
+6. [ ] Remove duplicate code blocks across pages (MyCostsDynamic, PublicOnboarding)
+7. [ ] Complete remaining TODO items from codebase
+8. [ ] Update CLEANUP_PROGRESS.md with Phase 4 summary
 
-*Last updated: Initial creation*
+## ⏳ FUTURE PHASES
+- Phase 5: Testing & CI
+- Phase 6: Bundle optimization
 

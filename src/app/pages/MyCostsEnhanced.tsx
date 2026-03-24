@@ -22,12 +22,12 @@ import {
   Info,
   RefreshCw,
   Save,
-  University,
+  University as UniversityIcon,
 } from 'lucide-react';
 import { getTrackingCode, searchTrackingCodesByEmail } from '../services/trackingCodeService';
-import { createClient } from '@supabase/supabase-js';
-import type { UniversitySystem, FlexibleFee, FeeOption, FeeCondition } from '../types/fees';
-import type { University } from '../types/university';
+import { supabase } from '../../config/supabase';
+import type { FlexibleFee, FeeOption, FeeCondition } from '../../types/fees';
+import type { University, UniversitySystem } from '../../types/university';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Progress } from '../components/ui/progress';
@@ -42,11 +42,6 @@ import { Separator } from '../components/ui/separator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip';
 import { Alert, AlertDescription } from '../components/ui/alert';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
 // Validation schema for student selections
 const studentSelectionSchema = z.object({
   systemCode: z.string(),
@@ -57,15 +52,6 @@ const studentSelectionSchema = z.object({
 });
 
 type StudentSelections = z.infer<typeof studentSelectionSchema>;
-
-// System code options
-const SYSTEM_OPTIONS = [
-  { code: 'D4-1', name: 'D4-1', nameVi: 'Chương trình tiếng Hàn', description: 'Học tiếng Hàn 6 tháng' },
-  { code: 'D2-1', name: 'D2-1', nameVi: 'Chương trình chuẩn bị', description: 'Chuẩn bị vào đại học' },
-  { code: 'D2-2', name: 'D2-2', nameVi: 'Chương trình đại học', description: 'Học đại học 4 năm' },
-  { code: 'D2-3', name: 'D2-3', nameVi: 'Chương trình sau đại học', description: 'Học thạc sĩ/tiến sĩ' },
-  { code: 'D2-6', name: 'D2-6', nameVi: 'Chương trình nâng cao', description: 'Chương trình chuyên sâu' },
-];
 
 export default function MyCostsEnhanced() {
   const { universities, user } = useApp();
@@ -134,12 +120,12 @@ export default function MyCostsEnhanced() {
           .single();
 
         if (universityError) {
-          throw new Error(universityError.message);
+          throw new Error(String(universityError));
         }
 
         if (universityData) {
-          setUniversity(universityData);
-          setSystems(universityData.systems || []);
+          setUniversity(universityData as any);
+          setSystems((universityData as any).systems || []);
         }
 
         // Load saved selections
@@ -153,10 +139,10 @@ export default function MyCostsEnhanced() {
 
           if (savedData) {
             try {
-              const selections = studentSelectionSchema.parse(savedData.selections);
-              setSelectedSystemCode(savedData.system_code);
-              setSelectedOptions(selections.options);
-              setSelectedConditions(selections.conditions);
+              const selections = studentSelectionSchema.parse((savedData as any)?.selections);
+              setSelectedSystemCode((savedData as any)?.system_code || '');
+              setSelectedOptions(selections.options || {});
+              setSelectedConditions(selections.conditions || {});
               setTimeValues(selections.timeValues);
               setOptionalFees(selections.optionalFees);
             } catch (err) {
@@ -223,7 +209,7 @@ export default function MyCostsEnhanced() {
           table: 'university_systems',
           filter: `university_id=eq.${selectedUniversityId}`
         },
-        (payload) => {
+        (payload: any) => {
           if (payload.new) {
             // Update systems array when changes occur
             setSystems(prev => {
@@ -242,7 +228,7 @@ export default function MyCostsEnhanced() {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel();
     };
   }, [selectedUniversityId]);
 
@@ -398,7 +384,7 @@ export default function MyCostsEnhanced() {
         });
 
       if (error) {
-        throw new Error(error.message);
+        throw new Error(String(error));
       }
 
       setSaveStatus('saved');
@@ -474,7 +460,7 @@ export default function MyCostsEnhanced() {
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
-              <University className="w-5 h-5" />
+              <UniversityIcon className="w-5 h-5" />
               {language === 'vi' ? 'Chọn trường đại học' : 'Select University'}
             </CardTitle>
           </CardHeader>
@@ -939,3 +925,4 @@ export default function MyCostsEnhanced() {
     </TooltipProvider>
   );
 }
+

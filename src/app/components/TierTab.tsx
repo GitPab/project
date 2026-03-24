@@ -3,18 +3,25 @@
  */
 
 import React from 'react';
+import { TOP_TIERS, getTierColor, getTierBg } from '../../constants/topTiers';
 
 interface TierTabProps {
   active: boolean;
   onClick: () => void;
   icon: string;
   label: string;
-  count: number;
+  count?: number;
   description?: string;
-  colorClass?: 'blue' | 'green' | 'red' | 'gray';
+  colorClass: string;
 }
 
-const colorStyles = {
+const colorStyles: Record<string, { bg: string; border: string; text: string; textMuted: string }> = {
+  gray: {
+    bg: '#F3F4F6',
+    border: '#9CA3AF',
+    text: '#6B7280',
+    textMuted: '#4B5563'
+  },
   blue: {
     bg: '#E6F1FB',
     border: '#185FA5',
@@ -25,70 +32,66 @@ const colorStyles = {
     bg: '#EAF3DE',
     border: '#3B6D11',
     text: '#3B6D11',
-    textMuted: '#2D5417'
+    textMuted: '#0C447C'
   },
   red: {
     bg: '#FCEBEB',
     border: '#A32D2D',
     text: '#A32D2D',
-    textMuted: '#7A2121'
-  },
-  gray: {
-    bg: '#F3F4F6',
-    border: '#9CA3AF',
-    text: '#6B7280',
-    textMuted: '#4B5563'
+    textMuted: '#A32D2D'
   }
 };
 
-export default function TierTab({
-  active,
-  onClick,
-  icon,
-  label,
-  count,
-  description,
-  colorClass = 'gray'
+export default function TierTab({ 
+  active, 
+  onClick, 
+  icon, 
+  label, 
+  count, 
+  description, 
+  colorClass 
 }: TierTabProps) {
-  const colors = colorStyles[colorClass];
-
+  const tierData = TOP_TIERS[colorClass as keyof typeof TOP_TIERS];
+  const colors = colorStyles[colorClass as keyof typeof colorStyles];
+  
   return (
     <button
       onClick={onClick}
       style={{
+        padding: '8px 16px',
+        borderRadius: '20px',
+        border: `1px solid ${colors.border}`,
         backgroundColor: active ? colors.bg : '#FFFFFF',
-        border: `1.5px solid ${colors.border}`,
-        borderRadius: '8px',
-        padding: '10px 12px',
+        color: active ? '#FFFFFF' : colors.text,
+        fontSize: '12px',
+        fontWeight: active ? 600 : 500,
         cursor: 'pointer',
-        transition: 'all 0.2s ease',
-        opacity: active ? 1 : 0.6,
+        whiteSpace: 'nowrap',
+        transition: 'all 0.2s',
         display: 'flex',
-        flexDirection: 'column',
         alignItems: 'center',
-        gap: '4px',
-        textAlign: 'center',
-        fontWeight: active ? 600 : 500
-      }}
-      onMouseEnter={(e) => {
-        if (!active) (e.currentTarget as HTMLButtonElement).style.opacity = '0.9';
-      }}
-      onMouseLeave={(e) => {
-        if (!active) (e.currentTarget as HTMLButtonElement).style.opacity = '0.6';
+        gap: '6px',
+        minWidth: '80px'
       }}
     >
-      <div style={{ fontSize: '18px' }}>{icon}</div>
-      <div style={{ fontSize: '12px', fontWeight: 600, color: colors.text, whiteSpace: 'nowrap' }}>
-        {label}
-      </div>
+      <span style={{ fontSize: '14px', marginRight: '4px' }}>{icon}</span>
+      <span style={{ fontSize: '12px', fontWeight: 500 }}>{label}</span>
+      {count !== undefined && (
+        <span style={{
+          backgroundColor: active ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)',
+          padding: '2px 6px',
+          borderRadius: '10px',
+          fontSize: '10px',
+          marginLeft: '4px'
+        }}>
+          {count}
+        </span>
+      )}
       {description && (
-        <div style={{ fontSize: '10px', color: colors.textMuted, whiteSpace: 'normal', lineHeight: '1.2' }}>
+        <div style={{ fontSize: '11px', fontWeight: 700, color: colors.text }}>
           {description}
         </div>
       )}
-      <div style={{ fontSize: '11px', fontWeight: 700, color: colors.text }}>
-        {count}
-      </div>
     </button>
   );
 }

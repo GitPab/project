@@ -22,7 +22,8 @@ import {
   Info,
 } from 'lucide-react';
 import { getTrackingCode, searchTrackingCodesByEmail } from '../services/trackingCodeService';
-import { useFees, saveFeeSelections, loadFeeSelections } from '../hooks/useFees';
+import { useFees, saveFeeSelections, loadFeeSelections } from '../../hooks/useFees';
+import type { FlexibleFee, FeeOption, FeeCondition } from '../../types/fees';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Progress } from '../components/ui/progress';
@@ -35,7 +36,7 @@ import { Label } from '../components/ui/label';
 import { Slider } from '../components/ui/slider';
 import { Separator } from '../components/ui/separator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip';
-import type { FlexibleFee, FeeOption, FeeCondition } from '../types/fees';
+import { VISA_SYSTEMS } from '../../constants/visaSystems';
 
 // Validation schema for fee selections
 const feeSelectionSchema = z.object({
@@ -47,15 +48,6 @@ const feeSelectionSchema = z.object({
 });
 
 type FeeSelections = z.infer<typeof feeSelectionSchema>;
-
-// Visa system options
-const VISA_SYSTEMS = [
-  { id: 'D4-1', label: 'D4-1', description: 'Tiếng Hàn' },
-  { id: 'D2-1', label: 'D2-1', description: 'Chuẩn bị' },
-  { id: 'D2-2', label: 'D2-2', description: 'Đại học' },
-  { id: 'D2-3', label: 'D2-3', description: 'Sau đại học' },
-  { id: 'D2-6', label: 'D2-6', description: 'Nâng cao' },
-];
 
 export default function MyCostsDynamic() {
   const { registrations, universities, user, studentOnboardings } = useApp();
@@ -169,11 +161,11 @@ export default function MyCostsDynamic() {
   // Group fees by category
   const feeGroups = useMemo(() => {
     const groups: Record<string, FlexibleFee[]> = {};
-    const applicableFees = fees.filter(fee => 
+    const applicableFees = fees.filter((fee: FlexibleFee) => 
       !fee.applies_to || fee.applies_to.includes(selectedVisaType || '')
     );
 
-    applicableFees.forEach(fee => {
+    applicableFees.forEach((fee: FlexibleFee) => {
       const category = fee.category || 'other';
       if (!groups[category]) {
         groups[category] = [];
@@ -221,19 +213,19 @@ export default function MyCostsDynamic() {
   };
 
   const handleOptionSelect = (feeId: string, optionId: string) => {
-    setSelectedOptions(prev => ({ ...prev, [feeId]: optionId }));
+    setSelectedOptions((prev: any) => ({ ...(prev || {}), [feeId]: optionId }));
   };
 
   const handleConditionSelect = (feeId: string, conditionId: string) => {
-    setSelectedConditions(prev => ({ ...prev, [feeId]: conditionId }));
+    setSelectedConditions((prev: any) => ({ ...(prev || {}), [feeId]: conditionId }));
   };
 
   const handleTimeChange = (feeId: string, value: number) => {
-    setTimeValues(prev => ({ ...prev, [feeId]: value }));
+    setTimeValues((prev: any) => ({ ...(prev || {}), [feeId]: value }));
   };
 
-  const handleOptionalToggle = (feeId: string, checked: boolean) => {
-    setOptionalFees(prev => ({ ...prev, [feeId]: checked }));
+  const handleOptionalFeeToggle = (feeId: string) => {
+    setOptionalFees((prev: any) => ({ ...(prev || {}), [feeId]: !(prev || {})[feeId] }));
   };
 
   const toggleSection = (section: string) => {
@@ -321,16 +313,17 @@ export default function MyCostsDynamic() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {VISA_SYSTEMS.map((system) => (
                   <div
-                    key={system.id}
+                    key={system.key}
                     className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                      selectedVisaType === system.id
+                      selectedVisaType === system.key
                         ? 'border-[#003AB7] bg-[#003AB7]/5'
                         : 'border-slate-200 hover:border-slate-300'
                     }`}
-                    onClick={() => setSelectedVisaType(system.id)}
+                    onClick={() => setSelectedVisaType(system.key)}
                   >
                     <div className="font-bold text-lg">{system.label}</div>
-                    <div className="text-sm text-slate-600">{system.description}</div>
+                    <div className="text-sm text-slate-600">{system.name}</div>
+                    <div className="text-xs text-slate-500">{system.description}</div>
                   </div>
                 ))}
               </div>
@@ -565,7 +558,7 @@ export default function MyCostsDynamic() {
                                       <Checkbox
                                         id={`optional-${fee.id}`}
                                         checked={optionalFees[fee.id] || false}
-                                        onCheckedChange={(checked) => handleOptionalToggle(fee.id, checked)}
+                                        onCheckedChange={(checked) => handleOptionalFeeToggle(fee.id)}
                                       />
                                       <Label htmlFor={`optional-${fee.id}`} className="flex-1">
                                         <div className="flex items-center justify-between">
@@ -720,3 +713,4 @@ export default function MyCostsDynamic() {
     </TooltipProvider>
   );
 }
+

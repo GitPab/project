@@ -22,7 +22,6 @@ export const koreanUniversities: University[] = [
       'https://images.unsplash.com/photo-1562774053-701939374585?w=800',
     ],
     ranking: 'Ranked 15/200 universities in South Korea',
-    worldRanking: 550,
     
     // Traditional costs (will be overridden by Korean system)
     generalTuition: 0,
@@ -292,6 +291,10 @@ export const koreanUniversities: University[] = [
       }
     ],
     
+    systems: [
+      { id: 'd4-1', code: 'D4-1', name: 'Korean Language Program', available: true, fees: [] },
+      { id: 'd2-2', code: 'D2-2', name: 'Undergraduate Program', available: true, fees: [] }
+    ],
     majors: ['Engineering', 'IT', 'Communications', 'Natural Sciences', 'Business Management', 'Law', 'Humanities', 'Social Sciences', 'Cybersecurity']
   }
 ];

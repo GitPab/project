@@ -46,7 +46,7 @@ export default function SchoolCard({ university, onSelect }: SchoolCardProps) {
 
     // Fallback keywords based on ranking
     if (keywords.length === 0) {
-      const worldRank = university.worldRanking || 999;
+      const worldRank = university.koreanData?.koreanRanking ? parseInt(university.koreanData.koreanRanking.split('/')[0]) : 999;
       if (worldRank < 200) {
         keywords.push(language === 'vi' ? 'Top đầu' : language === 'ko' ? '최고 등급' : 'Top Tier');
       }
@@ -70,7 +70,7 @@ export default function SchoolCard({ university, onSelect }: SchoolCardProps) {
   };
 
   const keywords = getKeywords();
-  const topTier = university.topTier || university.koreanData?.topTier;
+  const topTier = university.koreanData?.topTier;
 
   // Get tier icon
   const getTierIcon = () => {

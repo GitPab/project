@@ -22,15 +22,7 @@ import {
   Mail
 } from 'lucide-react';
 import { toast } from 'sonner';
-
-// Visa system options
-const VISA_SYSTEMS = [
-  { value: 'D4-1', label: 'D4-1 (Language Course)', labelVi: 'D4-1 (Khóa học tiếng Hàn)', labelKr: 'D4-1 (한국어 과정)' },
-  { value: 'D2-1', label: 'D2-1 (Pre-Undergraduate)', labelVi: 'D2-1 (Tiền đại học)', labelKr: 'D2-1 (학부 예비과정)' },
-  { value: 'D2-2', label: 'D2-2 (Undergraduate)', labelVi: 'D2-2 (Đại học)', labelKr: 'D2-2 (학부)' },
-  { value: 'D2-3', label: 'D2-3 (Graduate)', labelVi: 'D2-3 (Sau đại học)', labelKr: 'D2-3 (대학원)' },
-  { value: 'D2-6', label: 'D2-6 (Advanced)', labelVi: 'D2-6 (Nâng cao)', labelKr: 'D2-6 (고급)' },
-];
+import { VISA_SYSTEMS } from '../../constants/visaSystems';
 
 // TOPIK level options
 const TOPIK_LEVELS = [
@@ -42,6 +34,11 @@ const TOPIK_LEVELS = [
   { value: 5, label: 'TOPIK 5 (40% scholarship)', labelVi: 'TOPIK 5 (Giảm 40% học phí)', labelKr: 'TOPIK 5 (40% 장학금)' },
   { value: 6, label: 'TOPIK 6 (50% scholarship)', labelVi: 'TOPIK 6 (Giảm 50% học phí)', labelKr: 'TOPIK 6 (50% 장학금)' },
 ];
+
+const VISA_SYSTEM_OPTIONS = VISA_SYSTEMS.map(system => ({
+  value: system.key,
+  label: system.label === system.name ? system.label : `${system.label} (${system.name})`
+}));
 
 export default function PublicOnboarding() {
   const navigate = useNavigate();
@@ -123,12 +120,20 @@ export default function PublicOnboarding() {
 
     // Add system-specific costs (convert to VND)
     if (selectedUni.koreanData?.visaSystems) {
-      const visaSystem = selectedUni.koreanData.visaSystems.find(vs => {
-        if (selectedSystem === 'D4-1') return vs.visaType === 'D4-1';
-        if (selectedSystem === 'D2-1' || selectedSystem === 'D2-2') return vs.visaType === 'D2-2';
-        if (selectedSystem === 'D2-3' || selectedSystem === 'D2-6') return vs.visaType === 'D2-3';
-        return false;
-      });
+      const legacyCandidates: Record<string, string[]> = {
+        'D4-1': ['D4-1'],
+        'D2-1': ['D2-2'],
+        'D2-2': ['D2-2'],
+        'D2-3': ['D2-3'],
+        'D2-3M': ['D2-3'],
+        'D2-3P': ['D2-3'],
+        'D2-6': ['D2-6', 'D2-3'],
+        'D2-6E': ['D2-6', 'D2-2'],
+        'D2-8': ['D2-6', 'D2-2']
+      };
+
+      const candidates = legacyCandidates[selectedSystem] || [selectedSystem];
+      const visaSystem = selectedUni.koreanData.visaSystems.find(vs => candidates.includes(vs.visaType));
 
       if (visaSystem) {
         // Add tuition (convert from KRW to VND)
@@ -370,7 +375,7 @@ export default function PublicOnboarding() {
                       onChange={(e) => setSelectedSystem(e.target.value)}
                       className="w-full px-4 py-3 bg-[#F8F9FA] rounded-lg border border-[#558EFF] focus:outline-none focus:ring-2 focus:ring-[#558EFF]/50 focus:border-[#003AB7] transition-all font-['Be_Vietnam_Pro']"
                     >
-                      {VISA_SYSTEMS.map(system => (
+                      {VISA_SYSTEM_OPTIONS.map(system => (
                         <option key={system.value} value={system.value}>
                           {getLabel(system, 'label')}
                         </option>
@@ -557,3 +562,5 @@ export default function PublicOnboarding() {
     </div>
   );
 }
+
+

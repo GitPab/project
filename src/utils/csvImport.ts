@@ -257,24 +257,23 @@ export async function importFeesFromCSV(file: File): Promise<ParsedCSVData> {
 
     switch (csvType) {
       case 'accommodation':
-        allFees = parseAccommodationCSV(jsonData);
+        allFees = parseAccommodationCSV(jsonData as any[][]);
         break;
       case 'general':
-        allFees = parseGeneralCSV(jsonData);
+        allFees = parseGeneralCSV(jsonData as any[][]);
         break;
       case 'd22':
-        allFees = parseD22CSV(jsonData);
+        allFees = parseD22CSV(jsonData as any[][]);
         break;
       case 'd23':
-        allFees = parseD23CSV(jsonData);
+        allFees = parseD23CSV(jsonData as any[][]);
         break;
       case 'scholarship':
-        allFees = parseScholarshipCSV(jsonData);
+        allFees = parseScholarshipCSV(jsonData as any[][]);
         break;
       default:
-        // Try to auto-detect and parse
         warnings.push('Không thể xác định loại CSV, đang cố gắng phân tích tự động...');
-        allFees = parseGeneralCSV(jsonData);
+        allFees = parseGeneralCSV(jsonData as any[][]);
     }
 
     // Validate parsed fees
@@ -288,7 +287,7 @@ export async function importFeesFromCSV(file: File): Promise<ParsedCSVData> {
     });
 
   } catch (error) {
-    errors.push(`Lỗi khi đọc file CSV: ${error.message}`);
+    errors.push(`Lỗi khi đọc file CSV: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 
   return {

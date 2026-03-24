@@ -19,7 +19,10 @@ export const asianUniversities: University[] = [
     ],
     galleryImages: ['https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=800'],
     ranking: 'Ranked 1/200 universities in South Korea',
-    worldRanking: 29,
+    systems: [
+      { id: 'd4-1', code: 'D4-1', name: 'Korean Language Program', available: true, fees: [] },
+      { id: 'd2-2', code: 'D2-2', name: 'Undergraduate Program', available: true, fees: [] }
+    ],
     generalTuition: 0,
     visaFee: 0,
     accommodationFee: 0,
@@ -96,7 +99,10 @@ export const asianUniversities: University[] = [
     ],
     galleryImages: ['https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=800'],
     ranking: 'Ranked 3/200 universities in South Korea',
-    worldRanking: 56,
+    systems: [
+      { id: 'd4-1', code: 'D4-1', name: 'Korean Language Program', available: true, fees: [] },
+      { id: 'd2-2', code: 'D2-2', name: 'Undergraduate Program', available: true, fees: [] }
+    ],
     generalTuition: 0,
     visaFee: 0,
     accommodationFee: 0,
@@ -170,7 +176,6 @@ export const asianUniversities: University[] = [
     ],
     galleryImages: ['https://images.unsplash.com/photo-1562774053-701939374585?w=800'],
     ranking: 'Ranked 5/200 universities in South Korea',
-    worldRanking: 79,
     generalTuition: 0,
     visaFee: 0,
     accommodationFee: 0,
@@ -227,6 +232,10 @@ export const asianUniversities: University[] = [
       { id: 'savings-account', name: 'Savings Account', nameVi: 'Tài khoản tiết kiệm', nameKr: '저축 계좌', type: 'savings', amountRange: { min: 8000000, max: 10000000 }, selectable: true, requiresInput: true, options: [{ label: '8,000,000 KRW', value: 8000000 }, { label: '10,000,000 KRW', value: 10000000 }] },
       { id: 'flight-ticket', name: 'Flight Ticket', nameVi: 'Vé máy bay', nameKr: '항공권', type: 'flight', amount: 8000000, selectable: true, requiresInput: false },
     ],
+    systems: [
+      { id: 'd4-1', code: 'D4-1', name: 'Korean Language Program', available: true, fees: [] },
+      { id: 'd2-2', code: 'D2-2', name: 'Undergraduate Program', available: true, fees: [] }
+    ],
     majors: ['Business', 'Law', 'Political Science', 'Economics', 'Engineering', 'Liberal Arts']
   },
   {
@@ -245,7 +254,10 @@ export const asianUniversities: University[] = [
     ],
     galleryImages: ['https://images.unsplash.com/photo-1566404394190-cda8c6f3b9e5?w=800'],
     ranking: 'Ranked 4/200 universities in South Korea',
-    worldRanking: 76,
+    systems: [
+      { id: 'd4-1', code: 'D4-1', name: 'Korean Language Program', available: true, fees: [] },
+      { id: 'd2-2', code: 'D2-2', name: 'Undergraduate Program', available: true, fees: [] }
+    ],
     generalTuition: 0,
     visaFee: 0,
     accommodationFee: 0,
@@ -318,7 +330,10 @@ export const asianUniversities: University[] = [
     ],
     galleryImages: ['https://images.unsplash.com/photo-1576495199011-eb94736d05d6?w=800'],
     ranking: 'Ranked 6/200 universities in South Korea',
-    worldRanking: 88,
+    systems: [
+      { id: 'd4-1', code: 'D4-1', name: 'Korean Language Program', available: true, fees: [] },
+      { id: 'd2-2', code: 'D2-2', name: 'Undergraduate Program', available: true, fees: [] }
+    ],
     generalTuition: 0,
     visaFee: 0,
     accommodationFee: 0,
@@ -394,7 +409,10 @@ export const asianUniversities: University[] = [
     ],
     galleryImages: ['https://images.unsplash.com/photo-1567157577867-05ccb1388e66?w=800'],
     ranking: '#1 in China, #25 globally',
-    worldRanking: 25,
+    systems: [
+      { id: 'd4-1', code: 'D4-1', name: 'Korean Language Program', available: true, fees: [] },
+      { id: 'd2-2', code: 'D2-2', name: 'Undergraduate Program', available: true, fees: [] }
+    ],
     generalTuition: 4500,
     visaFee: 150,
     accommodationFee: 3000,
@@ -421,7 +439,10 @@ export const asianUniversities: University[] = [
     ],
     galleryImages: ['https://images.unsplash.com/photo-1538530432881-d8f211a7ff42?w=800'],
     ranking: '#2 in China, #26 globally',
-    worldRanking: 26,
+    systems: [
+      { id: 'd4-1', code: 'D4-1', name: 'Korean Language Program', available: true, fees: [] },
+      { id: 'd2-2', code: 'D2-2', name: 'Undergraduate Program', available: true, fees: [] }
+    ],
     generalTuition: 4500,
     visaFee: 150,
     accommodationFee: 2800,
@@ -448,7 +469,10 @@ export const asianUniversities: University[] = [
     ],
     galleryImages: ['https://images.unsplash.com/photo-1613250291634-eec7e60e0b0b?w=800'],
     ranking: '#3 in China, #50 globally',
-    worldRanking: 50,
+    systems: [
+      { id: 'd4-1', code: 'D4-1', name: 'Korean Language Program', available: true, fees: [] },
+      { id: 'd2-2', code: 'D2-2', name: 'Undergraduate Program', available: true, fees: [] }
+    ],
     generalTuition: 4200,
     visaFee: 150,
     accommodationFee: 3200,
@@ -475,7 +499,10 @@ export const asianUniversities: University[] = [
     ],
     galleryImages: ['https://images.unsplash.com/photo-1583309348787-838f3bd718c7?w=800'],
     ranking: '#4 in China, #46 globally',
-    worldRanking: 46,
+    systems: [
+      { id: 'd4-1', code: 'D4-1', name: 'Korean Language Program', available: true, fees: [] },
+      { id: 'd2-2', code: 'D2-2', name: 'Undergraduate Program', available: true, fees: [] }
+    ],
     generalTuition: 4100,
     visaFee: 150,
     accommodationFee: 3100,
@@ -502,7 +529,10 @@ export const asianUniversities: University[] = [
     ],
     galleryImages: ['https://images.unsplash.com/photo-1564981797816-1043664bf78d?w=800'],
     ranking: '#5 in China, #52 globally',
-    worldRanking: 52,
+    systems: [
+      { id: 'd4-1', code: 'D4-1', name: 'Korean Language Program', available: true, fees: [] },
+      { id: 'd2-2', code: 'D2-2', name: 'Undergraduate Program', available: true, fees: [] }
+    ],
     generalTuition: 4000,
     visaFee: 150,
     accommodationFee: 2900,
@@ -529,7 +559,10 @@ export const asianUniversities: University[] = [
     ],
     galleryImages: ['https://images.unsplash.com/photo-1580537659466-0a9bfa916a54?w=800'],
     ranking: '#6 in China, #94 globally',
-    worldRanking: 94,
+    systems: [
+      { id: 'd4-1', code: 'D4-1', name: 'Korean Language Program', available: true, fees: [] },
+      { id: 'd2-2', code: 'D2-2', name: 'Undergraduate Program', available: true, fees: [] }
+    ],
     generalTuition: 3900,
     visaFee: 150,
     accommodationFee: 2500,
@@ -558,7 +591,10 @@ export const asianUniversities: University[] = [
     ],
     galleryImages: ['https://images.unsplash.com/photo-1542051841857-5f90071e7989?w=800'],
     ranking: '#1 in Japan, #28 globally',
-    worldRanking: 28,
+    systems: [
+      { id: 'd4-1', code: 'D4-1', name: 'Korean Language Program', available: true, fees: [] },
+      { id: 'd2-2', code: 'D2-2', name: 'Undergraduate Program', available: true, fees: [] }
+    ],
     generalTuition: 5400,
     visaFee: 30,
     accommodationFee: 7000,
@@ -585,7 +621,10 @@ export const asianUniversities: University[] = [
     ],
     galleryImages: ['https://images.unsplash.com/photo-1619224141111-2ed933b9b8f0?w=800'],
     ranking: '#2 in Japan, #36 globally',
-    worldRanking: 36,
+    systems: [
+      { id: 'd4-1', code: 'D4-1', name: 'Korean Language Program', available: true, fees: [] },
+      { id: 'd2-2', code: 'D2-2', name: 'Undergraduate Program', available: true, fees: [] }
+    ],
     generalTuition: 5400,
     visaFee: 30,
     accommodationFee: 6500,
@@ -612,7 +651,10 @@ export const asianUniversities: University[] = [
     ],
     galleryImages: ['https://images.unsplash.com/photo-1590559899731-a382839e5549?w=800'],
     ranking: '#3 in Japan, #80 globally',
-    worldRanking: 80,
+    systems: [
+      { id: 'd4-1', code: 'D4-1', name: 'Korean Language Program', available: true, fees: [] },
+      { id: 'd2-2', code: 'D2-2', name: 'Undergraduate Program', available: true, fees: [] }
+    ],
     generalTuition: 5200,
     visaFee: 30,
     accommodationFee: 6200,
@@ -639,7 +681,10 @@ export const asianUniversities: University[] = [
     ],
     galleryImages: ['https://images.unsplash.com/photo-1528164344705-47542687000d?w=800'],
     ranking: '#4 in Japan, #113 globally',
-    worldRanking: 113,
+    systems: [
+      { id: 'd4-1', code: 'D4-1', name: 'Korean Language Program', available: true, fees: [] },
+      { id: 'd2-2', code: 'D2-2', name: 'Undergraduate Program', available: true, fees: [] }
+    ],
     generalTuition: 5200,
     visaFee: 30,
     accommodationFee: 5500,
@@ -666,7 +711,10 @@ export const asianUniversities: University[] = [
     ],
     galleryImages: ['https://images.unsplash.com/photo-1626125345510-4603468288da?w=800'],
     ranking: '#5 in Japan, #118 globally',
-    worldRanking: 118,
+    systems: [
+      { id: 'd4-1', code: 'D4-1', name: 'Korean Language Program', available: true, fees: [] },
+      { id: 'd2-2', code: 'D2-2', name: 'Undergraduate Program', available: true, fees: [] }
+    ],
     generalTuition: 5200,
     visaFee: 30,
     accommodationFee: 5300,
@@ -695,7 +743,10 @@ export const asianUniversities: University[] = [
     ],
     galleryImages: ['https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=800'],
     ranking: '#1 in Asia, #8 globally',
-    worldRanking: 8,
+    systems: [
+      { id: 'd4-1', code: 'D4-1', name: 'Korean Language Program', available: true, fees: [] },
+      { id: 'd2-2', code: 'D2-2', name: 'Undergraduate Program', available: true, fees: [] }
+    ],
     generalTuition: 27000,
     visaFee: 90,
     accommodationFee: 8000,
@@ -722,7 +773,10 @@ export const asianUniversities: University[] = [
     ],
     galleryImages: ['https://images.unsplash.com/photo-1601985704034-6c71d8b13e91?w=800'],
     ranking: '#2 in Singapore, #15 globally',
-    worldRanking: 15,
+    systems: [
+      { id: 'd4-1', code: 'D4-1', name: 'Korean Language Program', available: true, fees: [] },
+      { id: 'd2-2', code: 'D2-2', name: 'Undergraduate Program', available: true, fees: [] }
+    ],
     generalTuition: 26000,
     visaFee: 90,
     accommodationFee: 7500,
@@ -751,7 +805,10 @@ export const asianUniversities: University[] = [
     ],
     galleryImages: ['https://images.unsplash.com/photo-1555881025-ef7c4fdbbd90?w=800'],
     ranking: '#1 in Vietnam, #801-1000 globally',
-    worldRanking: 900,
+    systems: [
+      { id: 'd4-1', code: 'D4-1', name: 'Korean Language Program', available: true, fees: [] },
+      { id: 'd2-2', code: 'D2-2', name: 'Undergraduate Program', available: true, fees: [] }
+    ],
     generalTuition: 1200,
     visaFee: 25,
     accommodationFee: 1500,
@@ -778,7 +835,10 @@ export const asianUniversities: University[] = [
     ],
     galleryImages: ['https://images.unsplash.com/photo-1562813733-b31f71025d54?w=800'],
     ranking: '#2 in Vietnam',
-    worldRanking: 950,
+    systems: [
+      { id: 'd4-1', code: 'D4-1', name: 'Korean Language Program', available: true, fees: [] },
+      { id: 'd2-2', code: 'D2-2', name: 'Undergraduate Program', available: true, fees: [] }
+    ],
     generalTuition: 1100,
     visaFee: 25,
     accommodationFee: 1400,
@@ -805,7 +865,10 @@ export const asianUniversities: University[] = [
     ],
     galleryImages: ['https://images.unsplash.com/photo-1574260962699-c6c829c55e0f?w=800'],
     ranking: '#3 in Vietnam',
-    worldRanking: 980,
+    systems: [
+      { id: 'd4-1', code: 'D4-1', name: 'Korean Language Program', available: true, fees: [] },
+      { id: 'd2-2', code: 'D2-2', name: 'Undergraduate Program', available: true, fees: [] }
+    ],
     generalTuition: 1100,
     visaFee: 25,
     accommodationFee: 1300,
@@ -834,7 +897,10 @@ export const asianUniversities: University[] = [
     ],
     galleryImages: ['https://images.unsplash.com/photo-1532619675605-1ede6c2ed2b0?w=800'],
     ranking: '#1 in India, #149 globally',
-    worldRanking: 149,
+    systems: [
+      { id: 'd4-1', code: 'D4-1', name: 'Korean Language Program', available: true, fees: [] },
+      { id: 'd2-2', code: 'D2-2', name: 'Undergraduate Program', available: true, fees: [] }
+    ],
     generalTuition: 3000,
     visaFee: 190,
     accommodationFee: 1200,
@@ -861,7 +927,10 @@ export const asianUniversities: University[] = [
     ],
     galleryImages: ['https://images.unsplash.com/photo-1554188248-986adbb73be4?w=800'],
     ranking: '#2 in India, #197 globally',
-    worldRanking: 197,
+    systems: [
+      { id: 'd4-1', code: 'D4-1', name: 'Korean Language Program', available: true, fees: [] },
+      { id: 'd2-2', code: 'D2-2', name: 'Undergraduate Program', available: true, fees: [] }
+    ],
     generalTuition: 3000,
     visaFee: 190,
     accommodationFee: 1100,
@@ -888,7 +957,10 @@ export const asianUniversities: University[] = [
     ],
     galleryImages: ['https://images.unsplash.com/photo-1596526131083-e8c633c948d2?w=800'],
     ranking: '#3 in India, #155 globally',
-    worldRanking: 155,
+    systems: [
+      { id: 'd4-1', code: 'D4-1', name: 'Korean Language Program', available: true, fees: [] },
+      { id: 'd2-2', code: 'D2-2', name: 'Undergraduate Program', available: true, fees: [] }
+    ],
     generalTuition: 2800,
     visaFee: 190,
     accommodationFee: 1000,
@@ -917,7 +989,10 @@ export const asianUniversities: University[] = [
     ],
     galleryImages: ['https://images.unsplash.com/photo-1528127269322-539801943592?w=800'],
     ranking: '#1 in Thailand, #211 globally',
-    worldRanking: 211,
+    systems: [
+      { id: 'd4-1', code: 'D4-1', name: 'Korean Language Program', available: true, fees: [] },
+      { id: 'd2-2', code: 'D2-2', name: 'Undergraduate Program', available: true, fees: [] }
+    ],
     generalTuition: 4500,
     visaFee: 80,
     accommodationFee: 3500,
@@ -946,7 +1021,10 @@ export const asianUniversities: University[] = [
     ],
     galleryImages: ['https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800'],
     ranking: '#1 in Malaysia, #60 globally',
-    worldRanking: 60,
+    systems: [
+      { id: 'd4-1', code: 'D4-1', name: 'Korean Language Program', available: true, fees: [] },
+      { id: 'd2-2', code: 'D2-2', name: 'Undergraduate Program', available: true, fees: [] }
+    ],
     generalTuition: 3500,
     visaFee: 100,
     accommodationFee: 2000,

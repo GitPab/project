@@ -1,6 +1,242 @@
 import { University, OptionalAddon } from '../context/AppContext';
+import detailsCsv from './university-details.csv?raw';
 
 type TopTier = 'Top1' | 'Top2' | 'Top3';
+
+type DetailRecord = {
+  name: string;
+  koreanName: string;
+  address: string;
+  ranking: string;
+  majors: string[];
+  admissionText: string;
+  tuitionD41: number | null;
+  tuitionD22: number | null;
+  tuitionD23: number | null;
+  scholarshipPercents: number[];
+  ktxCost: number | null;
+  jobsText: string;
+  gpaD41: number | null;
+  gpaD2: number | null;
+};
+
+const parseCsvRows = (raw: string): string[][] => {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < raw.length; i += 1) {
+    const char = raw[i];
+    const next = raw[i + 1];
+
+    if (char === '"') {
+      if (inQuotes && next === '"') {
+        current += '"';
+        i += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if (!inQuotes && (char === '\n' || char === '\r')) {
+      if (char === '\r' && next === '\n') i += 1;
+      row.push(current);
+      if (row.some(value => value.trim().length > 0)) {
+        rows.push(row);
+      }
+      row = [];
+      current = '';
+      continue;
+    }
+
+    if (!inQuotes && char === ',') {
+      row.push(current);
+      current = '';
+      continue;
+    }
+
+    current += char;
+  }
+
+  if (current.length > 0 || row.length > 0) {
+    row.push(current);
+    if (row.some(value => value.trim().length > 0)) {
+      rows.push(row);
+    }
+  }
+
+  return rows;
+};
+
+const parseMinNumber = (text: string): number | null => {
+  if (!text) return null;
+  const matches = text.match(/[0-9][0-9.,]*/g);
+  if (!matches) return null;
+  const values = matches
+    .map(value => parseInt(value.replace(/[.,]/g, ''), 10))
+    .filter(value => Number.isFinite(value) && value > 0);
+  if (!values.length) return null;
+  let minValue = Math.min(...values);
+  if (/[0-9]\s*K\b/i.test(text)) minValue *= 1000;
+  if (/triệu|trieu|million|\bM\b/i.test(text)) minValue *= 1000000;
+  return minValue;
+};
+
+const parseTuition = (text: string): number | null => {
+  const value = parseMinNumber(text);
+  if (!value) return null;
+  const isPerTerm = /kỳ|semester/i.test(text);
+  return isPerTerm ? value * 2 : value;
+};
+
+const parseScholarshipPercents = (text: string): number[] => {
+  if (!text) return [];
+  const matches = text.match(/[0-9]{1,3}\s*%/g);
+  if (!matches) return [];
+  const values = matches
+    .map(value => parseInt(value.replace('%', ''), 10))
+    .filter(value => Number.isFinite(value) && value > 0);
+  return Array.from(new Set(values));
+};
+
+const parseGpa = (text: string, key: 'D4-1' | 'D2'): number | null => {
+  if (!text) return null;
+  const specific = text.match(new RegExp(`${key}[^0-9]*GPA\\s*>=\\s*([0-9.]+)`, 'i'));
+  if (specific?.[1]) return parseFloat(specific[1]);
+  const generic = text.match(/GPA\\s*>=\\s*([0-9.]+)/i);
+  if (generic?.[1]) return parseFloat(generic[1]);
+  return null;
+};
+
+const stopWords = new Set([
+  'university',
+  'college',
+  'institute',
+  'of',
+  'the',
+  'national',
+  'state',
+  'korea',
+  'korean',
+  'dai',
+  'hoc',
+  'dh'
+]);
+
+const normalizeForMatch = (value: string): string => {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[’']/g, '')
+    .replace(/\bpusan\b/g, 'busan')
+    .replace(/\bkyung\b/g, 'gyeong')
+    .replace(/\bkyong\b/g, 'gyeong')
+    .replace(/\bkwang\b/g, 'gwang')
+    .replace(/\byonsei\b/g, 'yeonsei')
+    .replace(/\bewha\b/g, 'ehwa')
+    .replace(/\bsungkyunkwan\b/g, 'seonggyungwan');
+};
+
+const tokenizeName = (name: string): string[] => {
+  if (!name) return [];
+  return normalizeForMatch(name)
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+};
+
+const simplifyName = (name: string): string => {
+  return tokenizeName(name)
+    .filter(token => !stopWords.has(token))
+    .join('');
+};
+
+const similarityScore = (left: string[], right: string[]): number => {
+  if (!left.length || !right.length) return 0;
+  const leftSet = new Set(left);
+  let overlap = 0;
+  right.forEach(token => {
+    if (leftSet.has(token)) overlap += 1;
+  });
+  return overlap / Math.max(left.length, right.length);
+};
+
+const findDetailRecord = (name: string, koreanName: string): DetailRecord | undefined => {
+  const koreanKey = koreanName.trim();
+  if (koreanKey && detailByKorean.has(koreanKey)) return detailByKorean.get(koreanKey);
+
+  const simpleKey = simplifyName(name);
+  if (simpleKey && detailBySimple.has(simpleKey)) return detailBySimple.get(simpleKey);
+
+  const targetTokens = tokenizeName(name).filter(token => !stopWords.has(token));
+  let best: { record: DetailRecord; score: number } | null = null;
+  detailRecords.forEach((record) => {
+    const recordTokens = tokenizeName(record.name).filter(token => !stopWords.has(token));
+    const score = similarityScore(targetTokens, recordTokens);
+    if (!best || score > best.score) {
+      best = { record, score };
+    }
+  });
+
+  if (best && (best as any).score >= 0.7) return (best as any).record;
+  return undefined;
+};
+
+const parseDetailsCsv = (raw: string): DetailRecord[] => {
+  const rows = parseCsvRows(raw.trim());
+  if (rows.length <= 1) return [];
+  const dataRows = rows.slice(1);
+  return dataRows
+    .map((row) => {
+      const [
+        name = '',
+        koreanName = '',
+        address = '',
+        ranking = '',
+        majorsText = '',
+        admissionText = '',
+        tuitionD41Text = '',
+        tuitionD22Text = '',
+        tuitionD23Text = '',
+        scholarshipText = '',
+        ktxText = '',
+        jobsText = ''
+      ] = row;
+
+      const majors = majorsText.split(',').map(part => part.trim()).filter(Boolean);
+      const gpaD41 = parseGpa(admissionText, 'D4-1');
+      const gpaD2 = parseGpa(admissionText, 'D2');
+      return {
+        name: name.trim(),
+        koreanName: koreanName.trim(),
+        address: address.trim(),
+        ranking: ranking.trim(),
+        majors,
+        admissionText,
+        tuitionD41: parseTuition(tuitionD41Text),
+        tuitionD22: parseTuition(tuitionD22Text),
+        tuitionD23: parseTuition(tuitionD23Text),
+        scholarshipPercents: parseScholarshipPercents(scholarshipText),
+        ktxCost: parseMinNumber(ktxText),
+        jobsText: jobsText.trim(),
+        gpaD41,
+        gpaD2
+      };
+    })
+    .filter(record => record.name || record.koreanName);
+};
+
+const detailRecords = parseDetailsCsv(detailsCsv);
+const detailByKorean = new Map<string, DetailRecord>();
+const detailBySimple = new Map<string, DetailRecord>();
+detailRecords.forEach((record) => {
+  if (record.koreanName) detailByKorean.set(record.koreanName, record);
+  if (record.name) detailBySimple.set(simplifyName(record.name), record);
+});
 
 const TOP1_CSV = `DANH SÁCH TRƯỜNG TOP 1 NĂM 2026,,,
 STT,TÊN TRƯỜNG,TÊN TIẾNG HÀN,KHU VỰC
@@ -142,11 +378,9 @@ STT,TÊN TRƯỜNG,TÊN TRƯỜNG TIẾNG HÀN,KHU VỰC
 6,Sangji University,상지대학교,Wonju
 7,Howon University,호원대학교,Jeonbuk (Gunsan)
 8,Busan Kyungsang College,부산경상대학교,Busan
-9,Dong-Eui Institute of Technology,동의과학대학교,Busan
-10,Jeju Tourism University,제주관광대학교,Jeju
-11,Busan Institute of Science and Technology,부산과학기술대학교,Busan
-12,Kaya University,가야대학교,Gyeongnam (Gimhae)
-13,Daedong College,대동대학,Busan`;
+9,Busan Arts College,부산예술대학교,Busan
+10,Hanyeong University,한영대학교,Jeollanam
+11,Mokpo Science College,목포과학대학교,Jeollanam`;
 
 const placeholders = [
   'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=1400&auto=format&fit=crop',
@@ -181,13 +415,53 @@ const buildUniversity = (
   const slug = slugify(name);
   const heroImage = `${pickImage(index)}&sig=${index + 1}`;
   const topLabel = tier === 'Top3' ? 'Trường hạn chế visa' : `Trường ${tier.replace('Top', 'Top ')}`;
+  const detail = findDetailRecord(name, koreanName);
 
-  return {
+  const scholarshipList = detail?.scholarshipPercents ?? [];
+  const buildScholarships = () => scholarshipList.map((discount) => ({ discountPct: discount }));
+  const buildKtxOptions = () => detail?.ktxCost ? [{ priceKRWPerKy: detail.ktxCost }] : [];
+  const visaSystemsDetail: Record<string, any> = {};
+
+  if (detail?.tuitionD41) {
+    visaSystemsDetail['D4-1'] = {
+      available: true,
+      invoiceKRWPerYear: detail.tuitionD41,
+      scholarships: buildScholarships(),
+      ktxOptions: buildKtxOptions()
+    };
+  }
+  if (detail?.tuitionD22) {
+    visaSystemsDetail['D2-2'] = {
+      available: true,
+      invoiceKRWPerYear: detail.tuitionD22,
+      scholarships: buildScholarships(),
+      ktxOptions: buildKtxOptions()
+    };
+  }
+  if (detail?.tuitionD23) {
+    visaSystemsDetail['D2-3'] = {
+      available: true,
+      invoiceKRWPerYear: detail.tuitionD23,
+      scholarships: buildScholarships(),
+      ktxOptions: buildKtxOptions()
+    };
+  }
+
+  const admission: Record<string, any> = {};
+  if (detail?.gpaD41) {
+    admission['D4-1'] = { gpaMin: detail.gpaD41 };
+  }
+  if (detail?.gpaD2) {
+    admission['D2-2'] = { gpaMin: detail.gpaD2 };
+    admission['D2-3'] = { gpaMin: detail.gpaD2 };
+  }
+
+  const university: University = {
     id: `kr-${slug}-${tier.toLowerCase()}`,
     name,
     koreanName,
     region,
-    topTier: tier,
+    top_tier: tier,
     country: 'South Korea',
     countryCode: '🇰🇷',
     tagline: `${topLabel} - Danh sách 2026`,
@@ -199,34 +473,44 @@ const buildUniversity = (
       { icon: 'Cpu', title: 'Kỹ thuật & CNTT', description: 'Các ngành phổ biến cho du học sinh' },
     ],
     galleryImages: [heroImage],
-    ranking: `${topLabel} 2026`,
-    worldRanking: 0,
+    ranking: detail?.ranking || `${topLabel} 2026`,
     generalTuition: 0,
     visaFee: 0,
     accommodationFee: 0,
     insuranceFee: 0,
     additionalFees: [],
+    systems: [
+      { id: 'd4-1', code: 'D4-1', name: 'Chương trình tiếng Hàn', available: true, fees: [] },
+      { id: 'd2-2', code: 'D2-2', name: 'Chương trình đại học', available: true, fees: [] },
+      { id: 'd2-3', code: 'D2-3', name: 'Chương trình sau đại học', available: true, fees: [] }
+    ],
     koreanData: {
       isKoreanUniversity: true,
-      address: region,
+      topTier: tier as 'Top1' | 'Top2' | 'Top3',
+      address: detail?.address || region,
       topVisa: tier,
-      topTier: tier,
-      koreanRanking: topLabel,
+      koreanRanking: detail?.ranking || topLabel,
       visaSystems: [
         { visaType: 'D4-1', tuitionRange: { min: 0, max: 0 }, applicationFee: 0, baseYearlyFee: 0, description: 'Chương trình tiếng Hàn' },
         { visaType: 'D2-2', tuitionRange: { min: 0, max: 0 }, applicationFee: 0, baseYearlyFee: 0, description: 'Chương trình đại học' },
         { visaType: 'D2-3', tuitionRange: { min: 0, max: 0 }, applicationFee: 0, baseYearlyFee: 0, description: 'Chương trình sau đại học' },
       ],
+      visaSystemsDetail: Object.keys(visaSystemsDetail).length > 0 ? visaSystemsDetail : undefined,
       languageCourse: { available: true, priceVND: 13000000 },
       studentSupport: ['Airport pickup', 'ARC support', 'SIM setup'],
+      majors: detail?.majors?.length ? detail.majors : undefined,
+      admission: Object.keys(admission).length > 0 ? admission : undefined,
+      jobOpportunities: detail?.jobsText || undefined,
     },
     fixedCosts: [
       { type: 'Phí tư vấn', amount: 39000000, currency: 'VND', category: 'fixed', description: 'Tư vấn định hướng & xử lý hồ sơ' },
       { type: 'Phí apply', amount: 100000, currency: 'KRW', category: 'fixed', description: 'Lệ phí nộp hồ sơ' },
     ],
     optionalAddons: defaultAddons(),
-    majors: ['Engineering', 'Business', 'Korean Language'],
+    majors: detail?.majors?.length ? detail.majors : ['Engineering', 'Business', 'Korean Language'],
   };
+
+  return university;
 };
 
 const parseCsv = (raw: string, tier: TopTier): University[] => {
@@ -264,4 +548,3 @@ export const topCsvParsers = {
   parseCsv,
   buildUniversity,
 };
-

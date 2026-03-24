@@ -90,11 +90,6 @@ export default function EditUniversityModal({
   const [selectedVisaType, setSelectedVisaType] = useState<string | null>(null);
   const [enabledVisaSystems, setEnabledVisaSystems] = useState<Set<string>>(new Set());
   const [showCostForm, setShowCostForm] = useState(false);
-  const [costFormData, setCostFormData] = useState<any>(null);
-
-  // Visa systems imported from shared constant above
-  // No need to define locally - use VISA_SYSTEMS instead
-
   const defaultValues: FormValues = useMemo(
     () => ({
       name: university?.name || '',
@@ -222,21 +217,28 @@ export default function EditUniversityModal({
     setEnabledVisaSystems(new Set(currentVisaSystems.map(v => v.visaType)));
   }, [university, defaultValues, reset, currentVisaSystems]);
 
-  const handleSave = handleSubmit(async (values) => {
+  const handleSave = handleSubmit((values) => {
+    const topVisaLabel = values.topTier === 'Top1' ? 'Top 1' : values.topTier === 'Top2' ? 'Top 2' : 'Top 3';
+    const enabledVisaSystemsData = currentVisaSystems.filter(vs => enabledVisaSystems.has(vs.visaType));
+
     const payload: Partial<University> = {
       name: values.name,
       koreanName: values.koreanName,
       region: values.region,
-      country: values.country,
-      overview: values.overview,
+      country: 'South Korea',
+      overview: values.overview || '',
       koreanData: {
-        isKoreanUniversity: isKorean,
+        ...(university?.koreanData || { isKoreanUniversity: true }),
+        isKoreanUniversity: isKorean ?? true,
+        address: values.region || university?.koreanData?.address,
         topTier: values.topTier,
-        visaSystems: currentVisaSystems.filter(vs => enabledVisaSystems.has(vs.visaType)),
+        topVisa: topVisaLabel,
+        visaSystems: enabledVisaSystemsData.length > 0 ? enabledVisaSystemsData : undefined,
       },
     };
 
     if (isKorean) {
+      // ✅ FIX 2: cast currency field when saving
       payload.fixedCosts = (values.fixedCosts || []).map(c => ({
         ...c,
         currency: c.currency as Currency | undefined,
@@ -257,17 +259,25 @@ export default function EditUniversityModal({
       payload.additionalFees = values.additionalFees || [];
     }
 
-    await onSave(payload);
+    onSave(payload);
     onClose();
     toast.success(isEditMode ? 'Đã cập nhật trường' : 'Đã thêm trường');
   });
 
-  const allVisaLabels: Record<string, { label: string; name: string }> = {
-    'D4-1': { label: 'D4-1', name: '(Tiếng Hàn)' },
-    'D2-1': { label: 'D2-1', name: '(Chuẩn bị)' },
-    'D2-2': { label: 'D2-2', name: '(Đại học)' },
-    'D2-3': { label: 'D2-3', name: '(Sau đại học)' },
-    'D2-6': { label: 'D2-6', name: '(Nâng cao)' },
+  const allVisaLabels = VISA_SYSTEMS.reduce<Record<string, { label: string; name: string }>>(
+    (acc, visa) => {
+      acc[visa.key] = { label: visa.label, name: `(${visa.name})` };
+      return acc;
+    },
+    {}
+  );
+  // Legacy support for existing D2-3 data
+  allVisaLabels['D2-3'] = { label: 'D2-3', name: '(Sau dai hoc)' };
+
+  const visaOrder = [...VISA_SYSTEMS.map(visa => visa.key), 'D2-3'];
+  const orderIndex = (type: string) => {
+    const idx = visaOrder.indexOf(type);
+    return idx === -1 ? 999 : idx;
   };
 
   const visaSystemButtons = currentVisaSystems
@@ -275,10 +285,7 @@ export default function EditUniversityModal({
       type: vs.visaType,
       ...allVisaLabels[vs.visaType] || { label: vs.visaType, name: '' }
     }))
-    .sort((a, b) =>
-      ['D4-1', 'D2-1', 'D2-2', 'D2-3', 'D2-6'].indexOf(a.type) -
-      ['D4-1', 'D2-1', 'D2-2', 'D2-3', 'D2-6'].indexOf(b.type)
-    );
+    .sort((a, b) => orderIndex(a.type) - orderIndex(b.type));
 
   return (
     // Overlay
@@ -690,9 +697,8 @@ export default function EditUniversityModal({
             <CostInputForm
               universityId={university?.id}
               universityName={university?.name}
-              initialData={costFormData}
               onSave={(costData) => {
-                setCostFormData(costData);
+                // Handle cost data save here
                 console.log('Cost data saved:', costData);
                 setShowCostForm(false);
               }}
@@ -704,3 +710,7 @@ export default function EditUniversityModal({
     </div>
   );
 }
+
+
+
+

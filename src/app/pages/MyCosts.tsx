@@ -80,13 +80,13 @@ export default function MyCosts() {
             visa: true,
             accommodation: true,
             insurance: true,
-            additional: university.additionalFees.map(() => true),
+            additional: (university.additionalFees || []).map(() => true),
           };
 
           const visa = selectedFees.visa ? university.visaFee : 0;
           const accommodation = selectedFees.accommodation ? university.accommodationFee : 0;
           const insurance = selectedFees.insurance ? university.insuranceFee : 0;
-          const additionalTotal = university.additionalFees.reduce((sum, fee, index) => {
+          const additionalTotal = (university.additionalFees || []).reduce((sum, fee, index) => {
             if (selectedFees.additional && selectedFees.additional[index]) {
               return sum + fee.amount;
             }
@@ -94,8 +94,8 @@ export default function MyCosts() {
           }, 0);
 
           const tuition = university.generalTuition;
-          const insuranceAndMisc = insurance + additionalTotal;
-          const total = tuition + visa + accommodation + insuranceAndMisc;
+          const insuranceAndMisc = (insurance || 0) + additionalTotal;
+          const total = (tuition || 0) + (visa || 0) + (accommodation || 0) + insuranceAndMisc;
 
           return {
             registrationId: `${reg.studentEmail}-${reg.universityId}`,
@@ -117,11 +117,11 @@ export default function MyCosts() {
     if (!university) return [];
 
     const baseTotal =
-      university.generalTuition +
-      university.visaFee +
-      university.accommodationFee +
-      university.insuranceFee +
-      university.additionalFees.reduce((sum, fee) => sum + fee.amount, 0);
+      (university.generalTuition || 0) +
+      (university.visaFee || 0) +
+      (university.accommodationFee || 0) +
+      (university.insuranceFee || 0) +
+      (university.additionalFees || []).reduce((sum, fee) => sum + fee.amount, 0);
 
     const useEstimate = baseTotal === 0 && estimatedTotalVnd > 0;
 
@@ -134,13 +134,13 @@ export default function MyCosts() {
           visa: true,
           accommodation: true,
           insurance: true,
-          additional: university.additionalFees.map(() => true),
+          additional: (university.additionalFees || []).map(() => true),
         },
         costs: {
-          tuition: useEstimate ? estimatedTotalVnd : university.generalTuition,
-          visa: useEstimate ? 0 : university.visaFee,
-          accommodation: useEstimate ? 0 : university.accommodationFee,
-          insuranceAndMisc: useEstimate ? 0 : university.insuranceFee,
+          tuition: useEstimate ? estimatedTotalVnd : university.generalTuition || 0,
+          visa: university.visaFee || 0,
+          accommodation: university.accommodationFee || 0,
+          insuranceAndMisc: (university.insuranceFee || 0) + (university.additionalFees || []).reduce((sum, fee) => sum + fee.amount, 0),
           total: useEstimate ? estimatedTotalVnd : baseTotal,
         },
         isEstimated: useEstimate,
@@ -287,25 +287,25 @@ export default function MyCosts() {
                     <div>
                       <p className="text-xs text-slate-600">Học phí</p>
                       <p className="font-semibold text-slate-900">
-                        {formatFrom(item.costs.tuition, 'VND')}
+                        {formatFrom(item.costs.tuition || 0, 'VND')}
                       </p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-600">Phí visa</p>
                       <p className="font-semibold text-slate-900">
-                        {formatFrom(item.costs.visa, 'VND')}
+                        {formatFrom(item.costs.visa || 0, 'VND')}
                       </p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-600">Lưu trú</p>
                       <p className="font-semibold text-slate-900">
-                        {formatFrom(item.costs.accommodation, 'VND')}
+                        {formatFrom(item.costs.accommodation || 0, 'VND')}
                       </p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-600">Bảo hiểm & khác</p>
                       <p className="font-semibold text-slate-900">
-                        {formatFrom(item.costs.insuranceAndMisc, 'VND')}
+                        {formatFrom(item.costs.insuranceAndMisc || 0, 'VND')}
                       </p>
                     </div>
                   </div>

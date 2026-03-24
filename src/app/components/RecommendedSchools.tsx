@@ -29,7 +29,6 @@ export default function RecommendedSchools({ onUniversitySelect }: RecommendedSc
 
     universities.forEach((uni) => {
       const tier =
-        (uni.topTier as TopTier | undefined) ||
         (uni.koreanData?.topTier as TopTier | undefined) ||
         (uni.koreanData?.topVisa === 'Top 1'
           ? 'Top1'

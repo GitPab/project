@@ -87,7 +87,7 @@ export interface AdditionalFee {
 }
 
 export interface VisaSystemCost {
-  visaType: 'D4-1' | 'D2-1' | 'D2-2' | 'D2-3' | 'D2-6'; // Extended Korean visa types
+  visaType: 'D4-1' | 'D2-1' | 'D2-2' | 'D2-3' | 'D2-3M' | 'D2-3P' | 'D2-6' | 'D2-6E' | 'D2-8'; // Extended Korean visa types
   tuitionPerTerm?: number;
   tuitionRange?: { min: number; max: number };
   applicationFee?: number;
@@ -177,6 +177,7 @@ export interface University {
   country: string;
   countryCode?: string; // Emoji flag like 🇰🇷
   region?: string;
+  top_tier?: 'Top1' | 'Top2' | 'Top3';
   ranking?: string;
   description?: string;
   tagline?: string; // Short tagline for hero section

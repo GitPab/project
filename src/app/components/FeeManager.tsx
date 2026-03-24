@@ -14,6 +14,23 @@ import { Badge } from './ui/badge';
 import PriceInput from './PriceInput';
 import type { FlexibleFee, FeeType, TimeUnit, FeeOption, FeeCondition } from '../../types/fees';
 
+const optionSchema = z.object({
+  id: z.string(),
+  label: z.string().min(1, 'Vui lòng nhập nhãn'),
+  value: z.number().min(0, 'Giá trị phải là số không âm'),
+  currency: z.string().default('VND'),
+  note: z.string().optional(),
+  condition: z.string().optional(),
+});
+
+const conditionSchema = z.object({
+  id: z.string(),
+  label: z.string().min(1, 'Vui lòng nhập nhãn điều kiện'),
+  percentage: z.number().min(0).max(100, 'Phần trăm phải từ 0-100'),
+  note: z.string().optional(),
+  requirement: z.string().optional(),
+});
+
 const feeSchema = z.object({
   id: z.string().optional(),
   name: z.string().min(1, 'Vui lòng nhập tên phí'),
@@ -30,23 +47,8 @@ const feeSchema = z.object({
   min_value: z.number().optional(),
   max_value: z.number().optional(),
   applies_to: z.array(z.string()).default([]),
-});
-
-const optionSchema = z.object({
-  id: z.string(),
-  label: z.string().min(1, 'Vui lòng nhập nhãn'),
-  value: z.number().min(0, 'Giá trị phải là số không âm'),
-  currency: z.string().default('VND'),
-  note: z.string().optional(),
-  condition: z.string().optional(),
-});
-
-const conditionSchema = z.object({
-  id: z.string(),
-  label: z.string().min(1, 'Vui lòng nhập nhãn điều kiện'),
-  percentage: z.number().min(0).max(100, 'Phần trăm phải từ 0-100'),
-  note: z.string().optional(),
-  requirement: z.string().optional(),
+  options: z.array(optionSchema).optional(),
+  conditions: z.array(conditionSchema).optional(),
 });
 
 type FeeFormData = z.infer<typeof feeSchema>;
@@ -278,10 +280,10 @@ export default function FeeManager({ fees, onChange, visaTypes = [] }: FeeManage
                   <div>
                     <Label htmlFor={`base_value-${fee.id}`}>Giá trị cơ bản *</Label>
                     <PriceInput
+                      label="Giá trị cơ bản"
                       id={`base_value-${fee.id}`}
                       value={fee.base_value}
                       onChange={(value) => updateFee(feeIndex, 'base_value', value)}
-                      currency={fee.currency}
                     />
                   </div>
 
@@ -357,7 +359,12 @@ export default function FeeManager({ fees, onChange, visaTypes = [] }: FeeManage
                       <Label className="text-base font-medium">Lựa chọn</Label>
                       <Button
                         size="sm"
-                        onClick={() => addFeeOption(feeIndex)}
+                        onClick={() => appendOption({
+                          id: `option-${Date.now()}`,
+                          label: '',
+                          value: 0,
+                          currency: 'VND'
+                        })}
                         className="bg-[#003AB7] hover:bg-[#002A8F]"
                       >
                         <Plus className="w-4 h-4 mr-1" />
@@ -373,7 +380,7 @@ export default function FeeManager({ fees, onChange, visaTypes = [] }: FeeManage
                             <Button
                               variant="destructive"
                               size="sm"
-                              onClick={() => removeOption(feeIndex, optionIndex)}
+                              onClick={() => removeOption(optionIndex)}
                             >
                               <Trash2 className="w-4 h-4" />
                             </Button>
@@ -396,6 +403,7 @@ export default function FeeManager({ fees, onChange, visaTypes = [] }: FeeManage
                             <div>
                               <Label>Giá trị *</Label>
                               <PriceInput
+                                label="Giá trị"
                                 value={option.value}
                                 onChange={(value) => {
                                   const newOptions = [...(fee.options || [])];
@@ -449,7 +457,7 @@ export default function FeeManager({ fees, onChange, visaTypes = [] }: FeeManage
                             <Button
                               variant="destructive"
                               size="sm"
-                              onClick={() => removeCondition(feeIndex, conditionIndex)}
+                              onClick={() => removeCondition(conditionIndex)}
                             >
                               <Trash2 className="w-4 h-4" />
                             </Button>

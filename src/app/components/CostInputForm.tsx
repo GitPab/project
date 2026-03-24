@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { ChevronLeft, ChevronRight, Plus, Trash2, Info, CheckCircle, AlertCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -145,6 +145,38 @@ const VISA_DEFAULTS: Record<string, Partial<VisaSystem>> = {
       { label: 'Tất cả khu vực', amount_krw: 20000000 }
     ]
   },
+  'D2-3M': {
+    invoice_krw: 8076000,
+    apply_fee_krw: 100000,
+    enrollment_fee_krw: 900000,
+    scholarships: [
+      { topik_level: 5, discount_pct: 30 },
+      { topik_level: 6, discount_pct: 50 }
+    ],
+    ktx_options: [
+      { name: 'Phong 4 nguoi', price_krw: 747000 },
+      { name: 'Phong 2 nguoi', price_krw: 1102000 }
+    ],
+    so_tiet_kiem_options: [
+      { label: 'Tat ca khu vuc', amount_krw: 20000000 }
+    ]
+  },
+  'D2-3P': {
+    invoice_krw: 9000000,
+    apply_fee_krw: 100000,
+    enrollment_fee_krw: 0,
+    scholarships: [
+      { topik_level: 5, discount_pct: 25 },
+      { topik_level: 6, discount_pct: 45 }
+    ],
+    ktx_options: [
+      { name: 'Phong 4 nguoi', price_krw: 747000 },
+      { name: 'Phong 2 nguoi', price_krw: 1102000 }
+    ],
+    so_tiet_kiem_options: [
+      { label: 'Tat ca khu vuc', amount_krw: 20000000 }
+    ]
+  },
   'D2-4': {
     invoice_krw: 7000000,
     apply_fee_krw: 100000,
@@ -196,6 +228,22 @@ const VISA_DEFAULTS: Record<string, Partial<VisaSystem>> = {
       { label: 'Tất cả khu vực', amount_krw: 10000000 }
     ]
   },
+  'D2-6E': {
+    invoice_krw: 0,
+    apply_fee_krw: 0,
+    enrollment_fee_krw: 0,
+    scholarships: [],
+    ktx_options: [],
+    so_tiet_kiem_options: []
+  },
+  'D2-8': {
+    invoice_krw: 0,
+    apply_fee_krw: 0,
+    enrollment_fee_krw: 0,
+    scholarships: [],
+    ktx_options: [],
+    so_tiet_kiem_options: []
+  },
   'D2-7': {
     invoice_krw: 3000000,
     apply_fee_krw: 50000,
@@ -234,12 +282,12 @@ export default function CostInputForm({
   const [formData, setFormData] = useState<CostFormData>(() => {
     const visaSystems: VisaSystems = {};
     VISA_SYSTEMS.forEach(visa => {
-      const defaults = VISA_DEFAULTS[visa.id];
-      visaSystems[visa.id] = {
-        available: visa.defaultAvailable,
+      const defaults = VISA_DEFAULTS[visa.key];
+      visaSystems[visa.key] = {
+        available: false,
         invoice_krw: defaults?.invoice_krw || 0,
-        apply_fee_krw: defaults?.apply_fee_krw || 0,
-        enrollment_fee_krw: defaults?.enrollment_fee_krw || 0,
+        apply_fee_krw: defaults?.apply_fee_krw ?? visa.default_apply_fee ?? 0,
+        enrollment_fee_krw: defaults?.enrollment_fee_krw ?? visa.default_enrollment_fee ?? 0,
         scholarships: defaults?.scholarships || [],
         ktx_options: defaults?.ktx_options || [],
         so_tiet_kiem_options: defaults?.so_tiet_kiem_options || [],
@@ -408,7 +456,7 @@ export default function CostInputForm({
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <span className="text-lg">🇻🇳</span>
+          <span className="text-lg">💰</span>
           Phí chung tại Việt Nam (VNĐ)
         </CardTitle>
         <p className="text-sm text-gray-600">
@@ -459,15 +507,15 @@ export default function CostInputForm({
                 <details className="text-xs text-gray-500 cursor-pointer">
                   <summary>Danh sách dịch vụ</summary>
                   <div className="mt-1 pl-4 space-y-1">
-                    <div>• Công chứng</div>
-                    <div>• Tem vàng</div>
-                    <div>• Tem tím</div>
-                    <div>• Xin visa</div>
-                    <div>• Khám sức khỏe</div>
-                    <div>• Ship hồ sơ (VN)</div>
-                    <div>• Ship hồ sơ (HQ)</div>
-                    <div>• Đưa đón HQ</div>
-                    <div>• Tìm KTX</div>
+                    <div>⬢ Công chứng</div>
+                    <div>⬢ Tem vàng</div>
+                    <div>⬢ Tem tím</div>
+                    <div>⬢ Xin visa</div>
+                    <div>⬢ Khám sức khỏe</div>
+                    <div>⬢ Ship hồ sơ (VN)</div>
+                    <div>⬢ Ship hồ sơ (HQ)</div>
+                    <div>⬢ Đưa đón HQ</div>
+                    <div>⬢ Tìm KTX</div>
                   </div>
                 </details>
               </div>
@@ -546,7 +594,7 @@ export default function CostInputForm({
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <span className="text-lg">🇰🇷</span>
+          <span className="text-lg">🎓</span>
           Phí theo từng hệ (KRW)
         </CardTitle>
         <p className="text-sm text-gray-600">
@@ -557,11 +605,11 @@ export default function CostInputForm({
         <div className="flex flex-wrap gap-2 mb-6">
           {VISA_SYSTEMS.map((visa) => (
             <button
-              key={visa.id}
-              onClick={() => toggleVisaSystem(visa.id)}
+              key={visa.key}
+              onClick={() => toggleVisaSystem(visa.key)}
               className={cn(
                 "px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                formData.visa_systems[visa.id].available
+                formData.visa_systems[visa.key].available
                   ? "bg-blue-600 text-white"
                   : "bg-gray-200 text-gray-600 hover:bg-gray-300"
               )}
@@ -573,11 +621,11 @@ export default function CostInputForm({
 
         <div className="space-y-6">
           {VISA_SYSTEMS.map((visa) => {
-            const system = formData.visa_systems[visa.id];
+            const system = formData.visa_systems[visa.key];
             
             if (!system.available) {
               return (
-                <Card key={visa.id} className="opacity-50">
+                <Card key={visa.key} className="opacity-50">
                   <CardContent className="p-6">
                     <div className="text-center text-gray-500">
                       <div className="font-medium">{visa.label}</div>
@@ -589,7 +637,7 @@ export default function CostInputForm({
             }
 
             return (
-              <Card key={visa.id}>
+              <Card key={visa.key}>
                 <CardHeader>
                   <CardTitle className="text-lg">{visa.name}</CardTitle>
                   <p className="text-sm text-gray-600">{visa.description}</p>
@@ -599,11 +647,11 @@ export default function CostInputForm({
                     <h4 className="font-medium mb-3">Học phí cơ bản</h4>
                     <div className="grid grid-cols-3 gap-4">
                       <div>
-                        <Label className="text-sm">Invoice học phí / năm</Label>
+                        <Label className="text-sm">Invoice học phí / nĒm</Label>
                         <Input
                           type="text"
                           value={formatNumber(system.invoice_krw)}
-                          onChange={(e) => updateFormData(`visa_systems.${visa.id}.invoice_krw`, parseNumber(e.target.value))}
+                          onChange={(e) => updateFormData(`visa_systems.${visa.key}.invoice_krw`, parseNumber(e.target.value))}
                           className="text-right"
                           placeholder="0"
                         />
@@ -614,7 +662,7 @@ export default function CostInputForm({
                         <Input
                           type="text"
                           value={formatNumber(system.apply_fee_krw)}
-                          onChange={(e) => updateFormData(`visa_systems.${visa.id}.apply_fee_krw`, parseNumber(e.target.value))}
+                          onChange={(e) => updateFormData(`visa_systems.${visa.key}.apply_fee_krw`, parseNumber(e.target.value))}
                           className="text-right"
                           placeholder="0"
                         />
@@ -625,7 +673,7 @@ export default function CostInputForm({
                         <Input
                           type="text"
                           value={formatNumber(system.enrollment_fee_krw)}
-                          onChange={(e) => updateFormData(`visa_systems.${visa.id}.enrollment_fee_krw`, parseNumber(e.target.value))}
+                          onChange={(e) => updateFormData(`visa_systems.${visa.key}.enrollment_fee_krw`, parseNumber(e.target.value))}
                           className="text-right"
                           placeholder="0"
                         />
@@ -637,7 +685,7 @@ export default function CostInputForm({
                   <div>
                     <div className="flex items-center justify-between mb-3">
                       <h4 className="font-medium">Chính sách học bổng theo TOPIK</h4>
-                      <Button type="button" size="sm" onClick={() => addScholarship(visa.id)}>
+                      <Button type="button" size="sm" onClick={() => addScholarship(visa.key)}>
                         <Plus className="w-4 h-4 mr-1" />
                         Thêm mức học bổng
                       </Button>
@@ -650,7 +698,7 @@ export default function CostInputForm({
                             onChange={(e) => {
                               const scholarships = [...system.scholarships];
                               scholarships[index].topik_level = parseInt(e.target.value);
-                              updateFormData(`visa_systems.${visa.id}.scholarships`, scholarships);
+                              updateFormData(`visa_systems.${visa.key}.scholarships`, scholarships);
                             }}
                             className="w-24 px-2 py-1 border rounded text-sm"
                           >
@@ -664,7 +712,7 @@ export default function CostInputForm({
                             onChange={(e) => {
                               const scholarships = [...system.scholarships];
                               scholarships[index].discount_pct = parseInt(e.target.value) || 0;
-                              updateFormData(`visa_systems.${visa.id}.scholarships`, scholarships);
+                              updateFormData(`visa_systems.${visa.key}.scholarships`, scholarships);
                             }}
                             className="w-20 text-right"
                             placeholder="0"
@@ -676,7 +724,7 @@ export default function CostInputForm({
                             type="button"
                             variant="ghost"
                             size="sm"
-                            onClick={() => removeScholarship(visa.id, index)}
+                            onClick={() => removeScholarship(visa.key, index)}
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
@@ -688,7 +736,7 @@ export default function CostInputForm({
                   <div>
                     <div className="flex items-center justify-between mb-3">
                       <h4 className="font-medium">Ký túc xá tại Hàn (KRW / kỳ)</h4>
-                      <Button type="button" size="sm" onClick={() => addKTXOption(visa.id)}>
+                      <Button type="button" size="sm" onClick={() => addKTXOption(visa.key)}>
                         <Plus className="w-4 h-4 mr-1" />
                         Thêm loại phòng
                       </Button>
@@ -702,7 +750,7 @@ export default function CostInputForm({
                             onChange={(e) => {
                               const options = [...system.ktx_options];
                               options[index].name = e.target.value;
-                              updateFormData(`visa_systems.${visa.id}.ktx_options`, options);
+                              updateFormData(`visa_systems.${visa.key}.ktx_options`, options);
                             }}
                             className="flex-1"
                             placeholder="Tên phòng"
@@ -713,7 +761,7 @@ export default function CostInputForm({
                             onChange={(e) => {
                               const options = [...system.ktx_options];
                               options[index].price_krw = parseNumber(e.target.value);
-                              updateFormData(`visa_systems.${visa.id}.ktx_options`, options);
+                              updateFormData(`visa_systems.${visa.key}.ktx_options`, options);
                             }}
                             className="w-32 text-right"
                             placeholder="0"
@@ -723,7 +771,7 @@ export default function CostInputForm({
                             type="button"
                             variant="ghost"
                             size="sm"
-                            onClick={() => removeKTXOption(visa.id, index)}
+                            onClick={() => removeKTXOption(visa.key, index)}
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
@@ -739,7 +787,7 @@ export default function CostInputForm({
                         <Info className="w-3 h-3" />
                         Số tiền sổ tiết kiệm phụ thuộc vào khu vực địa lý của trường
                       </div>
-                      <Button type="button" size="sm" onClick={() => addSavingsOption(visa.id)}>
+                      <Button type="button" size="sm" onClick={() => addSavingsOption(visa.key)}>
                         <Plus className="w-4 h-4 mr-1" />
                         Thêm mức sổ
                       </Button>
@@ -753,7 +801,7 @@ export default function CostInputForm({
                             onChange={(e) => {
                               const options = [...system.so_tiet_kiem_options];
                               options[index].label = e.target.value;
-                              updateFormData(`visa_systems.${visa.id}.so_tiet_kiem_options`, options);
+                              updateFormData(`visa_systems.${visa.key}.so_tiet_kiem_options`, options);
                             }}
                             className="flex-1"
                             placeholder="Mô tả"
@@ -764,7 +812,7 @@ export default function CostInputForm({
                             onChange={(e) => {
                               const options = [...system.so_tiet_kiem_options];
                               options[index].amount_krw = parseNumber(e.target.value);
-                              updateFormData(`visa_systems.${visa.id}.so_tiet_kiem_options`, options);
+                              updateFormData(`visa_systems.${visa.key}.so_tiet_kiem_options`, options);
                             }}
                             className="w-32 text-right"
                             placeholder="0"
@@ -774,7 +822,7 @@ export default function CostInputForm({
                             type="button"
                             variant="ghost"
                             size="sm"
-                            onClick={() => removeSavingsOption(visa.id, index)}
+                            onClick={() => removeSavingsOption(visa.key, index)}
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
@@ -792,8 +840,8 @@ export default function CostInputForm({
   );
 
   const renderStep3 = () => {
-    const availableSystems = VISA_SYSTEMS.filter(v => formData.visa_systems[v.id].available);
-    const unavailableSystems = VISA_SYSTEMS.filter(v => !formData.visa_systems[v.id].available);
+    const availableSystems = VISA_SYSTEMS.filter(v => formData.visa_systems[v.key].available);
+    const unavailableSystems = VISA_SYSTEMS.filter(v => !formData.visa_systems[v.key].available);
     
     const validationStatus = validateStep(3);
 
@@ -849,10 +897,10 @@ export default function CostInputForm({
           </div>
 
           <div>
-            <h4 className="font-medium mb-3">Hệ visa</h4>
+            <h4 className="font-medium mb-3">H? visa</h4>
             <div className="flex flex-wrap gap-2 mb-3">
               {availableSystems.map(visa => (
-                <Badge key={visa.id} className="bg-green-100 text-green-800">
+                <Badge key={visa.key} className="bg-green-100 text-green-800">
                   {visa.label}
                 </Badge>
               ))}
@@ -868,9 +916,9 @@ export default function CostInputForm({
           </div>
 
           {availableSystems.map(visa => {
-            const system = formData.visa_systems[visa.id];
+            const system = formData.visa_systems[visa.key];
             return (
-              <div key={visa.id} className="border rounded-lg p-4">
+              <div key={visa.key} className="border rounded-lg p-4">
                 <h5 className="font-medium mb-2">{visa.label}</h5>
                 <div className="grid grid-cols-3 gap-4 text-sm">
                   <div>
@@ -887,7 +935,7 @@ export default function CostInputForm({
                   </div>
                 </div>
                 <div className="mt-2 text-sm text-gray-600">
-                  {system.scholarships.length} mức học bổng • {system.ktx_options.length} loại phòng • {system.so_tiet_kiem_options.length} mức sổ
+                  {system.scholarships.length} mức học bổng ⬢ {system.ktx_options.length} loại phòng ⬢ {system.so_tiet_kiem_options.length} mức sổ
                 </div>
               </div>
             );
@@ -956,3 +1004,6 @@ export default function CostInputForm({
     </div>
   );
 }
+
+
+

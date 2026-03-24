@@ -12,7 +12,6 @@ import type { Currency } from '../../types/common';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import CostCalculator from '../components/CostCalculator';
-import { VISA_SYSTEMS } from '../../constants/visaSystems';
 
 export default function UniversityDetail() {
   const { id } = useParams<{ id: string }>();
