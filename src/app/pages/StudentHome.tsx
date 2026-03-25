@@ -14,6 +14,38 @@ export default function StudentHome() {
   const [currentPage, setCurrentPage] = React.useState(1);
   const itemsPerPage = 12;
 
+  // Load student profile from localStorage
+  const [studentProfile, setStudentProfile] = React.useState(() => {
+    const saved = localStorage.getItem('student_profile');
+    if (saved) {
+      return JSON.parse(saved);
+    }
+    return {
+      name: user?.name || "Nguyễn Văn A",
+      email: user?.email || "student@example.com",
+      phone: user?.phone || "+84-123-456-789",
+      university: "Konkuk University",
+      program: "Du học D4-1",
+      startDate: "09/2023",
+      status: "active",
+      gpa: "3.2",
+      totalCost: "₩15,000,000",
+      remainingCost: "₩8,500,000",
+      nextPayment: "15/03/2025",
+      progress: 65
+    };
+  });
+
+  // Update student profile and sync with localStorage
+  const handleStudentUpdate = (updatedStudent: any) => {
+    setStudentProfile(updatedStudent);
+    localStorage.setItem('student_profile', JSON.stringify(updatedStudent));
+    // Also update user context if needed
+    if (user) {
+      // Sync with user context
+    }
+  };
+
   const isRegistered = (uniId: string) => {
     return registrations.some(r => r.universityId === uniId && r.studentEmail === user?.email);
   };
@@ -245,20 +277,8 @@ export default function StudentHome() {
       {/* Student Info Sidebar */}
       <div className="w-80 flex-shrink-0">
         <StudentInfoSidebar 
-          student={{
-            name: user?.name || "Nguyễn Văn A",
-            email: user?.email || "student@example.com",
-            phone: "+84-123-456-789",
-            university: "Konkuk University",
-            program: "Du học D4-1",
-            startDate: "09/2023",
-            status: "active",
-            gpa: "3.2",
-            totalCost: "₩15,000,000",
-            remainingCost: "₩8,500,000",
-            nextPayment: "15/03/2025",
-            progress: 65
-          }}
+          student={studentProfile}
+          onStudentUpdate={handleStudentUpdate}
         />
       </div>
     </div>

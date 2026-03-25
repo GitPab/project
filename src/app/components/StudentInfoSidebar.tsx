@@ -1,5 +1,5 @@
-import React from 'react';
-import { User, Mail, Phone, MapPin, GraduationCap, Calendar, Award, FileText, TrendingUp, Clock, DollarSign, Target } from 'lucide-react';
+import React, { useState } from 'react';
+import { User, Mail, Phone, MapPin, GraduationCap, Calendar, Award, FileText, TrendingUp, Clock, DollarSign, Target, X } from 'lucide-react';
 
 interface StudentInfoSidebarProps {
   className?: string;
@@ -17,9 +17,10 @@ interface StudentInfoSidebarProps {
     nextPayment?: string;
     progress?: number;
   };
+  onStudentUpdate?: (updatedStudent: any) => void;
 }
 
-export default function StudentInfoSidebar({ className = '', student }: StudentInfoSidebarProps) {
+export default function StudentInfoSidebar({ className = '', student, onStudentUpdate }: StudentInfoSidebarProps) {
   const defaultStudent = {
     name: "Nguyễn Văn A",
     email: "nguyenvana@email.com",
@@ -34,13 +35,38 @@ export default function StudentInfoSidebar({ className = '', student }: StudentI
     nextPayment: "15/03/2025",
     progress: 65
   };
-
+  
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editForm, setEditForm] = useState<StudentInfoSidebarProps['student']>(student || defaultStudent);
+  
   const studentData = student || defaultStudent;
 
   const statusColors = {
     'active': 'bg-green-100 text-green-800',
     'pending': 'bg-yellow-100 text-yellow-800',
     'completed': 'bg-blue-100 text-blue-800'
+  };
+
+  const handleViewDetails = () => {
+    window.location.href = '/student/monitoring';
+  };
+
+  const handleEditClick = () => {
+    setEditForm(studentData);
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveEdit = () => {
+    if (onStudentUpdate) {
+      onStudentUpdate(editForm);
+    }
+    // Also update localStorage for persistence
+    localStorage.setItem('student_profile', JSON.stringify(editForm));
+    setIsEditModalOpen(false);
+  };
+
+  const handleInputChange = (field: string, value: string) => {
+    setEditForm(prev => prev ? { ...prev, [field]: value } : { ...defaultStudent, [field]: value });
   };
 
   return (
@@ -172,14 +198,104 @@ export default function StudentInfoSidebar({ className = '', student }: StudentI
 
         {/* Quick Actions */}
         <div className="space-y-2 pt-4 border-t border-[#558EFF]/20">
-          <button className="w-full bg-[#003AB7] text-white py-2 rounded-lg hover:bg-[#002A8F] transition-all text-sm font-['Be_Vietnam_Pro']">
+          <button 
+            onClick={handleViewDetails}
+            className="w-full bg-[#003AB7] text-white py-2 rounded-lg hover:bg-[#002A8F] transition-all text-sm font-['Be_Vietnam_Pro']"
+          >
             Xem chi tiết
           </button>
-          <button className="w-full bg-[#F8F9FA] text-[#003AB7] py-2 rounded-lg hover:bg-[#003AB7] hover:text-white transition-all text-sm font-['Be_Vietnam_Pro'] border border-[#558EFF]">
+          <button 
+            onClick={handleEditClick}
+            className="w-full bg-[#F8F9FA] text-[#003AB7] py-2 rounded-lg hover:bg-[#003AB7] hover:text-white transition-all text-sm font-['Be_Vietnam_Pro'] border border-[#558EFF]"
+          >
             Chỉnh sửa thông tin
           </button>
         </div>
       </div>
+
+      {/* Edit Modal */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-[20px] p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-[#003AB7] font-['Be_Vietnam_Pro']">Chỉnh sửa thông tin</h3>
+              <button onClick={() => setIsEditModalOpen(false)} className="p-1 hover:bg-gray-100 rounded">
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-[#4D4D4D] mb-1 font-['Be_Vietnam_Pro']">Họ và tên</label>
+                <input
+                  type="text"
+                  value={(editForm!).name || ''}
+                  onChange={(e) => handleInputChange('name', e.target.value)}
+                  className="w-full px-3 py-2 border border-[#558EFF]/30 rounded-lg focus:outline-none focus:border-[#003AB7] text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[#4D4D4D] mb-1 font-['Be_Vietnam_Pro']">Email</label>
+                <input
+                  type="email"
+                  value={(editForm!).email || ''}
+                  onChange={(e) => handleInputChange('email', e.target.value)}
+                  className="w-full px-3 py-2 border border-[#558EFF]/30 rounded-lg focus:outline-none focus:border-[#003AB7] text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[#4D4D4D] mb-1 font-['Be_Vietnam_Pro']">Số điện thoại</label>
+                <input
+                  type="tel"
+                  value={(editForm!).phone || ''}
+                  onChange={(e) => handleInputChange('phone', e.target.value)}
+                  className="w-full px-3 py-2 border border-[#558EFF]/30 rounded-lg focus:outline-none focus:border-[#003AB7] text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[#4D4D4D] mb-1 font-['Be_Vietnam_Pro']">Trường</label>
+                <input
+                  type="text"
+                  value={(editForm!).university || ''}
+                  onChange={(e) => handleInputChange('university', e.target.value)}
+                  className="w-full px-3 py-2 border border-[#558EFF]/30 rounded-lg focus:outline-none focus:border-[#003AB7] text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[#4D4D4D] mb-1 font-['Be_Vietnam_Pro']">Chương trình</label>
+                <select
+                  value={(editForm!).program || ''}
+                  onChange={(e) => handleInputChange('program', e.target.value)}
+                  className="w-full px-3 py-2 border border-[#558EFF]/30 rounded-lg focus:outline-none focus:border-[#003AB7] text-sm"
+                >
+                  <option value="Du học D4-1">Du học D4-1</option>
+                  <option value="Du học D2-2">Du học D2-2</option>
+                  <option value="Du học D2-3">Du học D2-3</option>
+                </select>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="flex-1 py-2 border border-[#558EFF] text-[#003AB7] rounded-lg hover:bg-[#F8F9FA] transition-all text-sm font-['Be_Vietnam_Pro']"
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={handleSaveEdit}
+                  className="flex-1 py-2 bg-[#003AB7] text-white rounded-lg hover:bg-[#002A8F] transition-all text-sm font-['Be_Vietnam_Pro']"
+                >
+                  Lưu
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

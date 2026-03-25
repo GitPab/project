@@ -1,5 +1,7 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { topUniversities } from '../data/top-universities';
+import { initDatabase } from '../services/sqliteDatabase';
+import { getAllUniversities, saveUniversity, bulkInsertUniversities } from '../services/universityService';
 import {
   University,
   User,
@@ -82,26 +84,44 @@ const parseMaybeJson = <T,>(value: any, fallback: T): T => {
 };
 
 const parseUniversity = (u: any): University => {
+  // Handle data from database (which has different field names)
   const normalizedTier = normalizeTier(u?.top_tier ?? u?.koreanData?.topTier ?? u?.topTier);
-  const visaSystems = parseMaybeJson<Record<string, any>>(u?.visa_systems, {});
-  const admission = parseMaybeJson<Record<string, any>>(u?.admission ?? u?.koreanData?.admission, u?.koreanData?.admission ?? {});
-  const majors = parseMaybeJson<string[]>(u?.majors ?? u?.koreanData?.majors, u?.koreanData?.majors ?? []);
-  const costConfig = parseMaybeJson<any>(u?.cost_config ?? u?.koreanData?.cost_config, u?.koreanData?.cost_config ?? null);
-
+  
+  // Parse korean_data if it's a string (from database)
+  let koreanData = u?.koreanData;
+  if (typeof koreanData === 'string') {
+    try {
+      koreanData = JSON.parse(koreanData);
+    } catch {
+      koreanData = { isKoreanUniversity: true };
+    }
+  }
+  
+  // Ensure systems array exists
+  const systems = u?.systems ?? koreanData?.systems ?? [];
+  
   return {
-    ...u,
-    visa_systems: visaSystems ?? {},
-    admission,
-    majors,
-    cost_config: costConfig,
+    id: u.id,
+    name: u.name,
+    koreanName: u.name_korean ?? u.koreanName,
+    country: u.country ?? 'Hàn Quốc',
+    countryCode: u.country_code ?? u.countryCode ?? '🇰🇷',
+    region: u.region,
     top_tier: normalizedTier,
+    ranking: u.ranking,
+    description: u.description,
+    systems: Array.isArray(systems) ? systems : [],
     koreanData: {
-      ...(u?.koreanData || { isKoreanUniversity: true }),
+      isKoreanUniversity: true,
       topTier: normalizedTier,
-      admission,
-      majors,
-      cost_config: costConfig,
-      visaSystemsDetail: u?.koreanData?.visaSystemsDetail,
+      address: koreanData?.address ?? u.address,
+      koreanRanking: koreanData?.koreanRanking ?? u.ranking,
+      majors: koreanData?.majors ?? [],
+      admission: koreanData?.admission ?? {},
+      visaSystemsDetail: koreanData?.visaSystemsDetail ?? {},
+      supportPolicies: koreanData?.supportPolicies ?? [],
+      commonFeesVND: koreanData?.commonFeesVND ?? [],
+      ...koreanData
     },
   };
 };
@@ -110,11 +130,52 @@ const allUniversitiesData = topUniversities.map(parseUniversity);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [universities, setUniversities] = useState<University[]>(allUniversitiesData);
+  const [universities, setUniversities] = useState<University[]>([]);
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [studentProgress, setStudentProgress] = useState<StudentProgress[]>([]);
   const [studentProfiles, setStudentProfiles] = useState<StudentProfile[]>([]);
   const [studentOnboardings, setStudentOnboardings] = useState<StudentOnboardingData[]>([]);
+  const [dbInitialized, setDbInitialized] = useState(false);
+
+  // Initialize SQLite database and load universities
+  useEffect(() => {
+    const init = async () => {
+      try {
+        await initDatabase();
+        
+        // Load universities from SQLite
+        let dbUniversities = await getAllUniversities();
+        
+        // If no universities in DB, seed with default data
+        if (dbUniversities.length === 0) {
+          const seedData = allUniversitiesData.map(u => ({
+            id: u.id,
+            name: u.name,
+            name_korean: u.koreanName,
+            region: u.region,
+            top_tier: u.top_tier,
+            ranking: u.ranking,
+            country: u.country,
+            country_code: u.countryCode,
+            address: u.koreanData?.address,
+            korean_data: JSON.stringify(u.koreanData)
+          }));
+          await bulkInsertUniversities(seedData);
+          dbUniversities = await getAllUniversities();
+        }
+        
+        setUniversities(dbUniversities.map(parseUniversity));
+        setDbInitialized(true);
+      } catch (error) {
+        console.error('Failed to initialize database:', error);
+        // Fallback to memory-only mode
+        setUniversities(allUniversitiesData);
+        setDbInitialized(true);
+      }
+    };
+    
+    init();
+  }, []);
 
   const login = (email: string, password: string, role: 'admin' | 'student', studentInfo?: { displayName?: string; phone?: string; trackingCode?: string }) => {
     // Login creates a user session
@@ -135,10 +196,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setRegistrations([]);
   };
 
-  const updateUniversity = (id: string, updates: Partial<University>) => {
+  const updateUniversity = async (id: string, updates: Partial<University>) => {
     setUniversities(prev =>
       prev.map(uni => uni.id === id ? parseUniversity({ ...uni, ...updates }) : uni)
     );
+    
+    // Save to SQLite
+    if (dbInitialized) {
+      try {
+        await saveUniversity({
+          id,
+          name: updates.name || '',
+          name_korean: updates.koreanName,
+          region: updates.region,
+          top_tier: updates.top_tier,
+          ranking: updates.ranking,
+          country: updates.country,
+          country_code: updates.countryCode,
+          address: updates.koreanData?.address,
+          korean_data: JSON.stringify(updates.koreanData)
+        });
+      } catch (error) {
+        console.error('Failed to save university to SQLite:', error);
+      }
+    }
   };
 
   const fetchUniversity = async (id: string) => {
@@ -157,12 +238,37 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const addUniversities = (universities: University[]) => {
-    setUniversities(prev => [...prev, ...universities.map(parseUniversity)]);
+  const addUniversities = async (newUniversities: University[]) => {
+    const parsed = newUniversities.map(parseUniversity);
+    setUniversities(prev => [...prev, ...parsed]);
+    
+    // Save to SQLite
+    if (dbInitialized) {
+      try {
+        const dbData = parsed.map(u => ({
+          id: u.id,
+          name: u.name,
+          name_korean: u.koreanName,
+          region: u.region,
+          top_tier: u.top_tier,
+          ranking: u.ranking,
+          country: u.country,
+          country_code: u.countryCode,
+          address: u.koreanData?.address,
+          korean_data: JSON.stringify(u.koreanData)
+        }));
+        await bulkInsertUniversities(dbData);
+      } catch (error) {
+        console.error('Failed to add universities to SQLite:', error);
+      }
+    }
   };
 
-  const updateUniversitiesList = (updater: (prev: University[]) => University[]) => {
-    setUniversities(prev => updater(prev).map(parseUniversity));
+  const updateUniversitiesList = async (updater: (prev: University[]) => University[]) => {
+    setUniversities(prev => {
+      const updated = updater(prev).map(parseUniversity);
+      return updated;
+    });
   };
 
   const registerForUniversity = (universityId: string, selectedFees?: {

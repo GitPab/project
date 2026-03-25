@@ -5,6 +5,7 @@ import StatCard from '../components/StatCard';
 import TierBreakdownBar from '../components/TierBreakdownBar';
 import TierMini from '../components/TierMini';
 import ImportUniversitiesModal from '../components/ImportUniversitiesModal';
+import DatabaseExportPanel from '../components/DatabaseExportPanel';
 import { toast } from 'sonner';
 
 const fetchDashboardStats = (universities: any[]) => {
@@ -142,6 +143,8 @@ export default function AdminDashboard() {
           </button>
         </div>
       )}
+
+      <DatabaseExportPanel />
 
       {showImportModal && (
         <ImportUniversitiesModal
