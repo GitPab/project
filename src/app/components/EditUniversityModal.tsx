@@ -70,6 +70,11 @@ const formSchema = z.object({
   selectedVisaType: z.string().optional(),
   fixedCosts: z.array(fixedCostSchema).optional(),
   optionalAddons: z.array(addonSchema).optional(),
+  // Missing fields from Detail.txt spec
+  supportPolicies: z.array(z.string()).optional(),
+  refundPolicy: z.string().optional(),
+  admissionsType: z.string().optional(),
+  partTimeInfo: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -116,6 +121,11 @@ export default function EditUniversityModal({
         amount: addon.amount,
         type: addon.type || 'other',
       })),
+      // Missing fields from Detail.txt
+      supportPolicies: university?.koreanData?.supportPolicies || [],
+      refundPolicy: university?.koreanData?.refundPolicy || '',
+      admissionsType: university?.koreanData?.admissionsType || '',
+      partTimeInfo: university?.koreanData?.partTimeInfo || '',
     }),
     [university]
   );
@@ -234,6 +244,11 @@ export default function EditUniversityModal({
         topTier: values.topTier,
         topVisa: topVisaLabel,
         visaSystems: enabledVisaSystemsData.length > 0 ? enabledVisaSystemsData : undefined,
+        // Missing fields from Detail.txt
+        supportPolicies: values.supportPolicies || [],
+        refundPolicy: values.refundPolicy || '',
+        admissionsType: values.admissionsType || '',
+        partTimeInfo: values.partTimeInfo || '',
       },
     };
 
@@ -470,6 +485,79 @@ export default function EditUniversityModal({
                 )}
               />
               {errors.overview && <p className="text-xs text-red-600">{errors.overview.message}</p>}
+            </div>
+          </div>
+
+          {/* Additional Information Section - Missing fields from Detail.txt */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-slate-900">Thông tin bổ sung</h3>
+            
+            {/* Part-time Work Info */}
+            <div className="space-y-2">
+              <Label htmlFor="partTimeInfo">Việc làm thêm</Label>
+              <Controller
+                control={control}
+                name="partTimeInfo"
+                render={({ field }) => (
+                  <Textarea
+                    id="partTimeInfo"
+                    {...field}
+                    rows={3}
+                    placeholder="Thông tin về việc làm thêm cho sinh viên..."
+                  />
+                )}
+              />
+            </div>
+
+            {/* Support Policies */}
+            <div className="space-y-2">
+              <Label htmlFor="supportPolicies">Chính sách hỗ trợ (mỗi dòng một chính sách)</Label>
+              <Controller
+                control={control}
+                name="supportPolicies"
+                render={({ field }) => (
+                  <Textarea
+                    id="supportPolicies"
+                    {...field}
+                    value={field.value?.join('\n') || ''}
+                    onChange={(e) => field.onChange(e.target.value.split('\n').filter(Boolean))}
+                    rows={3}
+                    placeholder="Đón sân bay&#10;Hỗ trợ CCCD nước ngoài&#10;Chuyển đổi visa"
+                  />
+                )}
+              />
+            </div>
+
+            {/* Refund Policy */}
+            <div className="space-y-2">
+              <Label htmlFor="refundPolicy">Chính sách hoàn tiền</Label>
+              <Controller
+                control={control}
+                name="refundPolicy"
+                render={({ field }) => (
+                  <Input
+                    id="refundPolicy"
+                    {...field}
+                    placeholder="Linh hoạt: hoàn về TK học viên, trung tâm hoặc người ủy quyền"
+                  />
+                )}
+              />
+            </div>
+
+            {/* Admissions Type */}
+            <div className="space-y-2">
+              <Label htmlFor="admissionsType">Hình thức xét tuyển</Label>
+              <Controller
+                control={control}
+                name="admissionsType"
+                render={({ field }) => (
+                  <Input
+                    id="admissionsType"
+                    {...field}
+                    placeholder="Xét hồ sơ + Phỏng vấn"
+                  />
+                )}
+              />
             </div>
           </div>
 

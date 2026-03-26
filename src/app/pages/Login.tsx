@@ -1,21 +1,39 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import { useApp } from '../context/AppContext';
-import { useLanguage } from '../context/LanguageContext';
-import { GraduationCap, Mail, Lock, UserCircle, Shield, ArrowLeft } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { Mail, Lock, ArrowLeft, GraduationCap } from 'lucide-react';
 
 export default function Login() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'admin' | 'student'>('student');
-  const { login } = useApp();
-  const { t } = useLanguage();
+  const [form, setForm] = useState({ email: '', password: '' });
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { login, user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Already logged in → auto redirect based on role
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      if (user.role === 'admin') {
+        navigate('/admin/dashboard');
+      } else {
+        navigate('/student/home');
+      }
+    }
+  }, [isAuthenticated, user, navigate]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    login(email, password, role);
-    navigate(role === 'admin' ? '/admin/dashboard' : '/student/home');
+    setError('');
+    setLoading(true);
+    
+    try {
+      await login(form.email, form.password);
+      // Redirect happens automatically via useEffect above
+    } catch (err: any) {
+      setError(err.message || 'Đăng nhập thất bại');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -58,8 +76,8 @@ export default function Login() {
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                   <input
                     type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    value={form.email}
+                    onChange={(e) => setForm(prev => ({ ...prev, email: e.target.value }))}
                     className="w-full pl-11 pr-4 py-3 bg-slate-50 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#003AB7]/50 focus:border-[#003AB7] transition-all"
                     placeholder="your.email@example.com"
                     required
@@ -73,8 +91,8 @@ export default function Login() {
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                   <input
                     type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    value={form.password}
+                    onChange={(e) => setForm(prev => ({ ...prev, password: e.target.value }))}
                     className="w-full pl-11 pr-4 py-3 bg-slate-50 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#003AB7]/50 focus:border-[#003AB7] transition-all"
                     placeholder="Enter your password"
                     required
@@ -82,107 +100,27 @@ export default function Login() {
                 </div>
               </div>
 
-              <div>
-                <label className="block mb-3 text-sm font-medium text-slate-700">Login as</label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setRole('student')}
-                    className={`flex flex-col items-center justify-center gap-2 py-4 px-4 rounded-lg border-2 transition-all active:scale-95 ${
-                      role === 'student'
-                        ? 'border-[#003AB7] bg-[#003AB7]/5 text-[#003AB7] shadow-sm'
-                        : 'border-slate-300 bg-white text-slate-700 hover:border-[#003AB7]/50 active:bg-[#F0F7FF] active:text-[#003AB7]'
-                    }`}
-                  >
-                    <UserCircle className="w-6 h-6" />
-                    <span className="font-medium">Student</span>
-                    <span className="text-xs opacity-75">View Only</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRole('admin')}
-                    className={`flex flex-col items-center justify-center gap-2 py-4 px-4 rounded-lg border-2 transition-all active:scale-95 ${
-                      role === 'admin'
-                        ? 'border-[#003AB7] bg-[#003AB7]/5 text-[#003AB7] shadow-sm'
-                        : 'border-slate-300 bg-white text-slate-700 hover:border-[#003AB7]/50 active:bg-[#F0F7FF] active:text-[#003AB7]'
-                    }`}
-                  >
-                    <Shield className="w-6 h-6" />
-                    <span className="font-medium">Admin</span>
-                    <span className="text-xs opacity-75">Full Access</span>
-                  </button>
-                </div>
-              </div>
+              {error && (
+                <div className="text-red-500 text-sm text-center">{error}</div>
+              )}
 
               <button
                 type="submit"
-                className="w-full bg-[#003AB7] text-white py-3 rounded-lg hover:bg-[#002A8F] active:bg-[#001F70] transition-colors font-medium shadow-md hover:shadow-lg active:shadow-inner"
+                disabled={loading}
+                className="w-full bg-[#003AB7] text-white py-3 rounded-lg font-semibold hover:bg-[#002A8F] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Sign In
+                {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
               </button>
             </form>
-          </div>
-        </div>
 
-        {/* Feature Comparison */}
-        <div className="mt-8 bg-white rounded-2xl shadow-lg border border-slate-200 p-6">
-          <h3 className="text-lg font-bold text-slate-900 mb-4 text-center">Role Comparison</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 text-primary font-semibold">
-                <Shield className="w-5 h-5" />
-                <span>Admin Features</span>
-              </div>
-              <ul className="space-y-2 text-sm text-slate-700">
-                <li className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
-                  Edit university information
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
-                  Update cost breakdowns
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
-                  Manage additional fees
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
-                  View all registrations
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
-                  Analytics dashboard
-                </li>
-              </ul>
-            </div>
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 text-emerald-600 font-semibold">
-                <UserCircle className="w-5 h-5" />
-                <span>Student Features</span>
-              </div>
-              <ul className="space-y-2 text-sm text-slate-700">
-                <li className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
-                  Browse universities
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
-                  View costs (read-only)
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
-                  Register for programs
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
-                  Track personal costs
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 bg-amber-500 rounded-full"></span>
-                  No edit permissions 🔒
-                </li>
-              </ul>
+            <div className="mt-6 text-center text-sm text-slate-600">
+              Chưa có tài khoản?{' '}
+              <button
+                onClick={() => navigate('/register')}
+                className="text-[#003AB7] font-semibold hover:underline"
+              >
+                Đăng ký học viên
+              </button>
             </div>
           </div>
         </div>

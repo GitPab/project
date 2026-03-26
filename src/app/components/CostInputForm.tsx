@@ -41,6 +41,9 @@ interface VisaSystem {
   scholarships: Scholarship[];
   ktx_options: KTXOption[];
   so_tiet_kiem_options: SoTietKiemOption[];
+  // Admission requirements
+  gpa_min?: number;
+  gap_year_limit?: number;
 }
 
 interface VisaSystems {
@@ -59,6 +62,8 @@ const VISA_DEFAULTS: Record<string, Partial<VisaSystem>> = {
     invoice_krw: 5800000,
     apply_fee_krw: 100000,
     enrollment_fee_krw: 0,
+    gpa_min: 7.0,
+    gap_year_limit: 2,
     scholarships: [
       { topik_level: 3, discount_pct: 30 },
       { topik_level: 4, discount_pct: 50 },
@@ -678,6 +683,35 @@ export default function CostInputForm({
                           placeholder="0"
                         />
                         <span className="text-xs text-gray-500">KRW</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="font-medium mb-3">Điều kiện tuyển sinh</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-sm">GPA tối thiểu</Label>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          value={system.gpa_min ?? 7.0}
+                          onChange={(e) => updateFormData(`visa_systems.${visa.key}.gpa_min`, parseFloat(e.target.value) || 7.0)}
+                          className="text-right"
+                          placeholder="7.0"
+                        />
+                        <span className="text-xs text-gray-500">Điểm</span>
+                      </div>
+                      <div>
+                        <Label className="text-sm">Năm trống tối đa</Label>
+                        <Input
+                          type="number"
+                          value={system.gap_year_limit ?? 2}
+                          onChange={(e) => updateFormData(`visa_systems.${visa.key}.gap_year_limit`, parseInt(e.target.value) || 2)}
+                          className="text-right"
+                          placeholder="2"
+                        />
+                        <span className="text-xs text-gray-500">năm</span>
                       </div>
                     </div>
                   </div>

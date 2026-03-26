@@ -194,6 +194,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     setUser(null);
     setRegistrations([]);
+    // Also clear AuthContext localStorage keys
+    localStorage.removeItem('auth_user');
+    localStorage.removeItem('auth_token');
   };
 
   const updateUniversity = async (id: string, updates: Partial<University>) => {

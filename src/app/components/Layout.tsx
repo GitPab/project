@@ -1,16 +1,17 @@
 ﻿import React from 'react';
 import { Outlet, NavLink, useNavigate, Navigate } from 'react-router';
-import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { LayoutDashboard, School, Users, LogOut, Menu, X, Shield, UserCircle, Lock, Edit3, TrendingUp, ChevronsLeft, ChevronsRight } from 'lucide-react';
 
 export default function Layout() {
-  const { logout } = useApp();
-  const { user, isAdmin } = useAuth();
+  const { logout, user, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
-  const handleLogout = () => { logout(); navigate('/login'); };
+  const handleLogout = () => { 
+    logout(); 
+    navigate('/login'); 
+  };
   if (!user) return <Navigate to="/login" replace />;
 
   const menuItems = isAdmin

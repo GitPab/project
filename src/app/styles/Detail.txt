@@ -1,0 +1,240 @@
+Based on my CSV data analysis, I need a complete redesign of the fee system.
+Here are all the findings and what needs to be built:
+
+---
+
+## KEY FINDINGS FROM CSV DATA
+
+1. Fee structure has TWO currency groups: VNĐ (Vietnam) + KRW (Korea)
+2. ~90% of fees are IDENTICAL across D4-1/D2-2/D2-3 — only invoice, apply fee,
+   enrollment fee, and scholarship differ per system
+3. "Phí trung tâm thu hộ" (11M VNĐ) contains 8 sub-items that need to be shown
+4. Sổ tiết kiệm amount depends on university region (Gyeonggi vs outside)
+5. Scholarship is a % discount applied to the invoice amount, not a fixed number
+
+---
+
+## PART 1 — DATABASE SCHEMA REDESIGN
+
+Replace the current flat fee list with this structured schema per university:
+```json
+{
+  "common_fees_vnd": [
+    { "id": "hoc_tieng", "name": "Học tiếng Hàn", "amount": 13000000,
+      "note": "Học từ 0 lên TOPIK 2 + Tài khoản E-Learning", "editable": true },
+    { "id": "phi_tu_van", "name": "Phí tư vấn & xử lý hồ sơ", "amount": 39000000,
+      "note": "", "editable": true },
+    { "id": "phi_trung_tam", "name": "Phí trung tâm thu hộ", "amount": 11000000,
+      "sub_items": ["Phí công chứng","Tem vàng","Tem tím","Xin visa",
+        "Khám sức khoẻ","Ship hồ sơ (VN)","Ship hồ sơ (HQ)","Đưa đón HQ","Tìm KTX"],
+      "editable": true },
+    { "id": "ve_may_bay", "name": "Vé máy bay 1 chiều", "amount": 8000000,
+      "note": "Bao gồm 40kg ký gửi", "optional": true, "editable": true },
+    { "id": "ktx_vn", "name": "KTX tại Việt Nam", "amount_per_month": 800000,
+      "note": "Học viên chọn số tháng", "optional": true, "editable": true }
+  ],
+  "visa_systems": {
+    "D4-1": {
+      "available": true,
+      "invoice_krw_per_year": 5800000,
+      "apply_fee_krw": 100000,
+      "enrollment_fee_krw": 0,
+      "scholarships": [
+        { "condition": "TOPIK 3", "discount_pct": 30 },
+        { "condition": "TOPIK 4", "discount_pct": 50 },
+        { "condition": "TOPIK 5", "discount_pct": 70 },
+        { "condition": "TOPIK 6", "discount_pct": 100 }
+      ],
+      "ktx_options": [
+        { "name": "Phòng 4 người", "price_krw_per_ky": 747000 },
+        { "name": "Phòng 2 người", "price_krw_per_ky": 1102000 },
+        { "name": "Phòng 2 người (Quốc tế)", "price_krw_per_ky": 1440000 }
+      ],
+      "financial_requirement": {
+        "so_tiet_kiem_options": [
+          { "label": "Khu vực Gyeonggi", "amount_krw": 10000000 },
+          { "label": "Ngoài Gyeonggi", "amount_krw": 8000000 }
+        ],
+        "lui_n_thang": 6
+      }
+    },
+    "D2-2": { ... same structure, different values ... },
+    "D2-3": { ... same structure, different values ... }
+  },
+  "admission": {
+    "D4-1": { "gpa_min": 7.0, "gap_year_limit": 2, "regions": ["all"] },
+    "D2": { "gpa_min": 6.5, "gap_year_limit": null, "regions": ["all"] }
+  },
+  "support_policies": ["Đón sân bay", "Hỗ trợ CCCD nước ngoài", "Chuyển đổi visa"],
+  "refund_policy": "Linh hoạt: hoàn về TK học viên, trung tâm hoặc người ủy quyền",
+  "admissions_type": "Xét hồ sơ + Phỏng vấn"
+}
+```
+
+---
+
+## PART 2 — COST CALCULATOR (student-facing detail page)
+
+Build an interactive cost calculator on the university detail page with:
+
+### Controls (left panel):
+- Visa system tabs: [D4-1] [D2-2] [D2-3] — only show available systems
+- TOPIK level selector: dropdown (0 = chưa có, 1–6) — show discount % next to each
+- KTX type selector: dropdown with room options + prices
+- Sổ tiết kiệm selector: dropdown based on region options
+- KTX tại Việt Nam: month selector (0 = không ở, 1–6 tháng)
+- Vé máy bay: checkbox (default checked)
+
+### Fee breakdown (right panel):
+Grouped in two sections:
+
+**Phí tại Việt Nam (VNĐ):**
+- Học tiếng Hàn: fixed
+- Phí tư vấn: fixed
+- Phí trung tâm thu hộ: fixed, with expandable sub-items list
+- KTX tại VN: show only if months > 0, display total (months × price)
+- Vé máy bay: show only if checked
+
+**Phí tại Hàn Quốc (KRW):**
+- Phí apply
+- Phí nhập học (if > 0)
+- Invoice học phí (1 năm): from visa system data
+- Học bổng: show as negative value in red if TOPIK discount applies
+  → label: "Học bổng TOPIK X (−Y%)" → value: −(invoice × Y/100)
+- KTX tại HQ (1 kỳ): from selected ktx_option
+- Sổ tiết kiệm: from selected financial_requirement option
+
+### Total section (bottom):
+- Total VNĐ (sum of all VND fees)
+- Total KRW (sum of all KRW fees)
+- Approximate USD total (convert both at current rates)
+- If scholarship applied: show "Tiết kiệm X KRW nhờ học bổng TOPIK Y"
+- If no scholarship: show tip "Đạt TOPIK 3+ để nhận học bổng từ 30%"
+
+### Calculation rules:
+totalVND = hoc_tieng + phi_tu_van + phi_trung_tam
++ (ktx_vn_months × 800000) [if selected]
++ 8000000 [if ve_may_bay checked]
+hocbong_krw = invoice_krw × (discount_pct / 100)
+totalKRW = apply_fee + enrollment_fee + invoice_krw
+- hocbong_krw
++ ktx_option.price_krw
++ so_tiet_kiem.amount_krw
+---
+
+## PART 3 — ADMIN EDIT MODAL REDESIGN
+
+Replace the current flat fee list with structured sections:
+
+### Section 1: Phí chung (VNĐ) — shared across all visa systems
+- Table with rows for each common_fees_vnd item
+- Each row: fee name (read-only label) | amount (editable number) | note (editable text)
+- No add/delete (these are fixed categories for all universities)
+
+### Section 2: Per visa system panels (expandable, all open by default)
+For each visa system (D4-1, D2-2, D2-3, D2-6):
+- Toggle Available/Non-available (existing behavior)
+- When Available and expanded, show:
+  - Invoice học phí (KRW/năm): number input
+  - Phí apply (KRW): number input
+  - Phí nhập học (KRW): number input
+  - Scholarship table: rows of [Điều kiện | Discount %] with add/delete
+  - KTX options table: rows of [Tên phòng | Giá KRW/kỳ] with add/delete
+  - Sổ tiết kiệm options: rows of [Mô tả | Số tiền KRW] with add/delete
+
+### Section 3: Thông tin chung
+- Textarea: Việc làm thêm
+- Textarea: Chính sách hỗ trợ (one per line)
+- Text: Chính sách hoàn tiền
+- Text: Hình thức xét tuyển
+
+---
+
+## PART 4 — UNIVERSITIES LIST — Tổng column fix
+
+The "Tổng" column in the list should show the estimated total for D4-1 
+(as default/most common system) using these rules:
+
+tong_vnd = 13M + 39M + 11M + 8M = 71.000.000 VNĐ (fixed base)
+tong_krw = apply_fee + invoice_krw + ktx_min_price (cheapest room option)
+
+Display format: "71.000.000đ + X KRW" OR convert everything to VND 
+using stored exchange rate and show single total.
+
+The column must recalculate after any university save.
+
+---
+
+## PART 5 — CSV IMPORT UPDATE
+
+Update import to parse new fields from "Thông tin chung" CSV:
+- Row "Top Visa" → top_visa_category (Top 1 / Top 2 / Top 3)
+- Row "Ranking" → extract number before "/" 
+- Row "Học phí" → parse D4-1/D2-2/D2-3 invoice ranges from bullet text
+- Row "Phí KTX" → parse ktx_options from bullet text
+- Row "Học bổng" → parse scholarship_policy text per system
+- Row "Điều kiện tuyển sinh" → parse gpa_min and gap_year per system
+- Row "Điều kiện tài chính" → parse so_tiet_kiem per system
+- Row "Hỗ trợ/Chính sách" → support_policies array
+- Row "Việc làm thêm" → part_time_info
+
+For D4-1/D2-2/D2-3 cost CSV files (the bóc giá sheets):
+- Rows 1-3 (fixed fees) → update common_fees_vnd amounts
+- Row "Phí Apply" → apply_fee_krw for that visa system
+- Row "Phí nhập học" → enrollment_fee_krw
+- Row "Invoice" → invoice_krw_per_year
+- Row "Invoice ký túc xá" → ktx_options (parse room types + prices)
+- Row "Mở sổ tiết kiệm" → financial_requirement.so_tiet_kiem_options
+- Row "Vé máy bay" → update ve_may_bay amount in common_fees_vnd
+
+Update the university detail page visa system tab behavior as follows:
+
+## All visa systems must always be rendered (D4-1, D2-1, D2-2, D2-3, D2-6)
+
+### Available tabs (clickable):
+- Render normally with onClick handler
+- Show a green dot + sub-label (e.g. "Hệ tiếng", "Đại học", "Sau đại học")
+- First available tab is selected by default on page load
+- Active state: solid blue background + white text
+
+### Non-available tabs (not clickable):
+- Render with `opacity: 0.45`, `cursor: not-allowed`
+- Strike-through on the visa code label (text-decoration: line-through)
+- Sub-label shows "Không có" in red color
+- No onClick handler, button has `disabled` attribute
+- Do NOT hide them — they must be visible so students understand the school
+  doesn't offer that visa system
+
+### Sub-labels per visa system:
+- D4-1 → "Hệ tiếng"
+- D2-1 → "Dự bị ĐH"
+- D2-2 → "Đại học"
+- D2-3 → "Sau đại học"
+- D2-6 → "Nghiên cứu"
+
+### Data mapping:
+Each visa system in the university data has an `available: boolean` field.
+Use this to determine which tabs are clickable vs disabled.
+```jsx
+const ALL_VISA_SYSTEMS = ['D4-1', 'D2-1', 'D2-2', 'D2-3', 'D2-6']
+
+const VISA_LABELS = {
+  'D4-1': 'Hệ tiếng',
+  'D2-1': 'Dự bị ĐH',
+  'D2-2': 'Đại học',
+  'D2-3': 'Sau đại học',
+  'D2-6': 'Nghiên cứu'
+}
+
+// On mount: auto-select first available
+const firstAvailable = ALL_VISA_SYSTEMS.find(
+  v => university.visa_systems[v]?.available
+)
+setSelectedVisa(firstAvailable)
+```
+
+### When switching tabs:
+- Update all fee values, scholarship options, sổ tiết kiệm options, 
+  and TOPIK dropdown labels to match the selected visa system
+- Reset TOPIK selector to "Chưa có" when switching visa systems
+- Recalculate total immediately after switch

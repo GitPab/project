@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
 import { Search, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router';
@@ -21,11 +22,45 @@ function UniversityRow({ university, onEdit, onQuickInfo, palette }: UniversityR
   const navigate = useNavigate();
   
   const formatKRW = (amount?: number | null) => Number(amount ?? 0).toLocaleString('vi-VN');
+  const formatVND = (amount?: number | null) => Number(amount ?? 0).toLocaleString('vi-VN');
   
   const visaSystems = university?.koreanData?.visaSystemsDetail || {};
   const d41Data = visaSystems['D4-1'];
   const hasD41 = d41Data?.available;
-  const d41Price = d41Data?.invoiceKRWPerYear;
+  
+  // Calculate Tổng (Total) for D4-1 system
+  const calculateTotal = () => {
+    // Fixed VND fees (common across all systems)
+    const commonFees = university?.koreanData?.commonFeesVND || [];
+    const hocTieng = commonFees.find((f: any) => f.id === 'hoc_tieng')?.amount || 13000000;
+    const phiTuVan = commonFees.find((f: any) => f.id === 'phi_tu_van')?.amount || 39000000;
+    const phiTrungTam = commonFees.find((f: any) => f.id === 'phi_trung_tam')?.amount || 11000000;
+    const veMayBay = commonFees.find((f: any) => f.id === 've_may_bay')?.amount || 8000000;
+    
+    // Total VND (base fixed costs)
+    const totalVND = hocTieng + phiTuVan + phiTrungTam + veMayBay;
+    
+    // KRW costs from D4-1
+    if (hasD41 && d41Data) {
+      const applyFee = d41Data.applyFeeKRW || 0;
+      const enrollmentFee = d41Data.enrollmentFeeKRW || 0;
+      const invoice = d41Data.invoiceKRWPerYear || 0;
+      
+      // Get cheapest KTX option
+      const ktxOptions = d41Data.ktxOptions || [];
+      const cheapestKTX = ktxOptions.length > 0 
+        ? Math.min(...ktxOptions.map((k: any) => k.priceKRWPerKy || 0))
+        : 0;
+      
+      const totalKRW = applyFee + enrollmentFee + invoice + cheapestKTX;
+      
+      return { totalVND, totalKRW, hasData: true };
+    }
+    
+    return { totalVND, totalKRW: 0, hasData: false };
+  };
+  
+  const { totalVND, totalKRW, hasData } = calculateTotal();
   
   const availableVisas = Object.entries(visaSystems)
     .filter(([_, data]: [string, any]) => data?.available)
@@ -119,15 +154,18 @@ function UniversityRow({ university, onEdit, onQuickInfo, palette }: UniversityR
         </div>
       </div>
 
-      {/* Column 2: Price */}
-      <div style={{ width: 160, flexShrink: 0, textAlign: 'right' }}>
-        {hasD41 && d41Price ? (
+      {/* Column 2: Tổng chi phí ước tính */}
+      <div style={{ width: 180, flexShrink: 0, textAlign: 'right' }}>
+        {hasData ? (
           <>
-            <div style={{ fontSize: 15, fontWeight: 700, color: palette.text }}>
-              {formatKRW(d41Price)} KRW
+            <div style={{ fontSize: 14, fontWeight: 700, color: palette.text }}>
+              {formatVND(totalVND)}đ
             </div>
-            <div style={{ fontSize: 10, color: palette.textMuted }}>
-              D4-1 · mỗi kỳ
+            <div style={{ fontSize: 11, color: palette.textMuted }}>
+              + {formatKRW(totalKRW)} KRW
+            </div>
+            <div style={{ fontSize: 10, color: '#2D8C4E', marginTop: 2 }}>
+              D4-1 ước tính
             </div>
           </>
         ) : (
@@ -136,7 +174,7 @@ function UniversityRow({ university, onEdit, onQuickInfo, palette }: UniversityR
       </div>
 
       {/* Column 3: Features */}
-      <div style={{ width: 200, flexShrink: 0, paddingLeft: 20 }}>
+      <div style={{ width: 180, flexShrink: 0, paddingLeft: 20 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
           {bestScholarship && (
             <span style={{
@@ -165,7 +203,7 @@ function UniversityRow({ university, onEdit, onQuickInfo, palette }: UniversityR
       </div>
 
       {/* Column 4: Scholarship Bar */}
-      <div style={{ width: 180, flexShrink: 0, paddingLeft: 20 }}>
+      <div style={{ width: 160, flexShrink: 0, paddingLeft: 20 }}>
         {bestScholarship ? (
           <>
             <div style={{ fontSize: 11, color: palette.textMuted, marginBottom: 4 }}>
@@ -248,9 +286,13 @@ interface UniversitiesListEnhancedProps {
   onUniversitySelect?: (university: University) => void;
 }
 
-export default function UniversitiesListEnhanced({ onUniversitySelect: _onUniversitySelect }: UniversitiesListEnhancedProps) {
-  const { universities, addUniversities, updateUniversity, user } = useApp();
-  const isAdmin = user?.role === 'admin';
+export default function UniversitiesListEnhancedRedesigned() {
+  const { universities, setUniversities, updateUniversity, addUniversities } = useApp();
+  const { isAdmin, user } = useAuth();
+  const navigate = useNavigate();
+
+  // Debug logging
+  console.log('UniversitiesListEnhancedRedesigned - isAdmin:', isAdmin, 'user:', user);
 
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -544,9 +586,9 @@ export default function UniversitiesListEnhanced({ onUniversitySelect: _onUniver
           borderRadius: 10,
         }}>
           <span style={{ width: 340 }}>Trường</span>
-          <span style={{ width: 160, textAlign: 'right' }}>Học phí thấp nhất</span>
-          <span style={{ width: 200, paddingLeft: 20 }}>Ưu đãi nổi bật</span>
-          <span style={{ width: 180, paddingLeft: 20 }}>Học bổng tốt nhất</span>
+          <span style={{ width: 180, textAlign: 'right' }}>Tổng chi phí (D4-1)</span>
+          <span style={{ width: 180, paddingLeft: 20 }}>Ưu đãi nổi bật</span>
+          <span style={{ width: 160, paddingLeft: 20 }}>Học bổng tốt nhất</span>
           <span style={{ flex: 1, textAlign: 'right' }}>Thao tác</span>
         </div>
       )}

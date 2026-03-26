@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { X, Upload, FileSpreadsheet, CheckCircle, ChevronRight, ChevronLeft } from 'lucide-react';
 import type { University } from '../context/AppContext';
 import { useApp } from '../context/AppContext';
@@ -152,9 +152,22 @@ const parseCsvText = (raw: string): { headers: string[]; rows: Record<string, st
 
 const parseXlsx = async (file: File): Promise<{ headers: string[]; rows: Record<string, string>[] }> => {
   const buffer = await file.arrayBuffer();
-  const workbook = XLSX.read(buffer, { type: 'array' });
-  const sheet = workbook.Sheets[workbook.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false }) as string[][];
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer);
+  
+  const worksheet = workbook.worksheets[0];
+  if (!worksheet) {
+    throw new Error('No worksheet found in file');
+  }
+  
+  const rows: any[][] = [];
+  worksheet.eachRow((row) => {
+    const rowValues = row.values as any[];
+    // Remove first element if it's null/undefined (exceljs adds extra element)
+    const cleanValues = rowValues.slice(1);
+    rows.push(cleanValues.map(cell => String(cell || '')));
+  });
+  
   const headers = rows[0]?.map(h => String(h || '').trim()) || [];
   const dataRows = rows.slice(1);
   const mapped = dataRows.map((cells) => {

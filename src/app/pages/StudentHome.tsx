@@ -1,20 +1,22 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { useApp } from '../context/AppContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useLanguage } from '../context/LanguageContext';
 import { MapPin, CheckCircle, Lock, Search, Star, UserPlus, GraduationCap } from 'lucide-react';
 import StudentInfoSidebar from '../components/StudentInfoSidebar';
+import { getAllTrackingCodes } from '../services/trackingCodeService';
 
 export default function StudentHome() {
   const { universities, registrations, user } = useApp();
   const { language } = useLanguage();
+  const { formatFrom } = useCurrency();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = React.useState('');
   const [currentPage, setCurrentPage] = React.useState(1);
   const itemsPerPage = 12;
 
-  // Load student profile from localStorage
+  // Load student profile from tracking codes or fallback to localStorage defaults
   const [studentProfile, setStudentProfile] = React.useState(() => {
     const saved = localStorage.getItem('student_profile');
     if (saved) {
@@ -29,12 +31,49 @@ export default function StudentHome() {
       startDate: "09/2023",
       status: "active",
       gpa: "3.2",
-      totalCost: "₩15,000,000",
-      remainingCost: "₩8,500,000",
+      totalCost: "0 ₫",
+      remainingCost: "0 ₫",
       nextPayment: "15/03/2025",
       progress: 65
     };
   });
+
+  // Sync with tracking code data on mount
+  useEffect(() => {
+    const syncWithTrackingData = async () => {
+      if (!user?.email) return;
+      
+      try {
+        const codes = await getAllTrackingCodes();
+        // Find tracking code for current user
+        const userCode = codes.find(code => code.studentEmail === user.email);
+        
+        if (userCode) {
+          const updatedProfile = {
+            name: userCode.studentName,
+            email: userCode.studentEmail,
+            phone: userCode.studentPhone,
+            university: userCode.desiredUniversityName || 'Chưa chọn',
+            program: `Du học ${userCode.visaSystem}`,
+            startDate: new Date(userCode.createdAt).toLocaleDateString('vi-VN', { month: '2-digit', year: 'numeric' }),
+            status: userCode.status === 'approved' ? 'active' : 'pending',
+            gpa: "3.2",
+            totalCost: formatFrom(userCode.initialTotalCostVnd || 0, 'VND'),
+            remainingCost: formatFrom(userCode.initialTotalCostVnd || 0, 'VND'),
+            nextPayment: "15/03/2025",
+            progress: userCode.status === 'approved' ? 65 : 25
+          };
+          
+          setStudentProfile(updatedProfile);
+          localStorage.setItem('student_profile', JSON.stringify(updatedProfile));
+        }
+      } catch (error) {
+        console.error('Failed to sync with tracking data:', error);
+      }
+    };
+    
+    syncWithTrackingData();
+  }, [user, formatFrom]);
 
   // Update student profile and sync with localStorage
   const handleStudentUpdate = (updatedStudent: any) => {
