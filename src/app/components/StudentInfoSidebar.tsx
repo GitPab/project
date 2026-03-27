@@ -60,8 +60,6 @@ export default function StudentInfoSidebar({ className = '', student, onStudentU
     if (onStudentUpdate) {
       onStudentUpdate(editForm);
     }
-    // Also update localStorage for persistence
-    localStorage.setItem('student_profile', JSON.stringify(editForm));
     setIsEditModalOpen(false);
   };
 

@@ -17,9 +17,9 @@ export interface KoreanUniversityData {
   studentSupport?: string[];
   jobOpportunities?: string;
   workOpportunity?: string;
+  partTimeInfo?: string; // Việc làm thêm
   // Missing fields from Detail.txt spec
   supportPolicies?: string[]; // Chính sách hỗ trợ
   refundPolicy?: string; // Chính sách hoàn tiền
   admissionsType?: string; // Hình thức xét tuyển
-  partTimeInfo?: string; // Việc làm thêm
 }

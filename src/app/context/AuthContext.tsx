@@ -1,4 +1,5 @@
-﻿import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+﻿import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect, useRef } from 'react';
+import { initDatabase, saveUser, getUserByEmail, getAllUsers } from '../services/sqliteDatabase';
 
 export type UserRole = 'student' | 'admin';
 
@@ -30,12 +31,8 @@ export interface RegisterData {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const STORAGE_KEYS = {
-  USER: 'auth_user',
-  TOKEN: 'auth_token'
-};
-
-const MOCK_USERS: Array<AuthUser & { password: string }> = [
+// Default mock users - will be seeded to database
+const DEFAULT_USERS: Array<AuthUser & { password: string }> = [
   {
     id: '1',
     email: 'admin@duhoccost.vn',
@@ -55,63 +52,123 @@ const MOCK_USERS: Array<AuthUser & { password: string }> = [
 ];
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(() => {
-    const stored = localStorage.getItem(STORAGE_KEYS.USER);
-    return stored ? JSON.parse(stored) : null;
-  });
-  const [token, setToken] = useState<string | null>(() => 
-    localStorage.getItem(STORAGE_KEYS.TOKEN)
-  );
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [dbInitialized, setDbInitialized] = useState(false);
+  const dbInitRef = useRef(false);
+
+  // Initialize database and seed default users
+  useEffect(() => {
+    const init = async () => {
+      try {
+        await initDatabase();
+        
+        // Seed default users if none exist
+        const existingUsers = getAllUsers();
+        if (existingUsers.length === 0) {
+          DEFAULT_USERS.forEach(u => {
+            saveUser({
+              id: u.id,
+              email: u.email,
+              name: u.name,
+              role: u.role,
+              password_hash: u.password,
+              phone: u.phone
+            });
+          });
+        }
+        
+        dbInitRef.current = true;
+        setDbInitialized(true);
+      } catch (error) {
+        console.error('Failed to initialize auth database:', error);
+      }
+    };
+    
+    init();
+  }, []);
+
+  const waitForDb = async (timeout = 10000): Promise<boolean> => {
+    const start = Date.now();
+    while (!dbInitRef.current) {
+      if (Date.now() - start > timeout) {
+        return false;
+      }
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    return true;
+  };
 
   const login = useCallback(async (email: string, password: string): Promise<void> => {
-    const foundUser = MOCK_USERS.find(u => u.email === email && u.password === password);
+    // Wait for database to be initialized
+    const isReady = await waitForDb();
+    if (!isReady) {
+      throw new Error('Database not initialized - please refresh the page and try again');
+    }
     
-    if (!foundUser) {
+    // Get user from database
+    const dbUser = getUserByEmail(email);
+    
+    if (!dbUser || dbUser.password_hash !== password) {
       throw new Error('Email hoặc mật khẩu không đúng');
     }
     
-    const { password: _, ...userWithoutPassword } = foundUser;
-    const mockToken = `mock_token_${foundUser.id}_${Date.now()}`;
+    const authUser: AuthUser = {
+      id: dbUser.id,
+      email: dbUser.email,
+      name: dbUser.name,
+      phone: dbUser.phone,
+      role: dbUser.role
+    };
     
-    localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(userWithoutPassword));
-    localStorage.setItem(STORAGE_KEYS.TOKEN, mockToken);
+    const mockToken = `mock_token_${dbUser.id}_${Date.now()}`;
     
-    setUser(userWithoutPassword);
+    setUser(authUser);
     setToken(mockToken);
   }, []);
 
   const logout = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEYS.USER);
-    localStorage.removeItem(STORAGE_KEYS.TOKEN);
     setUser(null);
     setToken(null);
     window.location.href = '/';
   }, []);
 
   const register = useCallback(async (userData: RegisterData): Promise<void> => {
-    const existingUser = MOCK_USERS.find(u => u.email === userData.email);
+    // Wait for database to be initialized
+    const isReady = await waitForDb();
+    if (!isReady) {
+      throw new Error('Database not initialized - please refresh the page and try again');
+    }
+    
+    // Check if email exists
+    const existingUser = getUserByEmail(userData.email);
     if (existingUser) {
       throw new Error('Email đã được sử dụng');
     }
     
-    const newUser: AuthUser & { password: string } = {
-      id: `student_${Date.now()}`,
+    const newId = `student_${Date.now()}`;
+    
+    // Save to database
+    saveUser({
+      id: newId,
       email: userData.email,
-      password: userData.password,
+      name: userData.name,
+      role: 'student',
+      password_hash: userData.password,
+      phone: userData.phone
+    });
+    
+    const authUser: AuthUser = {
+      id: newId,
+      email: userData.email,
       name: userData.name,
       phone: userData.phone,
       role: 'student'
     };
     
-    MOCK_USERS.push(newUser);
+    const mockToken = `mock_token_${newId}_${Date.now()}`;
     
-    const { password: _, ...userWithoutPassword } = newUser;
-    const mockToken = `mock_token_${newUser.id}_${Date.now()}`;
-    
-    localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(userWithoutPassword));
-    localStorage.setItem(STORAGE_KEYS.TOKEN, mockToken);
-    
-    setUser(userWithoutPassword);
+    setUser(authUser);
     setToken(mockToken);
   }, []);
 

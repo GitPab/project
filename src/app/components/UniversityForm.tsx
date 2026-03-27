@@ -42,6 +42,12 @@ interface FormData {
   additionalFees: AdditionalFee[];
   galleryImages: string[];
   isKoreanUniversity: boolean;
+  majors: string[];
+  ranking: string;
+  partTimeInfo: string;
+  supportPolicies: string[];
+  refundPolicy: string;
+  admissionsType: string;
 }
 
 export default function UniversityForm({ university, onClose, onSave }: UniversityFormProps) {
@@ -63,6 +69,12 @@ export default function UniversityForm({ university, onClose, onSave }: Universi
     additionalFees: university?.additionalFees ? [...university.additionalFees] : [],
     galleryImages: university?.galleryImages ? [...university.galleryImages] : [],
     isKoreanUniversity: university?.koreanData?.isKoreanUniversity ?? true,
+    majors: university?.majors || university?.koreanData?.majors || [],
+    ranking: university?.ranking || university?.koreanData?.koreanRanking || '',
+    partTimeInfo: university?.koreanData?.partTimeInfo || '',
+    supportPolicies: university?.koreanData?.supportPolicies || [],
+    refundPolicy: university?.koreanData?.refundPolicy || '',
+    admissionsType: university?.koreanData?.admissionsType || '',
   });
 
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
@@ -216,11 +228,13 @@ export default function UniversityForm({ university, onClose, onSave }: Universi
         koreanName: formData.koreanName,
         region: formData.region,
         country: formData.country,
+        ranking: formData.ranking,
         generalTuition: formData.generalTuition,
         visaFee: formData.visaFee,
         accommodationFee: formData.accommodationFee,
         insuranceFee: formData.insuranceFee,
         additionalFees: formData.additionalFees,
+        majors: formData.majors,
         ...(pendingCostConfig?.visa_systems ? { visa_systems: pendingCostConfig.visa_systems } : {}),
         koreanData: {
           ...(university?.koreanData || { isKoreanUniversity: true }),
@@ -228,6 +242,12 @@ export default function UniversityForm({ university, onClose, onSave }: Universi
           topVisa: formData.topTier === 'Top3' ? 'Top 3' : formData.topTier === 'Top2' ? 'Top 2' : 'Top 1',
           address: formData.region || university?.koreanData?.address,
           isKoreanUniversity: formData.isKoreanUniversity,
+          koreanRanking: formData.ranking,
+          majors: formData.majors,
+          partTimeInfo: formData.partTimeInfo,
+          supportPolicies: formData.supportPolicies,
+          refundPolicy: formData.refundPolicy,
+          admissionsType: formData.admissionsType,
           commonFeesVND: Array.isArray((pendingCostConfig as any)?.common_fees) ? (pendingCostConfig as any).common_fees : undefined,
         } as any,
       };
@@ -376,6 +396,127 @@ export default function UniversityForm({ university, onClose, onSave }: Universi
                 placeholder="Mô tả ngắn về trường..."
                 disabled={isSubmitting} />
               {fieldErrors.overview?.[0] && <p className="text-xs text-red-600 mt-1">{fieldErrors.overview[0]}</p>}
+            </div>
+
+            {/* Chuyên ngành (majors) */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Chuyên ngành đào tạo
+              </label>
+              <p className="text-xs text-slate-500 mb-2">Nhập mỗi chuyên ngành trên một dòng hoặc cách nhau bằng dấu phẩy</p>
+              <textarea
+                value={formData.majors.join('\n')}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  const majors = value.split(/[\n,]+/).map(m => m.trim()).filter(m => m.length > 0);
+                  setFormData({ ...formData, majors });
+                }}
+                className="w-full px-4 py-3 rounded-lg border border-slate-300 min-h-[100px] focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
+                placeholder="Khoa học máy tính\nKinh tế\nQuản trị kinh doanh"
+                disabled={isSubmitting}
+              />
+              {formData.majors.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {formData.majors.map((major, index) => (
+                    <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                      {major}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Xếp hạng */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Xếp hạng
+              </label>
+              <input
+                type="text"
+                value={formData.ranking}
+                onChange={(e) => setFormData({ ...formData, ranking: e.target.value })}
+                className={inputClass('ranking')}
+                placeholder="Ví dụ: 15/200 trường đại học tại Hàn Quốc"
+                disabled={isSubmitting}
+              />
+            </div>
+
+            {/* Thông tin bổ sung cho Đại học Hàn */}
+            <div className="space-y-4">
+              <h3 className="text-base font-semibold text-slate-900 pb-2 border-b border-slate-100">
+                Thông tin bổ sung
+              </h3>
+
+              {/* Việc làm thêm */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Việc làm thêm
+                </label>
+                <textarea
+                  value={formData.partTimeInfo}
+                  onChange={(e) => setFormData({ ...formData, partTimeInfo: e.target.value })}
+                  className="w-full px-4 py-3 rounded-lg border border-slate-300 min-h-[80px] focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
+                  placeholder="Thông tin về việc làm thêm cho sinh viên..."
+                  disabled={isSubmitting}
+                />
+              </div>
+
+              {/* Chính sách hỗ trợ */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Chính sách hỗ trợ
+                </label>
+                <p className="text-xs text-slate-500 mb-2">Mỗi dòng một chính sách</p>
+                <textarea
+                  value={formData.supportPolicies.join('\n')}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    const policies = value.split('\n').map(p => p.trim()).filter(p => p.length > 0);
+                    setFormData({ ...formData, supportPolicies: policies });
+                  }}
+                  className="w-full px-4 py-3 rounded-lg border border-slate-300 min-h-[100px] focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
+                  placeholder="Đón sân bay\nHỗ trợ CCCC nước ngoài\nChuyển đổi visa"
+                  disabled={isSubmitting}
+                />
+                {formData.supportPolicies.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {formData.supportPolicies.map((policy, index) => (
+                      <span key={index} className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+                        {policy}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Chính sách hoàn tiền */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Chính sách hoàn tiền
+                </label>
+                <textarea
+                  value={formData.refundPolicy}
+                  onChange={(e) => setFormData({ ...formData, refundPolicy: e.target.value })}
+                  className="w-full px-4 py-3 rounded-lg border border-slate-300 min-h-[80px] focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
+                  placeholder="Linh hoạt, hoàn 100% nếu TKN học viên, trung tâm hoặc người ủy quyền"
+                  disabled={isSubmitting}
+                />
+              </div>
+
+              {/* Hình thức xét tuyển */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Hình thức xét tuyển
+                </label>
+                <input
+                  type="text"
+                  value={formData.admissionsType}
+                  onChange={(e) => setFormData({ ...formData, admissionsType: e.target.value })}
+                  className={inputClass('admissionsType')}
+                  placeholder="Xét hồ sơ + Phỏng vấn"
+                  disabled={isSubmitting}
+                />
+              </div>
             </div>
 
             {/* Gallery ảnh (chỉ Edit) */}

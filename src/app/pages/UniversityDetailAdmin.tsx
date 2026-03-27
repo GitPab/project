@@ -1,12 +1,19 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { useApp } from '../context/AppContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
 import { Button } from '../components/ui/button';
-import { Info, ChevronDown, ChevronUp } from 'lucide-react';
+import { Info, ChevronDown, ChevronUp, MapPin, GraduationCap, Building2, ExternalLink } from 'lucide-react';
 import { DESIGN_TOKENS, normalizeTier, VISA_SYSTEMS } from '../styles/designTokens';
+import {
+  DEFAULT_FEES_VND,
+  DEFAULT_SO_TIET_KIEM_OPTIONS,
+  EXCHANGE_RATES,
+  DEFAULT_ADMISSION,
+  DEFAULT_FINANCIAL
+} from '../../constants/feeDefaults';
 
 // Import actual modal components
 import EditUniversityModal from '../components/EditUniversityModal';
@@ -24,9 +31,14 @@ const ALL_VISA_SYSTEMS = [
   { key: 'D2-8', label: 'Ngắn hạn', subLabel: 'Ngắn hạn', name: 'Chương trình ngắn hạn' },
 ];
 
-// Helper to format currency
+// Helper to format currency - memoized
 const formatVND = (amount: number) => amount.toLocaleString('vi-VN');
 const formatKRW = (amount: number) => amount.toLocaleString('vi-VN');
+
+// Empty object constant to prevent new references
+const EMPTY_OBJECT = {};
+const EMPTY_ARRAY: any[] = [];
+// Helper to convert camelCase to snake_case for saving to database
 const convertVisaSystemsToSnakeCase = (visaSystems: any): any => {
   if (!visaSystems) return {};
   
@@ -53,7 +65,10 @@ const convertVisaSystemsToSnakeCase = (visaSystems: any): any => {
         label: s.label || '',
         amount_krw: s.amountKRW ?? s.amount_krw ?? 0
       })),
-      lui_n_thang: system.financialRequirement?.luiNThang ?? system.lui_n_thang ?? 6
+      lui_n_thang: system.financialRequirement?.luiNThang ?? system.lui_n_thang ?? DEFAULT_FINANCIAL.luiNThang,
+      // Admission requirements
+      gpa_min: system.admission?.gpaMin ?? system.gpa_min ?? DEFAULT_ADMISSION.gpaMin,
+      gap_year_limit: system.admission?.gapYearLimit ?? system.gap_year_limit ?? DEFAULT_ADMISSION.gapYearLimit
     };
   });
   
@@ -62,43 +77,40 @@ const convertVisaSystemsToSnakeCase = (visaSystems: any): any => {
 
 // Helper to convert common fees array to snake_case object
 const convertCommonFeesToObject = (commonFees: any[]): any => {
-  if (!commonFees || !Array.isArray(commonFees)) {
-    return {
-      hoc_tieng: 13000000,
-      phi_tu_van: 39000000,
-      phi_trung_tam: 11000000,
-      ve_may_bay: { amount: 8000000, optional: true },
-      ktx_vn: { amount_per_month: 800000, optional: true }
-    };
+  if (!commonFees || !Array.isArray(commonFees) || commonFees.length === 0) {
+    return EMPTY_COMMON_FEES;
   }
   
-  const result: any = {
-    hoc_tieng: 13000000,
-    phi_tu_van: 39000000,
-    phi_trung_tam: 11000000,
-    ve_may_bay: { amount: 8000000, optional: true },
-    ktx_vn: { amount_per_month: 800000, optional: true }
-  };
+  const result: any = { ...EMPTY_COMMON_FEES };
   
   commonFees.forEach(fee => {
     if (fee.id === 'hoc_tieng' || fee.name?.includes('tiếng')) {
-      result.hoc_tieng = fee.amount ?? 13000000;
+      result.hoc_tieng = fee.amount ?? DEFAULT_FEES_VND.hocTieng;
     }
     if (fee.id === 'phi_tu_van' || fee.name?.includes('tư vấn')) {
-      result.phi_tu_van = fee.amount ?? 39000000;
+      result.phi_tu_van = fee.amount ?? DEFAULT_FEES_VND.phiTuVan;
     }
     if (fee.id === 'phi_trung_tam' || fee.name?.includes('trung tâm')) {
-      result.phi_trung_tam = fee.amount ?? 11000000;
+      result.phi_trung_tam = fee.amount ?? DEFAULT_FEES_VND.phiTrungTam;
     }
     if (fee.id === 've_may_bay' || fee.name?.includes('máy bay')) {
-      result.ve_may_bay = { amount: fee.amount ?? 8000000, optional: fee.optional ?? true };
+      result.ve_may_bay = { amount: fee.amount ?? DEFAULT_FEES_VND.veMayBay, optional: fee.optional ?? true };
     }
     if (fee.id === 'ktx_vn' || fee.name?.includes('KTX')) {
-      result.ktx_vn = { amount_per_month: fee.amountPerMonth ?? 800000, optional: fee.optional ?? true };
+      result.ktx_vn = { amount_per_month: fee.amountPerMonth ?? DEFAULT_FEES_VND.ktxVNPerMonth, optional: fee.optional ?? true };
     }
   });
   
   return result;
+};
+
+// Memoized empty common fees object
+const EMPTY_COMMON_FEES = {
+  hoc_tieng: DEFAULT_FEES_VND.hocTieng,
+  phi_tu_van: DEFAULT_FEES_VND.phiTuVan,
+  phi_trung_tam: DEFAULT_FEES_VND.phiTrungTam,
+  ve_may_bay: { amount: DEFAULT_FEES_VND.veMayBay, optional: true },
+  ktx_vn: { amount_per_month: DEFAULT_FEES_VND.ktxVNPerMonth, optional: true }
 };
 
 // Helper to convert snake_case to camelCase for visa system data
@@ -130,7 +142,11 @@ const convertVisaSystemsToCamelCase = (visaSystems: any): any => {
           label: s.label || '',
           amountKRW: s.amount_krw ?? s.amountKRW ?? 0
         })),
-        luiNThang: system.lui_n_thang ?? system.luiNThang ?? 6
+        luiNThang: system.lui_n_thang ?? system.luiNThang ?? DEFAULT_FINANCIAL.luiNThang
+      },
+      admission: {
+        gpaMin: system.gpa_min ?? system.gpaMin ?? DEFAULT_ADMISSION.gpaMin,
+        gapYearLimit: system.gap_year_limit ?? system.gapYearLimit ?? DEFAULT_ADMISSION.gapYearLimit
       }
     };
   });
@@ -165,9 +181,11 @@ const convertCommonFeesToArray = (commonFees: any): any[] => {
   return fees;
 };
 
-// Normalize common fees helper
+// Normalize common fees helper - memoized empty result
+const EMPTY_FEES_ARRAY: any[] = [];
+
 const normalizeCommonFees = (rawData: any) => {
-  if (!rawData) return [];
+  if (!rawData) return EMPTY_FEES_ARRAY;
   if (Array.isArray(rawData)) return rawData;
   
   const fees = [];
@@ -175,7 +193,7 @@ const normalizeCommonFees = (rawData: any) => {
     fees.push({ 
       id: 'hoc_tieng', 
       name: 'Học tiếng Hàn', 
-      amount: rawData.hoc_tieng ?? rawData.hocTieng ?? 13000000, 
+      amount: rawData.hoc_tieng ?? rawData.hocTieng ?? DEFAULT_FEES_VND.hocTieng, 
       editable: true 
     });
   }
@@ -183,7 +201,7 @@ const normalizeCommonFees = (rawData: any) => {
     fees.push({ 
       id: 'phi_tu_van', 
       name: 'Phí tư vấn', 
-      amount: rawData.phi_tu_van ?? rawData.phiTuVan ?? 39000000, 
+      amount: rawData.phi_tu_van ?? rawData.phiTuVan ?? DEFAULT_FEES_VND.phiTuVan, 
       editable: true 
     });
   }
@@ -191,7 +209,7 @@ const normalizeCommonFees = (rawData: any) => {
     fees.push({ 
       id: 'phi_trung_tam', 
       name: 'Phí trung tâm thu hộ', 
-      amount: rawData.phi_trung_tam ?? rawData.phiTrungTam ?? 11000000, 
+      amount: rawData.phi_trung_tam ?? rawData.phiTrungTam ?? DEFAULT_FEES_VND.phiTrungTam, 
       editable: true, 
       subItems: ['Phí công chứng', 'Tem vàng / Tem tím', 'Xin visa', 'Khám sức khoẻ', 'Ship hồ sơ tại Việt Nam', 'Ship hồ sơ sang trường', 'Đưa đón tại Hàn Quốc', 'Tìm ký túc xá']
     });
@@ -201,7 +219,7 @@ const normalizeCommonFees = (rawData: any) => {
     fees.push({ 
       id: 've_may_bay', 
       name: 'Vé máy bay', 
-      amount: fee.amount ?? 8000000, 
+      amount: fee.amount ?? DEFAULT_FEES_VND.veMayBay, 
       optional: fee.optional ?? true, 
       editable: true 
     });
@@ -211,7 +229,7 @@ const normalizeCommonFees = (rawData: any) => {
     fees.push({ 
       id: 'ktx_vn', 
       name: 'KTX Việt Nam', 
-      amountPerMonth: fee.amount_per_month ?? fee.amountPerMonth ?? 800000, 
+      amountPerMonth: fee.amount_per_month ?? fee.amountPerMonth ?? DEFAULT_FEES_VND.ktxVNPerMonth, 
       optional: fee.optional ?? true, 
       editable: true 
     });
@@ -230,7 +248,232 @@ const PHI_TRUNG_TAM_SUB_ITEMS = [
   'Tìm ký túc xá'
 ];
 
-const AdminControls = ({ university, onEditClick, onCostConfigClick }: { 
+// Memoized default soTietKiemOptions for components
+const DEFAULT_SO_TIET_KIEM_FALLBACK = [
+  { label: 'Khu vực Gyeonggi', amountKRW: 10000000 },
+  { label: 'Ngoài Gyeonggi', amountKRW: 8000000 }
+];
+
+// Admin General Info Cards - Same design as student page
+const AdminGeneralInfoCards = ({ university, visaSystems }: { university: any; visaSystems: any }) => {
+  const koreanData = university?.koreanData;
+  
+  // Get all visa systems that have data
+  const allSystems = ALL_VISA_SYSTEMS
+    .filter(v => visaSystems[v.key] != null)
+    .map((v, index) => ({ ...v, rank: index + 1 }));
+  
+  const availableSystems = allSystems.filter(v => visaSystems[v.key]?.available);
+  
+  // Get admission requirements
+  const firstSystem = availableSystems[0];
+  const visaData = firstSystem ? visaSystems[firstSystem.key] : null;
+  
+  const gpaMin = visaData?.admission?.gpaMin || DEFAULT_ADMISSION.gpaMin;
+  const gapYearLimit = visaData?.admission?.gapYearLimit || DEFAULT_ADMISSION.gapYearLimit;
+  const soTietKiemAmount = visaData?.financialRequirement?.soTietKiemOptions?.[0]?.amountKRW || DEFAULT_SO_TIET_KIEM_OPTIONS[0].amountKRW;
+  const luiNThang = visaData?.financialRequirement?.luiNThang || DEFAULT_FINANCIAL.luiNThang;
+  
+  // Find best scholarship
+  let bestScholarship: any = null;
+  allSystems.forEach(visa => {
+    const data = visaSystems[visa.key];
+    if (data?.scholarships?.length > 0) {
+      const max = Math.max(...data.scholarships.map((s: any) => s.discountPct));
+      if (!bestScholarship || max > bestScholarship.pct) {
+        bestScholarship = { pct: max, visa: visa.label };
+      }
+    }
+  });
+  
+  // Get all unique majors
+  const allMajors: string[] = [];
+  allSystems.forEach(visa => {
+    const data = visaSystems[visa.key];
+    if (data?.majors && Array.isArray(data.majors)) {
+      data.majors.forEach((m: string) => {
+        if (!allMajors.includes(m)) allMajors.push(m);
+      });
+    }
+  });
+  
+  const displayMajors = allMajors.length > 0 
+    ? allMajors.slice(0, 4).join(', ') + (allMajors.length > 4 ? ` +${allMajors.length - 4} ngành` : '')
+    : (Array.isArray(koreanData?.majors) 
+        ? koreanData.majors.slice(0, 4).join(', ')
+        : koreanData?.majors || university?.majors || 'Đang cập nhật');
+  
+  return (
+    <div style={{
+      background: '#fff',
+      borderRadius: 16,
+      overflow: 'hidden',
+      border: '1px solid #E8E8E8',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+    }}>
+      {/* Header */}
+      <div style={{
+        background: 'linear-gradient(135deg, #003AB7 0%, #1B3F8B 100%)',
+        padding: '20px 24px',
+        color: '#fff'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <h2 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 4px 0' }}>
+              {university?.name || 'Thông tin trường'}
+            </h2>
+            <p style={{ fontSize: 14, opacity: 0.9, margin: 0 }}>
+              {koreanData?.koreanName || university?.koreanName || ''}
+            </p>
+          </div>
+          {university?.ranking && (
+            <div style={{
+              background: 'rgba(255,255,255,0.2)',
+              borderRadius: 8,
+              padding: '6px 12px',
+              fontSize: 13,
+              fontWeight: 600
+            }}>
+              Top {university.ranking}
+            </div>
+          )}
+        </div>
+        
+        {/* Quick Stats */}
+        <div style={{
+          display: 'flex',
+          gap: 24,
+          marginTop: 16,
+          paddingTop: 16,
+          borderTop: '1px solid rgba(255,255,255,0.2)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <MapPin size={16} />
+            <span style={{ fontSize: 13 }}>{university?.region || koreanData?.region || 'Hàn Quốc'}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <GraduationCap size={16} />
+            <span style={{ fontSize: 13 }}>{availableSystems.length || allSystems.length || 0} hệ visa</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Building2 size={16} />
+            <span style={{ fontSize: 13 }}>{university?.country || 'Hàn Quốc'}</span>
+          </div>
+        </div>
+      </div>
+      
+      {/* Body */}
+      <div style={{ padding: '20px 24px' }}>
+        
+        {/* Điều kiện tuyển sinh */}
+        <div style={{ marginBottom: 20 }}>
+          <h3 style={{ fontSize: 16, fontWeight: 700, color: '#1A1A1A', marginBottom: 16 }}>
+            Điều kiện tuyển sinh
+          </h3>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px 24px' }}>
+            <div>
+              <div style={{ fontSize: 12, color: '#888', marginBottom: 4 }}>GPA tối thiểu</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: '#1A1A1A' }}>≥ {gpaMin}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 12, color: '#888', marginBottom: 4 }}>Năm trống / tuổi</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: '#1A1A1A' }}>Trống &lt; {gapYearLimit} năm</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 12, color: '#888', marginBottom: 4 }}>Điều kiện tài chính</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: '#1A1A1A' }}>Sổ tiết kiệm {luiNThang} tháng</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 12, color: '#888', marginBottom: 4 }}>Số tiền sổ TK</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: '#1A1A1A' }}>{formatKRW(soTietKiemAmount)} KRW</div>
+            </div>
+          </div>
+        </div>
+        
+        <div style={{ height: 1, background: '#F0F0F0', margin: '20px 0' }} />
+        
+        {/* Thông tin chung */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px 24px' }}>
+          <div>
+            <div style={{ fontSize: 12, color: '#888', marginBottom: 4, textTransform: 'uppercase', fontWeight: 600 }}>Địa chỉ</div>
+            <div style={{ fontSize: 14, color: '#333', lineHeight: 1.5 }}>
+              {koreanData?.address || university?.location || 'Đang cập nhật'}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 12, color: '#888', marginBottom: 4, textTransform: 'uppercase', fontWeight: 600 }}>Chuyên ngành</div>
+            <div style={{ fontSize: 14, color: '#333', lineHeight: 1.5 }}>{displayMajors}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 12, color: '#888', marginBottom: 4, textTransform: 'uppercase', fontWeight: 600 }}>Hệ đào tạo</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {(allSystems.length > 0 ? allSystems : ALL_VISA_SYSTEMS.slice(0, 4)).map((visa) => (
+                <span key={visa.key} style={{
+                  fontSize: 13,
+                  padding: '4px 10px',
+                  borderRadius: 12,
+                  background: visaSystems[visa.key]?.available ? '#ECFDF5' : '#F5F5F5',
+                  color: visaSystems[visa.key]?.available ? '#059669' : '#999',
+                  fontWeight: 600
+                }}>
+                  {visa.label}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 12, color: '#888', marginBottom: 4, textTransform: 'uppercase', fontWeight: 600 }}>Học bổng cao nhất</div>
+            <div style={{ fontSize: 14, color: bestScholarship ? '#059669' : '#666', fontWeight: 600 }}>
+              {bestScholarship ? `Giảm ${bestScholarship.pct}% học phí (${bestScholarship.visa})` : 'Không có thông tin'}
+            </div>
+          </div>
+          
+          {/* Part-time Work */}
+          {(koreanData?.partTimeInfo || koreanData?.partTimeWork) && (
+            <div>
+              <div style={{ fontSize: 12, color: '#888', marginBottom: 4, textTransform: 'uppercase', fontWeight: 600 }}>Cơ hội việc làm</div>
+              <div style={{ fontSize: 14, color: '#333', lineHeight: 1.5 }}>
+                {koreanData?.partTimeInfo || koreanData?.partTimeWork}
+              </div>
+            </div>
+          )}
+          
+          {/* Dormitory Info */}
+          {(visaData?.ktxOptions?.length > 0 || koreanData?.dormitoryInfo) && (
+            <div>
+              <div style={{ fontSize: 12, color: '#888', marginBottom: 4, textTransform: 'uppercase', fontWeight: 600 }}>Thông tin ký túc xá</div>
+              <div style={{ fontSize: 14, color: '#333', lineHeight: 1.5 }}>
+                {visaData?.ktxOptions?.length > 0 ? (
+                  <div>
+                    {visaData.ktxOptions.map((opt: any, i: number) => (
+                      <div key={i} style={{ marginBottom: 2 }}>
+                        {opt.name}: {formatKRW(opt.priceKRWPerKy)} KRW/kỳ
+                      </div>
+                    ))}
+                  </div>
+                ) : koreanData?.dormitoryInfo}
+              </div>
+            </div>
+          )}
+        </div>
+        
+        {/* Website */}
+        {university?.website && (
+          <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #F0F0F0' }}>
+            <a href={university.website} target="_blank" rel="noopener noreferrer"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#003AB7', textDecoration: 'none', fontWeight: 500 }}>
+              <ExternalLink size={14} />
+              Website trường
+            </a>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const AdminControls = React.memo(({ university, onEditClick, onCostConfigClick }: { 
   university: any; 
   onEditClick: () => void;
   onCostConfigClick: () => void;
@@ -278,10 +521,10 @@ const AdminControls = ({ university, onEditClick, onCostConfigClick }: {
       </div>
     </div>
   );
-};
+});
 
-// Visa Selector Component (Chọn hệ du học)
-const VisaSelector = ({ 
+// Visa Selector Component (Chọn hệ du học) - Memoized
+const VisaSelector = React.memo(({ 
   visaSystems, 
   selectedVisa, 
   onSelect 
@@ -355,10 +598,10 @@ const VisaSelector = ({
       </div>
     </div>
   );
-};
+});
 
-// Admin Cost Summary Component
-const AdminCostSummary = ({ university }: { university: any }) => {
+// Admin Cost Summary Component - Memoized
+const AdminCostSummary = React.memo(({ university }: { university: any }) => {
   const visaSystems = university.koreanData?.visaSystemsDetail || {};
   const availableCount = ALL_VISA_SYSTEMS.filter(v => visaSystems[v.key]?.available).length;
   
@@ -412,10 +655,10 @@ const AdminCostSummary = ({ university }: { university: any }) => {
       </div>
     </div>
   );
-};
+});
 
-// Cost Controls Panel (Left side) - for Admin preview
-const AdminCostControls = ({
+// Cost Controls Panel (Left side) - for Admin preview - Memoized
+const AdminCostControls = React.memo(({
   topikLevel,
   setTopikLevel,
   ktxRoom,
@@ -428,14 +671,11 @@ const AdminCostControls = ({
   setFlight,
   visaData,
 }: any) => {
-  const ktxOptions = visaData?.ktxOptions || [];
+  const ktxOptions = visaData?.ktxOptions || EMPTY_ARRAY;
   const soTietKiemOptions = (visaData?.financialRequirement?.soTietKiemOptions?.length > 0)
     ? visaData.financialRequirement.soTietKiemOptions
-    : [
-        { label: 'Khu vực Gyeonggi', amountKRW: 10000000 },
-        { label: 'Ngoài Gyeonggi', amountKRW: 8000000 }
-      ];
-  const scholarships = visaData?.scholarships || [];
+    : DEFAULT_SO_TIET_KIEM_FALLBACK;
+  const scholarships = visaData?.scholarships || EMPTY_ARRAY;
   
   return (
     <div style={{
@@ -601,10 +841,10 @@ const AdminCostControls = ({
       </label>
     </div>
   );
-};
+});
 
-// Fee Breakdown Panel (Right side) - for Admin preview
-const AdminFeeBreakdown = ({
+// Fee Breakdown Panel (Right side) - for Admin preview - Memoized
+const AdminFeeBreakdown = React.memo(({
   commonFees: rawCommonFees,
   visaData,
   topikLevel,
@@ -615,7 +855,8 @@ const AdminFeeBreakdown = ({
 }: any) => {
   const [expanded, setExpanded] = useState(false);
   
-  const commonFees = normalizeCommonFees(rawCommonFees);
+  // Memoize commonFees normalization
+  const commonFees = useMemo(() => normalizeCommonFees(rawCommonFees), [rawCommonFees]);
   
   const hocTiengFee = commonFees.find((f: any) => f.id === 'hoc_tieng');
   const phiTuVanFee = commonFees.find((f: any) => f.id === 'phi_tu_van');
@@ -623,11 +864,11 @@ const AdminFeeBreakdown = ({
   const veMayBayFee = commonFees.find((f: any) => f.id === 've_may_bay');
   const ktxVNFee = commonFees.find((f: any) => f.id === 'ktx_vn');
   
-  const hocTieng = hocTiengFee?.amount || 13000000;
-  const phiTuVan = phiTuVanFee?.amount || 39000000;
-  const phiTrungTam = phiTrungTamFee?.amount || 11000000;
-  const veMayBay = flight ? (veMayBayFee?.amount || 8000000) : 0;
-  const ktxVNCost = ktxVN * (ktxVNFee?.amountPerMonth || 800000);
+  const hocTieng = hocTiengFee?.amount || DEFAULT_FEES_VND.hocTieng;
+  const phiTuVan = phiTuVanFee?.amount || DEFAULT_FEES_VND.phiTuVan;
+  const phiTrungTam = phiTrungTamFee?.amount || DEFAULT_FEES_VND.phiTrungTam;
+  const veMayBay = flight ? (veMayBayFee?.amount || DEFAULT_FEES_VND.veMayBay) : 0;
+  const ktxVNCost = ktxVN * (ktxVNFee?.amountPerMonth || DEFAULT_FEES_VND.ktxVNPerMonth);
   
   const applyFee = visaData?.applyFeeKRW || 0;
   const enrollmentFee = visaData?.enrollmentFeeKRW || 0;
@@ -637,16 +878,13 @@ const AdminFeeBreakdown = ({
   const selectedScholarship = scholarships.find((s: any) => s.topikLevel === topikLevel);
   const hocBongAmount = selectedScholarship && invoice > 0 ? -(invoice * selectedScholarship.discountPct / 100) : 0;
   
-  const ktxOptions = visaData?.ktxOptions || [];
+  const ktxOptions = visaData?.ktxOptions || EMPTY_ARRAY;
   const ktxCost = ktxRoom >= 0 && ktxOptions[ktxRoom] ? ktxOptions[ktxRoom].priceKRWPerKy : 0;
   
   const soTietKiemOptions = (visaData?.financialRequirement?.soTietKiemOptions?.length > 0)
     ? visaData.financialRequirement.soTietKiemOptions
-    : [
-        { label: 'Khu vực Gyeonggi', amountKRW: 10000000 },
-        { label: 'Ngoài Gyeonggi', amountKRW: 8000000 }
-      ];
-  const soTietKiemAmount = soTietKiemOptions[soTietKiem]?.amountKRW || 10000000;
+    : DEFAULT_SO_TIET_KIEM_FALLBACK;
+  const soTietKiemAmount = soTietKiemOptions[soTietKiem]?.amountKRW || DEFAULT_SO_TIET_KIEM_OPTIONS[0].amountKRW;
   
   const totalVND = hocTieng + phiTuVan + phiTrungTam + veMayBay + ktxVNCost;
   const totalKRW = applyFee + enrollmentFee + invoice + hocBongAmount + ktxCost + soTietKiemAmount;
@@ -668,7 +906,7 @@ const AdminFeeBreakdown = ({
           marginBottom: 16,
           textTransform: 'uppercase'
         }}>
-          Chi phí hệ {visaData?.name || 'D4-1'}
+          Chi phí hệ {visaData?.name || ''}
         </h3>
         
         <div style={{ fontSize: 11, fontWeight: 600, color: '#2D8C4E', marginBottom: 12 }}>
@@ -799,7 +1037,7 @@ const AdminFeeBreakdown = ({
         </div>
         
         <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 16 }}>
-          Đã bao gồm sổ TK · ~${Math.round(totalVND / 25500 + totalKRW / 1350).toLocaleString()}
+          Đã bao gồm sổ TK · ~${Math.round(totalVND / EXCHANGE_RATES.vndToUsd + totalKRW / EXCHANGE_RATES.krwToUsd).toLocaleString()}
         </div>
         
         {!selectedScholarship && scholarships.length > 0 && (
@@ -815,61 +1053,216 @@ const AdminFeeBreakdown = ({
       </div>
     </div>
   );
-};
+});
 
-// Hero Banner Component
-const AdminHeroBanner = ({ university }: { university: any }) => {
+// Hero Banner Component - Modern Konkuk Style - Memoized
+const AdminHeroBanner = React.memo(({ university }: { university: any }) => {
   const ranking = university.koreanData?.ranking || university.ranking || 'Top 100';
   const location = university.koreanData?.address || university.location || '';
+  const koreanName = university?.koreanData?.koreanName || university?.koreanName || '';
+  const logo = university?.koreanData?.logo || university?.logo;
+  const bannerImage = university?.koreanData?.bannerImage || university?.bannerImage || 'https://images.unsplash.com/photo-1562774053-701939374585?w=1200&q=80';
   const visaSystems = university.koreanData?.visaSystemsDetail || {};
   const availableCount = ALL_VISA_SYSTEMS.filter(v => visaSystems[v.key]?.available).length;
   
   return (
     <div style={{
-      background: '#fff',
-      borderRadius: 16,
-      padding: '32px 40px',
-      border: '1px solid #E8E8E8',
-      marginBottom: 24
+      position: 'relative',
+      borderRadius: 0,
+      marginBottom: 24,
+      overflow: 'hidden',
+      minHeight: 280,
+      display: 'flex',
+      flexDirection: 'column',
     }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <h1 style={{ fontSize: 28, fontWeight: 800, color: '#1A1A1A', marginBottom: 8 }}>
+      {/* Background Image with Blue Gradient Overlay */}
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundImage: `linear-gradient(135deg, rgba(0, 58, 183, 0.85) 0%, rgba(27, 63, 139, 0.9) 50%, rgba(0, 35, 120, 0.95) 100%), url(${bannerImage})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        zIndex: 1
+      }} />
+      
+      {/* Top Navigation Bar */}
+      <div style={{
+        position: 'relative',
+        zIndex: 2,
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '16px 40px',
+        borderBottom: '1px solid rgba(255,255,255,0.1)'
+      }}>
+        {/* TBT Group Logo */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12
+        }}>
+          <div style={{
+            width: 40,
+            height: 40,
+            background: '#fff',
+            borderRadius: 8,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontWeight: 700,
+            color: '#003AB7',
+            fontSize: 18
+          }}>
+            TBT
+          </div>
+          <span style={{
+            color: '#fff',
+            fontSize: 16,
+            fontWeight: 600,
+            letterSpacing: 1
+          }}>
+            TBT GROUP - Admin
+          </span>
+        </div>
+        
+        {/* Admin Badge */}
+        <div style={{
+          background: 'rgba(255,255,255,0.2)',
+          color: '#fff',
+          padding: '8px 16px',
+          borderRadius: 20,
+          fontSize: 13,
+          fontWeight: 500,
+          backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(255,255,255,0.3)'
+        }}>
+          Quản trị viên
+        </div>
+      </div>
+      
+      {/* Main Hero Content */}
+      <div style={{
+        position: 'relative',
+        zIndex: 2,
+        flex: 1,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '40px 60px',
+        gap: 40
+      }}>
+        {/* Left: University Info */}
+        <div style={{ flex: 1 }}>
+          <h1 style={{
+            fontSize: 48,
+            fontWeight: 800,
+            color: '#fff',
+            marginBottom: 8,
+            textTransform: 'uppercase',
+            letterSpacing: 2,
+            textShadow: '0 2px 20px rgba(0,0,0,0.3)'
+          }}>
             {university.name}
           </h1>
-          <p style={{ fontSize: 14, color: '#666', marginBottom: 12 }}>
-            {location}
-          </p>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{
-              padding: '6px 14px',
-              borderRadius: 20,
-              fontSize: 13,
-              fontWeight: 600,
-              background: '#FEF3C7',
-              color: '#92400E'
+          
+          {koreanName && (
+            <p style={{
+              fontSize: 24,
+              color: 'rgba(255,255,255,0.9)',
+              marginBottom: 20,
+              fontWeight: 500
             }}>
-              {ranking}
+              {koreanName}
+            </p>
+          )}
+          
+          {/* Badges Row */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 16,
+            flexWrap: 'wrap'
+          }}>
+            {ranking && (
+              <span style={{
+                fontSize: 14,
+                fontWeight: 600,
+                color: '#fff',
+                background: 'rgba(255,255,255,0.2)',
+                padding: '8px 16px',
+                borderRadius: 20,
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(255,255,255,0.3)'
+              }}>
+                {ranking}
+              </span>
+            )}
+            
+            <span style={{
+              fontSize: 14,
+              color: 'rgba(255,255,255,0.9)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6
+            }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/>
+                <circle cx="12" cy="10" r="3"/>
+              </svg>
+              {location}
             </span>
+            
             <span style={{
+              fontSize: 14,
+              color: '#fff',
+              background: availableCount > 0 ? 'rgba(45, 140, 78, 0.8)' : 'rgba(239, 68, 68, 0.8)',
               padding: '6px 14px',
               borderRadius: 20,
-              fontSize: 13,
-              fontWeight: 600,
-              background: availableCount > 0 ? '#D1FAE5' : '#FEE2E2',
-              color: availableCount > 0 ? '#065F46' : '#991B1B'
+              fontWeight: 500
             }}>
-              {availableCount > 0 ? `${availableCount} hệ available` : 'Chưa cấu hình'}
+              {availableCount > 0 ? `${availableCount} hệ đã cấu hình` : 'Chưa cấu hình'}
             </span>
           </div>
+        </div>
+        
+        {/* Right: University Logo */}
+        <div style={{
+          width: 180,
+          height: 180,
+          borderRadius: '50%',
+          background: '#fff',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+          border: '4px solid rgba(255,255,255,0.5)',
+          flexShrink: 0
+        }}>
+          {logo ? (
+            <img 
+              src={logo} 
+              alt={university?.name}
+              style={{
+                width: 140,
+                height: 140,
+                objectFit: 'contain',
+                borderRadius: '50%'
+              }}
+            />
+          ) : (
+            <span style={{ fontSize: 60 }}>🏫</span>
+          )}
         </div>
       </div>
     </div>
   );
-};
+});
 
-// Additional Information Section (Missing fields from Detail.txt)
-const AdditionalInfoSection = ({ koreanData }: { koreanData: any }) => {
+// Additional Information Section (Missing fields from Detail.txt) - Memoized
+const AdditionalInfoSection = React.memo(({ koreanData }: { koreanData: any }) => {
   const supportPolicies = koreanData?.supportPolicies || [];
   const refundPolicy = koreanData?.refundPolicy;
   const admissionsType = koreanData?.admissionsType;
@@ -937,7 +1330,7 @@ const AdditionalInfoSection = ({ koreanData }: { koreanData: any }) => {
       </div>
     </div>
   );
-};
+});
 
 // Main Admin Component
 export default function UniversityDetailAdmin() {
@@ -951,31 +1344,46 @@ export default function UniversityDetailAdmin() {
 
   const university = universities.find(uni => uni.id === id);
   
-  // Extract and normalize visa systems data - useMemo to prevent recreating on every render
-  const rawVisaSystems = university?.koreanData?.visaSystemsDetail || {};
+  // Use stable empty object reference to prevent unnecessary re-renders
+  const rawVisaSystems = university?.koreanData?.visaSystemsDetail || EMPTY_OBJECT;
   const visaSystems = useMemo(() => convertVisaSystemsToCamelCase(rawVisaSystems), [rawVisaSystems]);
   const rawCommonFees = (university?.koreanData as any)?.commonFeesVND || (university?.koreanData as any)?.common_fees_vnd;
 
-  // State for interactive controls
-  const [selectedVisa, setSelectedVisa] = useState(() => {
-    const first = ALL_VISA_SYSTEMS.find(v => visaSystems[v.key]?.available);
-    return first?.key || 'D4-1';
-  });
+  // Compute available systems for useState initialization
+  const availableVisaKeys = useMemo(() => 
+    ALL_VISA_SYSTEMS.filter(v => visaSystems[v.key]?.available).map(v => v.key),
+  [visaSystems]);
+
+  // State for interactive controls - initialize with empty string, set in effect
+  const [selectedVisa, setSelectedVisa] = useState('');
+  const hasSetInitialVisa = useRef(false);
+  
+  // Set initial selected visa when data loads (only once)
+  useEffect(() => {
+    if (!hasSetInitialVisa.current && availableVisaKeys.length > 0) {
+      setSelectedVisa(availableVisaKeys[0]);
+      hasSetInitialVisa.current = true;
+    }
+  }, [availableVisaKeys]);
   
   const [topikLevel, setTopikLevel] = useState(0);
   const [ktxRoom, setKtxRoom] = useState(0);
   const [soTietKiem, setSoTietKiem] = useState(0);
   const [ktxVN, setKtxVN] = useState(0);
   const [flight, setFlight] = useState(true);
+  const prevVisaRef = useRef<string>('');
   
-  // Reset when visa changes
+  // Reset when visa changes (only when visa actually changes, not on every render)
   useEffect(() => {
-    setTopikLevel(0);
-    const visaData = visaSystems[selectedVisa];
-    if (visaData?.ktxOptions && visaData.ktxOptions.length > 0) {
-      setKtxRoom(0);
-    } else {
-      setKtxRoom(-1);
+    if (selectedVisa && selectedVisa !== prevVisaRef.current) {
+      setTopikLevel(0);
+      const visaData = visaSystems[selectedVisa];
+      if (visaData?.ktxOptions && visaData.ktxOptions.length > 0) {
+        setKtxRoom(0);
+      } else {
+        setKtxRoom(-1);
+      }
+      prevVisaRef.current = selectedVisa;
     }
   }, [selectedVisa, visaSystems]);
 
@@ -984,7 +1392,8 @@ export default function UniversityDetailAdmin() {
     if (id) {
       fetchUniversity(id);
     }
-  }, [id, fetchUniversity]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps  
+  }, [id]);
 
   // Redirect non-admin users
   if (!university) {
@@ -1004,24 +1413,53 @@ export default function UniversityDetailAdmin() {
     return null;
   }
 
-  const visaData = visaSystems[selectedVisa];
-  const availableCount = ALL_VISA_SYSTEMS.filter(v => visaSystems[v.key]?.available).length;
+  // Memoize availableCount to prevent recalculation on every render
+  const availableCount = useMemo(() => 
+    ALL_VISA_SYSTEMS.filter(v => visaSystems[v.key]?.available).length,
+  [visaSystems]);
+
+  // Memoize visaData for current selection
+  const visaData = useMemo(() => visaSystems[selectedVisa], [visaSystems, selectedVisa]);
+
+  // Memoize event handlers to prevent child re-renders
+  const handleEditClick = useCallback(() => setShowEditModal(true), []);
+  const handleCostConfigClick = useCallback(() => setShowCostConfigModal(true), []);
+  const handleCloseEditModal = useCallback(() => setShowEditModal(false), []);
+  const handleCloseCostModal = useCallback(() => setShowCostConfigModal(false), []);
+  const handleSaveEditModal = useCallback(async (data: any) => {
+    if (university) {
+      await updateUniversity(university.id, data);
+      setShowEditModal(false);
+      if (id) fetchUniversity(id);
+      toast.success('Cập nhật thông tin trường thành công!');
+    }
+  }, [university, id]);
 
   return (
-    <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh', padding: '24px 0' }}>
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 20px' }}>
+    <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
+      {/* Full-width Hero */}
+      <AdminHeroBanner university={university} />
+      
+      {/* Contained Content */}
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 20px' }}>
         
         {/* Admin Controls */}
         <AdminControls 
           university={university}
-          onEditClick={() => setShowEditModal(true)}
-          onCostConfigClick={() => setShowCostConfigModal(true)}
+          onEditClick={handleEditClick}
+          onCostConfigClick={handleCostConfigClick}
         />
 
-        {/* Hero Banner */}
-        <AdminHeroBanner university={university} />
+        {/* General Info Card + Summary - Same layout as student page */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 24, marginBottom: 24 }}>
+          {/* LEFT: General Information Card */}
+          <AdminGeneralInfoCards university={university} visaSystems={visaSystems} />
+          
+          {/* RIGHT: Admin Cost Summary */}
+          <AdminCostSummary university={university} />
+        </div>
 
-        {/* Visa System Selector - Chọn hệ du học */}
+        {/* Visa System Selector */}
         {availableCount > 0 && (
           <VisaSelector 
             visaSystems={visaSystems}
@@ -1030,80 +1468,67 @@ export default function UniversityDetailAdmin() {
           />
         )}
 
-        {/* Main Content Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 24 }}>
-          
-          {/* LEFT: Cost Controls & Fee Breakdown */}
-          {availableCount > 0 ? (
-            <div style={{ display: 'grid', gridTemplateColumns: '360px 1fr', gap: 24 }}>
-              <AdminCostControls
-                topikLevel={topikLevel}
-                setTopikLevel={setTopikLevel}
-                ktxRoom={ktxRoom}
-                setKtxRoom={setKtxRoom}
-                soTietKiem={soTietKiem}
-                setSoTietKiem={setSoTietKiem}
-                ktxVN={ktxVN}
-                setKtxVN={setKtxVN}
-                flight={flight}
-                setFlight={setFlight}
-                visaData={visaData}
-              />
-              <AdminFeeBreakdown
-                commonFees={rawCommonFees}
-                visaData={visaData}
-                topikLevel={topikLevel}
-                ktxRoom={ktxRoom}
-                soTietKiem={soTietKiem}
-                ktxVN={ktxVN}
-                flight={flight}
-              />
+        {/* Main Content Grid - Cost Controls & Fee Breakdown */}
+        {availableCount > 0 ? (
+          <div style={{ display: 'grid', gridTemplateColumns: '360px 1fr', gap: 24 }}>
+            <AdminCostControls
+              topikLevel={topikLevel}
+              setTopikLevel={setTopikLevel}
+              ktxRoom={ktxRoom}
+              setKtxRoom={setKtxRoom}
+              soTietKiem={soTietKiem}
+              setSoTietKiem={setSoTietKiem}
+              ktxVN={ktxVN}
+              setKtxVN={setKtxVN}
+              flight={flight}
+              setFlight={setFlight}
+              visaData={visaData}
+            />
+            <AdminFeeBreakdown
+              commonFees={rawCommonFees}
+              visaData={visaData}
+              topikLevel={topikLevel}
+              ktxRoom={ktxRoom}
+              soTietKiem={soTietKiem}
+              ktxVN={ktxVN}
+              flight={flight}
+            />
+          </div>
+        ) : (
+          <div style={{
+            background: '#fff',
+            borderRadius: 16,
+            padding: 40,
+            border: '1px solid #E8E8E8',
+            textAlign: 'center'
+          }}>
+            <div style={{ fontSize: 18, color: '#666', marginBottom: 16 }}>
+              Chưa có hệ visa nào được cấu hình
             </div>
-          ) : (
-            <div style={{
-              background: '#fff',
-              borderRadius: 16,
-              padding: 40,
-              border: '1px solid #E8E8E8',
-              textAlign: 'center'
-            }}>
-              <div style={{ fontSize: 18, color: '#666', marginBottom: 16 }}>
-                Chưa có hệ visa nào được cấu hình
-              </div>
-              <Button 
-                onClick={() => setShowCostConfigModal(true)}
-                style={{
-                  background: DESIGN_TOKENS.colors.primaryBlue,
-                  color: '#fff',
-                  padding: '12px 24px',
-                  borderRadius: 8
-                }}
-              >
-                Cấu hình chi phí ngay
-              </Button>
-            </div>
-          )}
-
-          {/* RIGHT: Admin Cost Summary */}
-          <AdminCostSummary university={university} />
-
-        </div>
+            <Button 
+              onClick={() => setShowCostConfigModal(true)}
+              style={{
+                background: DESIGN_TOKENS.colors.primaryBlue,
+                color: '#fff',
+                padding: '12px 24px',
+                borderRadius: 8
+              }}
+            >
+              Cấu hình chi phí ngay
+            </Button>
+          </div>
+        )}
         
         {/* Additional Information Section - Missing fields from Detail.txt */}
         <AdditionalInfoSection koreanData={university?.koreanData} />
       </div>
 
       {/* Modals */}
-      {showEditModal && university && (
+        {showEditModal && university && (
         <EditUniversityModal
           university={university}
-          onClose={() => setShowEditModal(false)}
-          onSave={async (data) => {
-            await updateUniversity(university.id, data);
-            setShowEditModal(false);
-            if (id) fetchUniversity(id);
-            toast.success('Cập nhật thông tin trường thành công!');
-          }}
+          onClose={handleCloseEditModal}
+          onSave={handleSaveEditModal}
         />
       )}
 
@@ -1155,7 +1580,7 @@ export default function UniversityDetailAdmin() {
                 setShowCostConfigModal(false);
                 if (id) fetchUniversity(id);
               }}
-              onCancel={() => setShowCostConfigModal(false)}
+              onCancel={handleCloseCostModal}
             />
           </div>
         </div>

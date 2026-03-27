@@ -5,7 +5,7 @@ import { useCurrency } from '../context/CurrencyContext';
 import { useLanguage } from '../context/LanguageContext';
 import { MapPin, CheckCircle, Lock, Search, Star, UserPlus, GraduationCap } from 'lucide-react';
 import StudentInfoSidebar from '../components/StudentInfoSidebar';
-import { getAllTrackingCodes } from '../services/trackingCodeService';
+import { getAllTrackingCodes, getTrackingCodesByEmail } from '../services/trackingCodeSqliteService';
 
 export default function StudentHome() {
   const { universities, registrations, user } = useApp();
@@ -16,26 +16,20 @@ export default function StudentHome() {
   const [currentPage, setCurrentPage] = React.useState(1);
   const itemsPerPage = 12;
 
-  // Load student profile from tracking codes or fallback to localStorage defaults
-  const [studentProfile, setStudentProfile] = React.useState(() => {
-    const saved = localStorage.getItem('student_profile');
-    if (saved) {
-      return JSON.parse(saved);
-    }
-    return {
-      name: user?.name || "Nguyễn Văn A",
-      email: user?.email || "student@example.com",
-      phone: user?.phone || "+84-123-456-789",
-      university: "Konkuk University",
-      program: "Du học D4-1",
-      startDate: "09/2023",
-      status: "active",
-      gpa: "3.2",
-      totalCost: "0 ₫",
-      remainingCost: "0 ₫",
-      nextPayment: "15/03/2025",
-      progress: 65
-    };
+  // Load student profile from tracking codes
+  const [studentProfile, setStudentProfile] = React.useState({
+    name: user?.name || "Nguyễn Văn A",
+    email: user?.email || "student@example.com",
+    phone: user?.phone || "+84-123-456-789",
+    university: "Konkuk University",
+    program: "Du học D4-1",
+    startDate: "09/2023",
+    status: "active",
+    gpa: "3.2",
+    totalCost: "0 ₫",
+    remainingCost: "0 ₫",
+    nextPayment: "15/03/2025",
+    progress: 65
   });
 
   // Sync with tracking code data on mount
@@ -44,28 +38,27 @@ export default function StudentHome() {
       if (!user?.email) return;
       
       try {
-        const codes = await getAllTrackingCodes();
-        // Find tracking code for current user
-        const userCode = codes.find(code => code.studentEmail === user.email);
+        // Use getTrackingCodesByEmail to find user's tracking code
+        const userCodes = await getTrackingCodesByEmail(user.email);
+        const userCode = userCodes[0]; // Get most recent
         
         if (userCode) {
           const updatedProfile = {
-            name: userCode.studentName,
-            email: userCode.studentEmail,
-            phone: userCode.studentPhone,
-            university: userCode.desiredUniversityName || 'Chưa chọn',
-            program: `Du học ${userCode.visaSystem}`,
-            startDate: new Date(userCode.createdAt).toLocaleDateString('vi-VN', { month: '2-digit', year: 'numeric' }),
-            status: userCode.status === 'approved' ? 'active' : 'pending',
+            name: userCode.student_name || user?.name || "Nguyễn Văn A",
+            email: userCode.student_email || user?.email || "student@example.com",
+            phone: userCode.student_phone || user?.phone || "+84-123-456-789",
+            university: userCode.desired_university_name || 'Chưa chọn',
+            program: `Du học ${userCode.visa_system}`,
+            startDate: new Date(userCode.created_at || Date.now()).toLocaleDateString('vi-VN', { month: '2-digit', year: 'numeric' }),
+            status: userCode.status === 'active' ? 'active' : 'pending',
             gpa: "3.2",
-            totalCost: formatFrom(userCode.initialTotalCostVnd || 0, 'VND'),
-            remainingCost: formatFrom(userCode.initialTotalCostVnd || 0, 'VND'),
+            totalCost: formatFrom(userCode.initial_total_cost_vnd || 0, 'VND'),
+            remainingCost: formatFrom(userCode.initial_total_cost_vnd || 0, 'VND'),
             nextPayment: "15/03/2025",
-            progress: userCode.status === 'approved' ? 65 : 25
+            progress: userCode.status === 'active' ? 65 : 25
           };
           
           setStudentProfile(updatedProfile);
-          localStorage.setItem('student_profile', JSON.stringify(updatedProfile));
         }
       } catch (error) {
         console.error('Failed to sync with tracking data:', error);
@@ -75,10 +68,9 @@ export default function StudentHome() {
     syncWithTrackingData();
   }, [user, formatFrom]);
 
-  // Update student profile and sync with localStorage
+  // Update student profile
   const handleStudentUpdate = (updatedStudent: any) => {
     setStudentProfile(updatedStudent);
-    localStorage.setItem('student_profile', JSON.stringify(updatedStudent));
     // Also update user context if needed
     if (user) {
       // Sync with user context

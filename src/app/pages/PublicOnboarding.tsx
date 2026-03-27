@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router';
 import { useApp, University } from '../context/AppContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useLanguage } from '../context/LanguageContext';
-import { generateUniqueTrackingCode, saveTrackingCode } from '../services/trackingCodeService';
+import { generateUniqueTrackingCode } from '../services/trackingCodeService';
+import { createTrackingCode } from '../services/trackingCodeSqliteService';
 import TBTLogo from '../components/TBTLogo';
 import Statistics from '../components/Statistics';
 import UniversityPartners from '../components/UniversityPartners';
@@ -238,22 +239,23 @@ export default function PublicOnboarding() {
       notes: `TOPIK Level: ${topikLevel}, System: ${selectedSystem}`
     });
 
-    // Save tracking code to storage
-    const saved = await saveTrackingCode({
+    // Save tracking code to SQLite database
+    const savedCode = await createTrackingCode({
       code: trackingCode,
-      studentEmail: generatedEmail,
-      studentName: fullName,
-      studentPhone: phoneNumber,
-      desiredUniversityId: desiredUniversity,
-      desiredUniversityName: selectedUni?.name || '',
-      visaSystem: selectedSystem,
-      topikLevel: topikLevel.toString(),
-      ieltsScore: '',
-      initialTotalCostVnd: initialCost,
+      student_email: generatedEmail,
+      student_name: fullName,
+      student_phone: phoneNumber,
+      desired_university_id: desiredUniversity,
+      desired_university_name: selectedUni?.name || '',
+      visa_system: selectedSystem,
+      topik_level: topikLevel.toString(),
+      ielts_score: '',
+      initial_total_cost_vnd: Math.round(initialCost),
+      status: 'pending',
       notes: `TOPIK Level: ${topikLevel}, System: ${selectedSystem}`
     });
 
-    if (!saved) {
+    if (!savedCode) {
       console.error('Failed to save tracking code');
       toast.error(language === 'vi' ? 'Lỗi lưu mã theo dõi' : 'Failed to save tracking code');
       return;

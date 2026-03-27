@@ -1,7 +1,15 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { topUniversities } from '../data/top-universities';
 import { initDatabase } from '../services/sqliteDatabase';
-import { getAllUniversities, saveUniversity, bulkInsertUniversities } from '../services/universityService';
+import {
+  saveContactRequest,
+  saveRegistration,
+  getContactRequests,
+  getRegistrations,
+  updateRegistrationStatus,
+  deleteRegistration
+} from '../services/sqliteDatabase';
+import { getAllUniversities, saveUniversity, bulkInsertUniversities, getUniversityById } from '../services/universityService';
 import {
   University,
   User,
@@ -44,7 +52,7 @@ interface AppContextType {
     accommodation: boolean;
     insurance: boolean;
     additional: boolean[];
-  }) => void;
+  }, totalCostVND?: number) => void;
   updateRegistration: (universityId: string, studentEmail: string, selectedFees: {
     visa: boolean;
     accommodation: boolean;
@@ -59,6 +67,18 @@ interface AppContextType {
   addStudentOnboarding: (data: Omit<StudentOnboardingData, 'id' | 'submittedAt' | 'status'>) => void;
   updateStudentOnboardingStatus: (id: string, status: StudentOnboardingData['status']) => void;
   deleteStudentOnboarding: (id: string) => void;
+  // Contact requests
+  saveContactRequest: (data: {
+    id: string;
+    studentName: string;
+    studentPhone: string;
+    studentEmail: string;
+    note: string;
+    universityId?: string;
+    universityName?: string;
+    visaSystem?: string;
+  }) => void;
+  getContactRequests: (universityId?: string) => any[];
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -225,21 +245,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const fetchUniversity = async (id: string) => {
+  const fetchUniversity = useCallback(async (id: string) => {
     try {
-      const response = await fetch(`/api/universities/${id}`);
-      const data = await response.json();
-      const parsed = parseUniversity(data);
+      // Fetch fresh data from SQLite database
+      const dbUniversity = await getUniversityById(id);
       
-      // Update the specific university in the list
-      updateUniversity(id, parsed);
+      if (!dbUniversity) {
+        console.error('University not found in database:', id);
+        return null;
+      }
+      
+      const parsed = parseUniversity(dbUniversity);
+      
+      // Update the specific university in the list with fresh data
+      setUniversities(prev =>
+        prev.map(uni => uni.id === id ? parsed : uni)
+      );
       
       return parsed;
     } catch (error) {
-      console.error('Error fetching university:', error);
+      console.error('Error fetching university from database:', error);
       return null;
     }
-  };
+  }, []);
 
   const addUniversities = async (newUniversities: University[]) => {
     const parsed = newUniversities.map(parseUniversity);
@@ -279,12 +307,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
     accommodation: boolean;
     insurance: boolean;
     additional: boolean[];
-  }) => {
+  }, totalCostVND?: number) => {
+    const id = Date.now().toString();
+    
     if (!registrations.find(r => r.universityId === universityId)) {
       setRegistrations(prev => [
         ...prev,
         { universityId, registeredAt: new Date().toISOString(), studentEmail: user?.email || '', selectedFees }
       ]);
+    }
+    
+    // Save to SQLite
+    if (dbInitialized && selectedFees) {
+      try {
+        saveRegistration({
+          id,
+          studentId: user?.email,
+          universityId,
+          selectedFees,
+          totalCostVND: totalCostVND || 0
+        });
+      } catch (error) {
+        console.error('Failed to save registration to SQLite:', error);
+      }
     }
   };
 
@@ -366,6 +411,38 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setStudentOnboardings(prev => prev.filter(onboarding => onboarding.id !== id));
   };
 
+  // Contact requests functions
+  const handleSaveContactRequest = (data: {
+    id: string;
+    studentName: string;
+    studentPhone: string;
+    studentEmail: string;
+    note: string;
+    universityId?: string;
+    universityName?: string;
+    visaSystem?: string;
+  }) => {
+    if (dbInitialized) {
+      try {
+        saveContactRequest(data);
+      } catch (error) {
+        console.error('Failed to save contact request to SQLite:', error);
+      }
+    }
+  };
+
+  const handleGetContactRequests = (universityId?: string) => {
+    if (dbInitialized) {
+      try {
+        return getContactRequests(universityId);
+      } catch (error) {
+        console.error('Failed to get contact requests from SQLite:', error);
+        return [];
+      }
+    }
+    return [];
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -389,7 +466,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         studentOnboardings,
         addStudentOnboarding,
         updateStudentOnboardingStatus,
-        deleteStudentOnboarding
+        deleteStudentOnboarding,
+        saveContactRequest: handleSaveContactRequest,
+        getContactRequests: handleGetContactRequests
       }}
     >
       {children}

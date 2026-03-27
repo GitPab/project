@@ -1,14 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../context/AuthContext';
+import { initDatabase } from '../services/sqliteDatabase';
 import { Mail, Lock, ArrowLeft, GraduationCap } from 'lucide-react';
 
 export default function Login() {
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [dbStatus, setDbStatus] = useState<'init'|'loading'|'ready'|'error'>('init');
   const { login, user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+
+  // Initialize database on mount
+  useEffect(() => {
+    const initDb = async () => {
+      setDbStatus('loading');
+      try {
+        await initDatabase();
+        setDbStatus('ready');
+      } catch (err: any) {
+        console.error('Database init error:', err);
+        setDbStatus('error');
+        setError('Database error: ' + (err.message || 'Unknown error'));
+      }
+    };
+    initDb();
+  }, []);
 
   // Already logged in → auto redirect based on role
   useEffect(() => {
@@ -104,12 +122,20 @@ export default function Login() {
                 <div className="text-red-500 text-sm text-center">{error}</div>
               )}
 
+              {dbStatus === 'loading' && (
+                <div className="text-blue-600 text-sm text-center">Initializing database...</div>
+              )}
+
+              {dbStatus === 'error' && (
+                <div className="text-red-500 text-sm text-center">Database failed to load. Check console for details.</div>
+              )}
+
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || dbStatus !== 'ready'}
                 className="w-full bg-[#003AB7] text-white py-3 rounded-lg font-semibold hover:bg-[#002A8F] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
+                {loading ? 'Đang đăng nhập...' : dbStatus === 'ready' ? 'Đăng nhập' : 'Loading database...'}
               </button>
             </form>
 

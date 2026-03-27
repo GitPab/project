@@ -127,7 +127,7 @@ export default function EditUniversityModal({
       admissionsType: university?.koreanData?.admissionsType || '',
       partTimeInfo: university?.koreanData?.partTimeInfo || '',
     }),
-    [university]
+    [university?.id] // Only recompute when university ID changes
   );
 
   const {
@@ -199,18 +199,24 @@ export default function EditUniversityModal({
     return convertAmount(total, currency, 'KRW');
   }, [selectedVisaSystem, currency, convertAmount]);
 
+  // Watch individual values instead of using watch() in useMemo
+  const generalTuition = watch('generalTuition') || 0;
+  const visaFee = watch('visaFee') || 0;
+  const accommodationFee = watch('accommodationFee') || 0;
+  const insuranceFee = watch('insuranceFee') || 0;
+
   const totalCost = useMemo(() => {
     if (isKorean && selectedVisaSystem) {
       return fixedCostsTotal + visaSystemCostTotal + addonsCostsTotal;
     }
     const traditional =
-      (watch('generalTuition') || 0) +
-      (watch('visaFee') || 0) +
-      (watch('accommodationFee') || 0) +
-      (watch('insuranceFee') || 0) +
+      generalTuition +
+      visaFee +
+      accommodationFee +
+      insuranceFee +
       additionalFeesTotal;
     return traditional;
-  }, [isKorean, selectedVisaSystem, fixedCostsTotal, visaSystemCostTotal, addonsCostsTotal, additionalFeesTotal, watch]);
+  }, [isKorean, selectedVisaSystem, fixedCostsTotal, visaSystemCostTotal, addonsCostsTotal, additionalFeesTotal, generalTuition, visaFee, accommodationFee, insuranceFee]);
 
   // Lock body scroll
   useEffect(() => {
@@ -220,64 +226,78 @@ export default function EditUniversityModal({
     };
   }, []);
 
-  // Reset form when university changes
+  // Reset form only once when university changes (on modal open)
   useEffect(() => {
-    reset(defaultValues);
-    setSelectedVisaType(defaultValues.selectedVisaType || 'D4-1');
-    setEnabledVisaSystems(new Set(currentVisaSystems.map(v => v.visaType)));
-  }, [university, defaultValues, reset, currentVisaSystems]);
-
-  const handleSave = handleSubmit((values) => {
-    const topVisaLabel = values.topTier === 'Top1' ? 'Top 1' : values.topTier === 'Top2' ? 'Top 2' : 'Top 3';
-    const enabledVisaSystemsData = currentVisaSystems.filter(vs => enabledVisaSystems.has(vs.visaType));
-
-    const payload: Partial<University> = {
-      name: values.name,
-      koreanName: values.koreanName,
-      region: values.region,
-      country: 'South Korea',
-      overview: values.overview || '',
-      koreanData: {
-        ...(university?.koreanData || { isKoreanUniversity: true }),
-        isKoreanUniversity: isKorean ?? true,
-        address: values.region || university?.koreanData?.address,
-        topTier: values.topTier,
-        topVisa: topVisaLabel,
-        visaSystems: enabledVisaSystemsData.length > 0 ? enabledVisaSystemsData : undefined,
-        // Missing fields from Detail.txt
-        supportPolicies: values.supportPolicies || [],
-        refundPolicy: values.refundPolicy || '',
-        admissionsType: values.admissionsType || '',
-        partTimeInfo: values.partTimeInfo || '',
-      },
-    };
-
-    if (isKorean) {
-      // ✅ FIX 2: cast currency field when saving
-      payload.fixedCosts = (values.fixedCosts || []).map(c => ({
-        ...c,
-        currency: c.currency as Currency | undefined,
-      }));
-      payload.optionalAddons = (values.optionalAddons || []).map(addon => ({
-        id: addon.id,
-        name: addon.name,
-        nameVi: addon.name,
-        type: (addon.type || 'other') as 'dorm-vn' | 'dorm-kr' | 'flight' | 'savings' | 'scholarship' | 'group' | 'other',
-        amount: addon.amount,
-        selectable: true,
-      }));
-    } else {
-      payload.generalTuition = values.generalTuition || 0;
-      payload.visaFee = values.visaFee || 0;
-      payload.accommodationFee = values.accommodationFee || 0;
-      payload.insuranceFee = values.insuranceFee || 0;
-      payload.additionalFees = values.additionalFees || [];
+    if (university) {
+      reset(defaultValues);
+      setSelectedVisaType(defaultValues.selectedVisaType || 'D4-1');
+      setEnabledVisaSystems(new Set(currentVisaSystems.map(v => v.visaType)));
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [university?.id]);
 
-    onSave(payload);
-    onClose();
-    toast.success(isEditMode ? 'Đã cập nhật trường' : 'Đã thêm trường');
+  const handleSave = handleSubmit(async (values) => {
+    console.log('=== handleSave CALLED ===');
+    console.log('Form values:', values);
+    try {
+      const topVisaLabel = values.topTier === 'Top1' ? 'Top 1' : values.topTier === 'Top2' ? 'Top 2' : 'Top 3';
+      const enabledVisaSystemsData = currentVisaSystems.filter(vs => enabledVisaSystems.has(vs.visaType));
+
+      const payload: Partial<University> = {
+        name: values.name,
+        koreanName: values.koreanName,
+        region: values.region,
+        country: 'South Korea',
+        overview: values.overview || '',
+        koreanData: {
+          ...(university?.koreanData || { isKoreanUniversity: true }),
+          isKoreanUniversity: isKorean ?? true,
+          address: values.region || university?.koreanData?.address,
+          topTier: values.topTier,
+          topVisa: topVisaLabel,
+          visaSystems: enabledVisaSystemsData.length > 0 ? enabledVisaSystemsData : undefined,
+          supportPolicies: values.supportPolicies || [],
+          refundPolicy: values.refundPolicy || '',
+          admissionsType: values.admissionsType || '',
+          partTimeInfo: values.partTimeInfo || '',
+        },
+      };
+
+      if (isKorean) {
+        payload.fixedCosts = (values.fixedCosts || []).map(c => ({
+          ...c,
+          currency: c.currency as Currency | undefined,
+        }));
+        payload.optionalAddons = (values.optionalAddons || []).map(addon => ({
+          id: addon.id,
+          name: addon.name,
+          nameVi: addon.name,
+          type: (addon.type || 'other') as 'dorm-vn' | 'dorm-kr' | 'flight' | 'savings' | 'scholarship' | 'group' | 'other',
+          amount: addon.amount,
+          selectable: true,
+        }));
+      } else {
+        payload.generalTuition = values.generalTuition || 0;
+        payload.visaFee = values.visaFee || 0;
+        payload.accommodationFee = values.accommodationFee || 0;
+        payload.insuranceFee = values.insuranceFee || 0;
+        payload.additionalFees = values.additionalFees || [];
+      }
+
+      console.log('Calling onSave with payload:', payload);
+      await onSave(payload);
+      console.log('onSave completed successfully');
+      onClose();
+      toast.success(isEditMode ? 'Đã cập nhật trường' : 'Đã thêm trường');
+    } catch (error) {
+      console.error('Error in handleSave:', error);
+      toast.error('Có lỗi xảy ra khi lưu: ' + (error as Error).message);
+    }
   });
+  
+  // Debug: log form errors
+  console.log('Form errors:', errors);
+  console.log('isSubmitting:', isSubmitting);
 
   const allVisaLabels = VISA_SYSTEMS.reduce<Record<string, { label: string; name: string }>>(
     (acc, visa) => {
@@ -373,7 +393,7 @@ export default function EditUniversityModal({
 
         {/* Scrollable content */}
         <div style={{ padding: 24 }}>
-          <form onSubmit={handleSave} className="space-y-6">
+          <form onSubmit={(e) => { console.log('Form onSubmit triggered'); handleSave(e); }} className="space-y-6">
           {/* Basic Information */}
           <div className="space-y-4">
             <h3 className="text-sm font-semibold text-slate-900">Thông tin cơ bản</h3>
@@ -569,9 +589,12 @@ export default function EditUniversityModal({
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => {
-                    console.log('Opening cost form for:', university?.name);
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('Button clicked! Opening cost form for:', university?.name);
                     setShowCostForm(true);
+                    console.log('setShowCostForm called with true');
                   }}
                 >
                   <Plus className="w-4 h-4 mr-2" />
@@ -741,10 +764,18 @@ export default function EditUniversityModal({
             display: 'flex', 
             justifyContent: 'space-between'
           }}>
-            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+            <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); console.log('Cancel clicked'); onClose(); }} disabled={isSubmitting}>
               Hủy
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button 
+              type="submit" 
+              disabled={isSubmitting} 
+              onClick={(e) => {
+                console.log('Save button clicked');
+                console.log('isSubmitting:', isSubmitting);
+                console.log('Form errors:', errors);
+              }}
+            >
               {isEditMode ? 'Lưu thay đổi' : 'Thêm trường'}
             </Button>
           </div>

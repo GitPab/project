@@ -1,8 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router';
 import { useApp } from '../context/AppContext';
-import { ChevronDown, ChevronUp, Info } from 'lucide-react';
+import { useParams, useNavigate } from 'react-router';
+import { ChevronDown, ChevronUp, Info, MapPin, GraduationCap, Building2, ExternalLink } from 'lucide-react';
 import { Button } from '../components/ui/button';
+import {
+  DEFAULT_FEES_VND,
+  DEFAULT_SO_TIET_KIEM_OPTIONS,
+  EXCHANGE_RATES,
+  DEFAULT_ADMISSION,
+  DEFAULT_FINANCIAL,
+  VISA_FALLBACKS,
+  PRICE_CALCULATION
+} from '../../constants/feeDefaults';
 
 // All visa systems - matching CostInputForm
 const ALL_VISA_SYSTEMS = [
@@ -62,7 +71,11 @@ const normalizeVisaData = (rawData: any) => {
   
   // Get luiNThang (months to backdate)
   const financialReq = rawData.financialRequirement || {};
-  const luiNThang = financialReq.luiNThang ?? 6;
+  const luiNThang = financialReq.luiNThang ?? rawData.lui_n_thang ?? DEFAULT_FINANCIAL.luiNThang;
+  
+  // Get admission requirements (snake_case from CostInputForm)
+  const gpaMin = rawData.gpa_min ?? rawData.gpaMin ?? DEFAULT_ADMISSION.gpaMin;
+  const gapYearLimit = rawData.gap_year_limit ?? rawData.gapYearLimit ?? DEFAULT_ADMISSION.gapYearLimit;
   
   return {
     available: rawData.available ?? false,
@@ -74,6 +87,10 @@ const normalizeVisaData = (rawData: any) => {
     financialRequirement: {
       soTietKiemOptions,
       luiNThang
+    },
+    admission: {
+      gpaMin,
+      gapYearLimit
     }
   };
 };
@@ -98,80 +115,218 @@ const normalizeCommonFees = (rawData: any) => {
     fees.push({ id: 'phi_trung_tam', name: 'Phí trung tâm thu hộ', amount: rawData.phi_trung_tam, editable: true, subItems: PHI_TRUNG_TAM_SUB_ITEMS });
   }
   if (rawData.ve_may_bay) {
-    fees.push({ id: 've_may_bay', name: 'Vé máy bay', amount: rawData.ve_may_bay.amount || 8000000, optional: rawData.ve_may_bay.optional, editable: true });
+    fees.push({ id: 've_may_bay', name: 'Vé máy bay', amount: rawData.ve_may_bay.amount || DEFAULT_FEES_VND.veMayBay, optional: rawData.ve_may_bay.optional, editable: true });
   }
   if (rawData.ktx_vn) {
-    fees.push({ id: 'ktx_vn', name: 'KTX Việt Nam', amountPerMonth: rawData.ktx_vn.amount_per_month || 800000, optional: rawData.ktx_vn.optional, editable: true });
+    fees.push({ id: 'ktx_vn', name: 'KTX Việt Nam', amountPerMonth: rawData.ktx_vn.amount_per_month || DEFAULT_FEES_VND.ktxVNPerMonth, optional: rawData.ktx_vn.optional, editable: true });
   }
   
   return fees;
 };
 
-// Hero Section Component
-const HeroSection = ({ university, availableCount }: { university: any; availableCount: number }) => {
+// Hero Section Component - Modern Konkuk Style
+const HeroSection = ({ university, availableCount, onContactClick }: { university: any; availableCount: number; onContactClick: () => void }) => {
   const ranking = university?.koreanData?.koreanRanking || university?.ranking;
   const address = university?.koreanData?.address || university?.region || 'Hàn Quốc';
+  const koreanName = university?.koreanData?.koreanName || university?.koreanName || '';
+  const logo = university?.koreanData?.logo || university?.logo;
+  const bannerImage = university?.koreanData?.bannerImage || university?.bannerImage || 'https://images.unsplash.com/photo-1562774053-701939374585?w=1200&q=80';
   
   return (
     <div style={{
-      background: 'linear-gradient(135deg, #F5F0E8 0%, #EDE6DC 100%)',
-      borderRadius: 16,
-      padding: '24px 28px',
+      position: 'relative',
+      borderRadius: 0,
       marginBottom: 24,
-      position: 'relative'
+      overflow: 'hidden',
+      minHeight: 280,
+      display: 'flex',
+      flexDirection: 'column',
     }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
-        {/* Logo placeholder */}
+      {/* Background Image with Blue Gradient Overlay */}
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundImage: `linear-gradient(135deg, rgba(0, 58, 183, 0.85) 0%, rgba(27, 63, 139, 0.9) 50%, rgba(0, 35, 120, 0.95) 100%), url(${bannerImage})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        zIndex: 1
+      }} />
+      
+      {/* Top Navigation Bar */}
+      <div style={{
+        position: 'relative',
+        zIndex: 2,
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '16px 40px',
+        borderBottom: '1px solid rgba(255,255,255,0.1)'
+      }}>
+        {/* TBT Group Logo */}
         <div style={{
-          width: 64,
-          height: 64,
-          borderRadius: 12,
-          background: '#fff',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: 28,
-          boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+          gap: 12
         }}>
-          🏫
+          <div style={{
+            width: 40,
+            height: 40,
+            background: '#fff',
+            borderRadius: 8,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontWeight: 700,
+            color: '#003AB7',
+            fontSize: 18
+          }}>
+            TBT
+          </div>
+          <span style={{
+            color: '#fff',
+            fontSize: 16,
+            fontWeight: 600,
+            letterSpacing: 1
+          }}>
+            TBT GROUP
+          </span>
         </div>
         
+        {/* CTA Button */}
+        <button 
+          onClick={onContactClick}
+          style={{
+            background: '#003AB7',
+            color: '#fff',
+            border: '1px solid rgba(255,255,255,0.3)',
+            padding: '10px 24px',
+            borderRadius: 25,
+            fontSize: 14,
+            fontWeight: 500,
+            cursor: 'pointer',
+            transition: 'all 0.3s',
+            boxShadow: '0 4px 15px rgba(0,0,0,0.2)'
+          }}
+        >
+          Nhận tư vấn
+        </button>
+      </div>
+      
+      {/* Main Hero Content */}
+      <div style={{
+        position: 'relative',
+        zIndex: 2,
+        flex: 1,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '40px 60px',
+        gap: 40
+      }}>
+        {/* Left: University Info */}
         <div style={{ flex: 1 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 700, color: '#1A1A1A', marginBottom: 4 }}>
-            {university?.name} <span style={{ fontSize: 14, color: '#666', fontWeight: 400 }}>{university?.koreanName}</span>
+          <h1 style={{
+            fontSize: 48,
+            fontWeight: 800,
+            color: '#fff',
+            marginBottom: 8,
+            textTransform: 'uppercase',
+            letterSpacing: 2,
+            textShadow: '0 2px 20px rgba(0,0,0,0.3)'
+          }}>
+            {university?.name}
           </h1>
           
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+          {koreanName && (
+            <p style={{
+              fontSize: 24,
+              color: 'rgba(255,255,255,0.9)',
+              marginBottom: 20,
+              fontWeight: 500
+            }}>
+              {koreanName}
+            </p>
+          )}
+          
+          {/* Badges Row */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 16,
+            flexWrap: 'wrap'
+          }}>
             {ranking && (
               <span style={{
-                fontSize: 12,
+                fontSize: 14,
                 fontWeight: 600,
-                color: '#2D8C4E',
-                background: '#E8F5E9',
-                padding: '4px 10px',
-                borderRadius: 20
+                color: '#fff',
+                background: 'rgba(255,255,255,0.2)',
+                padding: '8px 16px',
+                borderRadius: 20,
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(255,255,255,0.3)'
               }}>
                 Top {ranking}
               </span>
             )}
-            <span style={{ fontSize: 13, color: '#666' }}>
+            
+            <span style={{
+              fontSize: 14,
+              color: 'rgba(255,255,255,0.9)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6
+            }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/>
+                <circle cx="12" cy="10" r="3"/>
+              </svg>
               {address}
             </span>
+            
+            <span style={{
+              fontSize: 14,
+              color: '#fff',
+              background: 'rgba(45, 140, 78, 0.8)',
+              padding: '6px 14px',
+              borderRadius: 20,
+              fontWeight: 500
+            }}>
+              {availableCount} hệ du học
+            </span>
           </div>
-          
-          <div style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            fontSize: 12,
-            color: '#2D8C4E',
-            background: '#E8F5E9',
-            padding: '4px 12px',
-            borderRadius: 20
-          }}>
-            <span style={{ width: 6, height: 6, background: '#2D8C4E', borderRadius: '50%' }} />
-            {availableCount} hệ available
-          </div>
+        </div>
+        
+        {/* Right: University Logo */}
+        <div style={{
+          width: 180,
+          height: 180,
+          borderRadius: '50%',
+          background: '#fff',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+          border: '4px solid rgba(255,255,255,0.5)',
+          flexShrink: 0
+        }}>
+          {logo ? (
+            <img 
+              src={logo} 
+              alt={university?.name}
+              style={{
+                width: 140,
+                height: 140,
+                objectFit: 'contain',
+                borderRadius: '50%'
+              }}
+            />
+          ) : (
+            <span style={{ fontSize: 60 }}>🏫</span>
+          )}
         </div>
       </div>
     </div>
@@ -199,12 +354,12 @@ const VisaCostCards = ({ university }: { university: any }) => {
         
         // Format price display
         let priceDisplay = '';
-        if (invoice >= 1000000) {
-          const min = (invoice * 0.8 / 1000000).toFixed(1);
-          const max = (invoice * 1.2 / 1000000).toFixed(1);
+        if (invoice >= PRICE_CALCULATION.million) {
+          const min = (invoice * PRICE_CALCULATION.minFactor / PRICE_CALCULATION.million).toFixed(1);
+          const max = (invoice * PRICE_CALCULATION.maxFactor / PRICE_CALCULATION.million).toFixed(1);
           priceDisplay = `${min}-${max}M`;
         } else if (invoice > 0) {
-          priceDisplay = (invoice / 1000).toFixed(0) + 'K';
+          priceDisplay = (invoice / PRICE_CALCULATION.thousand).toFixed(0) + 'K';
         } else {
           priceDisplay = 'Liên hệ';
         }
@@ -319,10 +474,7 @@ const CostControls = ({
   const ktxOptions = visaData?.ktxOptions || [];
   const soTietKiemOptions = (visaData?.financialRequirement?.soTietKiemOptions?.length > 0)
     ? visaData.financialRequirement.soTietKiemOptions
-    : [
-        { label: 'Khu vực Gyeonggi', amountKRW: 10000000 },
-        { label: 'Ngoài Gyeonggi', amountKRW: 8000000 }
-      ];
+    : DEFAULT_SO_TIET_KIEM_OPTIONS;
   const scholarships = visaData?.scholarships || [];
   
   return (
@@ -447,7 +599,7 @@ const CostControls = ({
             <option key={idx} value={idx}>{opt.label} - {formatKRW(opt.amountKRW)} KRW</option>
           ))}
           {soTietKiemOptions.length === 0 && (
-            <option value={0}>Khu vực Gyeonggi - 10,000,000 KRW</option>
+            <option value={0}>{DEFAULT_SO_TIET_KIEM_OPTIONS[0].label} - {formatKRW(DEFAULT_SO_TIET_KIEM_OPTIONS[0].amountKRW)} KRW</option>
           )}
         </select>
         
@@ -488,7 +640,7 @@ const CostControls = ({
         >
           <option value={0}>Không ở</option>
           {[1,2,3,4,5,6].map(m => (
-            <option key={m} value={m}>{m} tháng - {formatVND(m * 800000)}đ</option>
+            <option key={m} value={m}>{m} tháng - {formatVND(m * DEFAULT_FEES_VND.ktxVNPerMonth)}đ</option>
           ))}
         </select>
       </div>
@@ -537,11 +689,11 @@ const FeeBreakdown = ({
   const veMayBayFee = commonFees.find((f: any) => f.id === 've_may_bay');
   const ktxVNFee = commonFees.find((f: any) => f.id === 'ktx_vn');
   
-  const hocTieng = hocTiengFee?.amount || 13000000;
-  const phiTuVan = phiTuVanFee?.amount || 39000000;
-  const phiTrungTam = phiTrungTamFee?.amount || 11000000;
-  const veMayBay = flight ? (veMayBayFee?.amount || 8000000) : 0;
-  const ktxVNCost = ktxVN * (ktxVNFee?.amountPerMonth || 800000);
+  const hocTieng = hocTiengFee?.amount || DEFAULT_FEES_VND.hocTieng;
+  const phiTuVan = phiTuVanFee?.amount || DEFAULT_FEES_VND.phiTuVan;
+  const phiTrungTam = phiTrungTamFee?.amount || DEFAULT_FEES_VND.phiTrungTam;
+  const veMayBay = flight ? (veMayBayFee?.amount || DEFAULT_FEES_VND.veMayBay) : 0;
+  const ktxVNCost = ktxVN * (ktxVNFee?.amountPerMonth || DEFAULT_FEES_VND.ktxVNPerMonth);
   
   // Get visa-specific amounts
   const applyFee = visaData?.applyFeeKRW || 0;
@@ -560,11 +712,8 @@ const FeeBreakdown = ({
   // Get sổ tiết kiệm amount
   const soTietKiemOptions = (visaData?.financialRequirement?.soTietKiemOptions?.length > 0)
     ? visaData.financialRequirement.soTietKiemOptions
-    : [
-        { label: 'Khu vực Gyeonggi', amountKRW: 10000000 },
-        { label: 'Ngoài Gyeonggi', amountKRW: 8000000 }
-      ];
-  const soTietKiemAmount = soTietKiemOptions[soTietKiem]?.amountKRW || 10000000;
+    : DEFAULT_SO_TIET_KIEM_OPTIONS;
+  const soTietKiemAmount = soTietKiemOptions[soTietKiem]?.amountKRW || DEFAULT_SO_TIET_KIEM_OPTIONS[0].amountKRW;
   
   // Calculate totals
   const totalVND = hocTieng + phiTuVan + phiTrungTam + veMayBay + ktxVNCost;
@@ -587,7 +736,7 @@ const FeeBreakdown = ({
           marginBottom: 16,
           textTransform: 'uppercase'
         }}>
-          Chi phí hệ {visaData?.name || 'D4-1'}
+          Chi phí hệ {visaData?.name || VISA_FALLBACKS.empty}
         </h3>
         
         <div style={{ fontSize: 11, fontWeight: 600, color: '#2D8C4E', marginBottom: 12 }}>
@@ -721,7 +870,7 @@ const FeeBreakdown = ({
         </div>
         
         <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 16 }}>
-          Đã bao gồm sổ TK · ~${Math.round(totalVND / 25500 + totalKRW / 1350).toLocaleString()}
+          Đã bao gồm sổ TK · ~${Math.round(totalVND / EXCHANGE_RATES.vndToUsd + totalKRW / EXCHANGE_RATES.krwToUsd).toLocaleString()}
         </div>
         
         {!selectedScholarship && scholarships.length > 0 && (
@@ -739,10 +888,126 @@ const FeeBreakdown = ({
   );
 };
 
+// Student Info Summary Card
+const StudentInfoCard = ({
+  name,
+  phone,
+  visaSystem,
+  topikLevel,
+  onRegister
+}: {
+  name?: string;
+  phone?: string;
+  visaSystem?: string;
+  topikLevel?: number;
+  onRegister: () => void;
+}) => {
+  return (
+    <div style={{
+      background: '#fff',
+      borderRadius: 16,
+      overflow: 'hidden',
+      boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+      border: '1px solid #E8E8E8'
+    }}>
+      {/* Header */}
+      <div style={{
+        background: '#003AB7',
+        padding: '16px 20px',
+        textAlign: 'center'
+      }}>
+        <h3 style={{
+          color: '#fff',
+          fontSize: 16,
+          fontWeight: 700,
+          margin: 0,
+          textTransform: 'uppercase',
+          letterSpacing: 1
+        }}>
+          Thông tin học viên
+        </h3>
+      </div>
+      
+      {/* Content */}
+      <div style={{ padding: '20px' }}>
+        {/* Name */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '12px 0',
+          borderBottom: '1px solid #F0F0F0'
+        }}>
+          <span style={{ fontSize: 14, color: '#666', fontWeight: 500 }}>Họ và tên</span>
+          <span style={{ fontSize: 14, color: '#1A1A1A', fontWeight: 600 }}>{name || 'Chưa cập nhật'}</span>
+        </div>
+        
+        {/* Phone */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '12px 0',
+          borderBottom: '1px solid #F0F0F0'
+        }}>
+          <span style={{ fontSize: 14, color: '#666', fontWeight: 500 }}>Số điện thoại</span>
+          <span style={{ fontSize: 14, color: '#1A1A1A', fontWeight: 600 }}>{phone || 'Chưa cập nhật'}</span>
+        </div>
+        
+        {/* Visa System */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '12px 0',
+          borderBottom: '1px solid #F0F0F0'
+        }}>
+          <span style={{ fontSize: 14, color: '#666', fontWeight: 500 }}>Hệ VISA</span>
+          <span style={{ fontSize: 14, color: '#1A1A1A', fontWeight: 600 }}>{visaSystem || VISA_FALLBACKS.empty}</span>
+        </div>
+        
+        {/* Korean Level */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '12px 0',
+          marginBottom: 16
+        }}>
+          <span style={{ fontSize: 14, color: '#666', fontWeight: 500 }}>Trình độ tiếng Hàn</span>
+          <span style={{ fontSize: 14, color: '#1A1A1A', fontWeight: 600 }}>
+            {topikLevel && topikLevel > 0 ? `TOPIK ${topikLevel}` : 'Chưa có TOPIK'}
+          </span>
+        </div>
+        
+        {/* Register Button */}
+        <button
+          onClick={onRegister}
+          style={{
+            width: '100%',
+            padding: '14px 24px',
+            background: '#EF4444',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 25,
+            fontSize: 15,
+            fontWeight: 600,
+            cursor: 'pointer',
+            transition: 'all 0.3s',
+            boxShadow: '0 4px 15px rgba(239, 68, 68, 0.3)'
+          }}
+        >
+          Đăng ký ngay
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // Admission Requirements Section
-const AdmissionRequirements = ({ admission, visaData }: any) => {
-  const d41Admission = admission?.['D4-1'] || admission?.D4_1;
-  const luiNThang = visaData?.financialRequirement?.luiNThang || 6;
+const AdmissionRequirements = ({ visaData }: { visaData: any }) => {
+  const admission = visaData?.admission;
+  const luiNThang = visaData?.financialRequirement?.luiNThang || DEFAULT_FINANCIAL.luiNThang;
   
   return (
     <div style={{
@@ -760,14 +1025,14 @@ const AdmissionRequirements = ({ admission, visaData }: any) => {
         <div>
           <div style={{ fontSize: 12, color: '#888', marginBottom: 4 }}>GPA tối thiểu</div>
           <div style={{ fontSize: 16, fontWeight: 600, color: '#1A1A1A' }}>
-            {d41Admission?.gpaMin ? `≥ ${d41Admission.gpaMin}` : '≥ 7.0'}
+            {admission?.gpaMin ? `≥ ${admission.gpaMin}` : `≥ ${DEFAULT_ADMISSION.gpaMin}`}
           </div>
         </div>
         
         <div>
           <div style={{ fontSize: 12, color: '#888', marginBottom: 4 }}>Năm trống / tuổi</div>
           <div style={{ fontSize: 16, fontWeight: 600, color: '#1A1A1A' }}>
-            Trống &lt; {d41Admission?.gapYearLimit || 2} năm
+            Trống &lt; {admission?.gapYearLimit || DEFAULT_ADMISSION.gapYearLimit} năm
           </div>
         </div>
         
@@ -783,7 +1048,7 @@ const AdmissionRequirements = ({ admission, visaData }: any) => {
           <div style={{ fontSize: 14, fontWeight: 600, color: '#1A1A1A' }}>
             {visaData?.financialRequirement?.soTietKiemOptions?.[0]?.amountKRW 
               ? formatKRW(visaData.financialRequirement.soTietKiemOptions[0].amountKRW) + ' KRW'
-              : '10,000,000 KRW'}
+              : `${formatKRW(DEFAULT_SO_TIET_KIEM_OPTIONS[0].amountKRW)} KRW`}
           </div>
         </div>
       </div>
@@ -791,71 +1056,594 @@ const AdmissionRequirements = ({ admission, visaData }: any) => {
   );
 };
 
-// Additional Information Section (Missing fields from Detail.txt)
-const AdditionalInfoSection = ({ koreanData }: { koreanData: any }) => {
-  const supportPolicies = koreanData?.supportPolicies || [];
-  const refundPolicy = koreanData?.refundPolicy;
-  const admissionsType = koreanData?.admissionsType;
-  const partTimeInfo = koreanData?.partTimeInfo;
+// University Summary Card - Compact overview of all university info
+const GeneralInfoCards = ({ university, visaSystems }: { university: any; visaSystems: any }) => {
+  const koreanData = university?.koreanData;
   
-  // Only render if at least one field has data
-  if (!supportPolicies.length && !refundPolicy && !admissionsType && !partTimeInfo) {
-    return null;
-  }
+  // Get all visa systems that have data (check for non-null values)
+  const allSystems = ALL_VISA_SYSTEMS
+    .filter(v => visaSystems[v.key] != null)
+    .map((v, index) => ({ ...v, rank: index + 1 }));
+  
+  // Get available (active) systems  
+  const availableSystems = allSystems.filter(v => visaSystems[v.key]?.available);
+  
+  // Get admission requirements from first available system or defaults
+  const firstSystem = availableSystems[0];
+  const visaData = firstSystem ? visaSystems[firstSystem.key] : null;
+  
+  const gpaMin = visaData?.admission?.gpaMin || DEFAULT_ADMISSION.gpaMin;
+  const gapYearLimit = visaData?.admission?.gapYearLimit || DEFAULT_ADMISSION.gapYearLimit;
+  const soTietKiemAmount = visaData?.financialRequirement?.soTietKiemOptions?.[0]?.amountKRW || DEFAULT_SO_TIET_KIEM_OPTIONS[0].amountKRW;
+  const luiNThang = visaData?.financialRequirement?.luiNThang || DEFAULT_FINANCIAL.luiNThang;
+  
+  // Find best scholarship
+  let bestScholarship: any = null;
+  allSystems.forEach(visa => {
+    const data = visaSystems[visa.key];
+    if (data?.scholarships?.length > 0) {
+      const max = Math.max(...data.scholarships.map((s: any) => s.discountPct));
+      if (!bestScholarship || max > bestScholarship.pct) {
+        bestScholarship = { pct: max, visa: visa.label };
+      }
+    }
+  });
+  
+  // Get all unique majors from all visa systems
+  const allMajors: string[] = [];
+  allSystems.forEach(visa => {
+    const data = visaSystems[visa.key];
+    if (data?.majors && Array.isArray(data.majors)) {
+      data.majors.forEach((m: string) => {
+        if (!allMajors.includes(m)) allMajors.push(m);
+      });
+    }
+  });
+  
+  const displayMajors = allMajors.length > 0 
+    ? allMajors.slice(0, 4).join(', ') + (allMajors.length > 4 ? ` +${allMajors.length - 4} ngành` : '')
+    : (Array.isArray(koreanData?.majors) 
+        ? koreanData.majors.slice(0, 4).join(', ')
+        : koreanData?.majors || university?.majors || 'Đang cập nhật');
   
   return (
     <div style={{
       background: '#fff',
       borderRadius: 16,
-      padding: 24,
+      overflow: 'hidden',
       border: '1px solid #E8E8E8',
-      marginTop: 24
+      boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
     }}>
-      <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1A1A1A', marginBottom: 16 }}>
-        Thông tin bổ sung
-      </h3>
+      {/* Header with University Info */}
+      <div style={{
+        background: 'linear-gradient(135deg, #003AB7 0%, #1B3F8B 100%)',
+        padding: '20px 24px',
+        color: '#fff'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <h2 style={{
+              fontSize: 20,
+              fontWeight: 700,
+              margin: '0 0 4px 0'
+            }}>
+              {university?.name || 'Thông tin trường'}
+            </h2>
+            <p style={{
+              fontSize: 14,
+              opacity: 0.9,
+              margin: 0
+            }}>
+              {koreanData?.koreanName || university?.koreanName || ''}
+            </p>
+          </div>
+          {university?.ranking && (
+            <div style={{
+              background: 'rgba(255,255,255,0.2)',
+              borderRadius: 8,
+              padding: '6px 12px',
+              fontSize: 13,
+              fontWeight: 600
+            }}>
+              Top {university.ranking}
+            </div>
+          )}
+        </div>
+        
+        {/* Quick Stats */}
+        <div style={{
+          display: 'flex',
+          gap: 24,
+          marginTop: 16,
+          paddingTop: 16,
+          borderTop: '1px solid rgba(255,255,255,0.2)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <MapPin size={16} />
+            <span style={{ fontSize: 13 }}>{university?.region || koreanData?.region || 'Hàn Quốc'}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <GraduationCap size={16} />
+            <span style={{ fontSize: 13 }}>{availableSystems.length || allSystems.length || 0} hệ visa</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Building2 size={16} />
+            <span style={{ fontSize: 13 }}>{university?.country || 'Hàn Quốc'}</span>
+          </div>
+        </div>
+      </div>
       
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16 }}>
-        {/* Part-time Work Info */}
-        {partTimeInfo && (
-          <div>
-            <div style={{ fontSize: 12, color: '#888', marginBottom: 4 }}>Việc làm thêm</div>
-            <div style={{ fontSize: 14, color: '#1A1A1A', whiteSpace: 'pre-wrap' }}>
-              {partTimeInfo}
+      {/* Body */}
+      <div style={{ padding: '20px 24px' }}>
+        
+        {/* Điều kiện tuyển sinh - Main Section */}
+        <div style={{ marginBottom: 20 }}>
+          <h3 style={{
+            fontSize: 16,
+            fontWeight: 700,
+            color: '#1A1A1A',
+            marginBottom: 16
+          }}>
+            Điều kiện tuyển sinh
+          </h3>
+          
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '16px 24px'
+          }}>
+            {/* GPA tối thiểu */}
+            <div>
+              <div style={{
+                fontSize: 12,
+                color: '#888',
+                marginBottom: 4
+              }}>GPA tối thiểu</div>
+              <div style={{
+                fontSize: 18,
+                fontWeight: 700,
+                color: '#1A1A1A'
+              }}>≥ {gpaMin}</div>
+            </div>
+            
+            {/* Năm trống */}
+            <div>
+              <div style={{
+                fontSize: 12,
+                color: '#888',
+                marginBottom: 4
+              }}>Năm trống / tuổi</div>
+              <div style={{
+                fontSize: 18,
+                fontWeight: 700,
+                color: '#1A1A1A'
+              }}>Trống &lt; {gapYearLimit} năm</div>
+            </div>
+            
+            {/* Điều kiện tài chính */}
+            <div>
+              <div style={{
+                fontSize: 12,
+                color: '#888',
+                marginBottom: 4
+              }}>Điều kiện tài chính</div>
+              <div style={{
+                fontSize: 14,
+                fontWeight: 600,
+                color: '#1A1A1A'
+              }}>Sổ tiết kiệm {luiNThang} tháng</div>
+            </div>
+            
+            {/* Số tiền sổ TK */}
+            <div>
+              <div style={{
+                fontSize: 12,
+                color: '#888',
+                marginBottom: 4
+              }}>Số tiền sổ TK</div>
+              <div style={{
+                fontSize: 18,
+                fontWeight: 700,
+                color: '#1A1A1A'
+              }}>{formatKRW(soTietKiemAmount)} KRW</div>
             </div>
           </div>
-        )}
+        </div>
         
-        {/* Support Policies */}
-        {supportPolicies.length > 0 && (
+        {/* Divider */}
+        <div style={{
+          height: 1,
+          background: '#F0F0F0',
+          margin: '20px 0'
+        }} />
+        
+        {/* Thông tin chung - Grid */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: '16px 24px'
+        }}>
+          {/* Address */}
           <div>
-            <div style={{ fontSize: 12, color: '#888', marginBottom: 4 }}>Chính sách hỗ trợ</div>
-            <ul style={{ margin: 0, paddingLeft: 20, fontSize: 14, color: '#1A1A1A' }}>
-              {supportPolicies.map((policy: string, idx: number) => (
-                <li key={idx} style={{ marginBottom: 4 }}>{policy}</li>
+            <div style={{
+              fontSize: 12,
+              color: '#888',
+              marginBottom: 4,
+              textTransform: 'uppercase',
+              fontWeight: 600
+            }}>Địa chỉ</div>
+            <div style={{ fontSize: 14, color: '#333', lineHeight: 1.5 }}>
+              {koreanData?.address || university?.location || 'Đang cập nhật'}
+            </div>
+          </div>
+          
+          {/* Majors */}
+          <div>
+            <div style={{
+              fontSize: 12,
+              color: '#888',
+              marginBottom: 4,
+              textTransform: 'uppercase',
+              fontWeight: 600
+            }}>Chuyên ngành</div>
+            <div style={{ fontSize: 14, color: '#333', lineHeight: 1.5 }}>
+              {displayMajors}
+            </div>
+          </div>
+          
+          {/* Visa Systems */}
+          <div>
+            <div style={{
+              fontSize: 12,
+              color: '#888',
+              marginBottom: 4,
+              textTransform: 'uppercase',
+              fontWeight: 600
+            }}>Hệ đào tạo</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {(allSystems.length > 0 ? allSystems : ALL_VISA_SYSTEMS.slice(0, 4)).map((visa, idx) => (
+                <span key={visa.key} style={{
+                  fontSize: 13,
+                  padding: '4px 10px',
+                  borderRadius: 12,
+                  background: visaSystems[visa.key]?.available ? '#ECFDF5' : '#F5F5F5',
+                  color: visaSystems[visa.key]?.available ? '#059669' : '#999',
+                  fontWeight: 600
+                }}>
+                  {visa.label}
+                </span>
               ))}
-            </ul>
-          </div>
-        )}
-        
-        {/* Refund Policy */}
-        {refundPolicy && (
-          <div>
-            <div style={{ fontSize: 12, color: '#888', marginBottom: 4 }}>Chính sách hoàn tiền</div>
-            <div style={{ fontSize: 14, color: '#1A1A1A' }}>
-              {refundPolicy}
             </div>
           </div>
-        )}
-        
-        {/* Admissions Type */}
-        {admissionsType && (
+          
+          {/* Scholarship Summary */}
           <div>
-            <div style={{ fontSize: 12, color: '#888', marginBottom: 4 }}>Hình thức xét tuyển</div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: '#1A1A1A' }}>
-              {admissionsType}
+            <div style={{
+              fontSize: 12,
+              color: '#888',
+              marginBottom: 4,
+              textTransform: 'uppercase',
+              fontWeight: 600
+            }}>Học bổng cao nhất</div>
+            <div style={{
+              fontSize: 14,
+              color: bestScholarship ? '#059669' : '#666',
+              fontWeight: 600
+            }}>
+              {bestScholarship 
+                ? `Giảm ${bestScholarship.pct}% học phí (${bestScholarship.visa})`
+                : 'Không có thông tin'
+              }
             </div>
           </div>
+          
+          {/* Part-time Work */}
+          {(koreanData?.partTimeInfo || koreanData?.partTimeWork) && (
+            <div>
+              <div style={{
+                fontSize: 12,
+                color: '#888',
+                marginBottom: 4,
+                textTransform: 'uppercase',
+                fontWeight: 600
+              }}>Cơ hội việc làm</div>
+              <div style={{ fontSize: 14, color: '#333', lineHeight: 1.5 }}>
+                {koreanData?.partTimeInfo || koreanData?.partTimeWork}
+              </div>
+            </div>
+          )}
+          
+          {/* Dormitory Info */}
+          {(visaData?.ktxOptions?.length > 0 || koreanData?.dormitoryInfo) && (
+            <div>
+              <div style={{
+                fontSize: 12,
+                color: '#888',
+                marginBottom: 4,
+                textTransform: 'uppercase',
+                fontWeight: 600
+              }}>Thông tin ký túc xá</div>
+              <div style={{ fontSize: 14, color: '#333', lineHeight: 1.5 }}>
+                {visaData?.ktxOptions?.length > 0 ? (
+                  <div>
+                    {visaData.ktxOptions.map((opt: any, i: number) => (
+                      <div key={i} style={{ marginBottom: 2 }}>
+                        {opt.name}: {formatKRW(opt.priceKRWPerKy)} KRW/kỳ
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  koreanData?.dormitoryInfo
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+        
+        {/* Website link if available */}
+        {university?.website && (
+          <div style={{
+            marginTop: 20,
+            paddingTop: 16,
+            borderTop: '1px solid #F0F0F0'
+          }}>
+            <a 
+              href={university.website} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                fontSize: 13,
+                color: '#003AB7',
+                textDecoration: 'none',
+                fontWeight: 500
+              }}
+            >
+              <ExternalLink size={14} />
+              Website trường
+            </a>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Contact Form Modal Component
+const ContactFormModal = ({ 
+  isOpen, 
+  onClose, 
+  universityName, 
+  universityId,
+  selectedVisa 
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  universityName: string;
+  universityId?: string;
+  selectedVisa?: string;
+}) => {
+  const { saveContactRequest } = useApp();
+  const [formData, setFormData] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    note: ''
+  });
+  const [submitted, setSubmitted] = useState(false);
+  
+  if (!isOpen) return null;
+  
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Save to database
+    const id = Date.now().toString();
+    saveContactRequest({
+      id,
+      studentName: formData.name,
+      studentPhone: formData.phone,
+      studentEmail: formData.email,
+      note: formData.note,
+      universityId,
+      universityName,
+      visaSystem: selectedVisa
+    });
+    
+    setSubmitted(true);
+    setTimeout(() => {
+      onClose();
+      setSubmitted(false);
+      setFormData({ name: '', phone: '', email: '', note: '' });
+    }, 2000);
+  };
+  
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: 'rgba(0,0,0,0.6)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1000,
+      padding: 20
+    }}>
+      <div style={{
+        background: '#fff',
+        borderRadius: 16,
+        padding: 32,
+        maxWidth: 480,
+        width: '100%',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+        position: 'relative'
+      }}>
+        {/* Close button */}
+        <button
+          onClick={onClose}
+          style={{
+            position: 'absolute',
+            top: 16,
+            right: 16,
+            width: 32,
+            height: 32,
+            borderRadius: '50%',
+            border: 'none',
+            background: '#F5F5F5',
+            cursor: 'pointer',
+            fontSize: 18,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          ×
+        </button>
+        
+        {submitted ? (
+          <div style={{ textAlign: 'center', padding: '20px 0' }}>
+            <div style={{
+              width: 60,
+              height: 60,
+              borderRadius: '50%',
+              background: '#10B981',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 16px'
+            }}>
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
+                <path d="M20 6L9 17l-5-5" />
+              </svg>
+            </div>
+            <h3 style={{ fontSize: 20, fontWeight: 700, color: '#1A1A1A', marginBottom: 8 }}>
+              Đã gửi thành công!
+            </h3>
+            <p style={{ fontSize: 14, color: '#666' }}>
+              Chúng tôi sẽ liên hệ với bạn trong 24h
+            </p>
+          </div>
+        ) : (
+          <>
+            <h2 style={{ fontSize: 22, fontWeight: 700, color: '#1A1A1A', marginBottom: 8 }}>
+              Nhận tư vấn miễn phí
+            </h2>
+            <p style={{ fontSize: 14, color: '#666', marginBottom: 24 }}>
+              Để lại thông tin để nhận tư vấn về <strong>{universityName}</strong>
+            </p>
+            
+            <form onSubmit={handleSubmit}>
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 6 }}>
+                  Họ và tên *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    borderRadius: 8,
+                    border: '1px solid #D1D5DB',
+                    fontSize: 14,
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                  placeholder="Nguyễn Văn A"
+                />
+              </div>
+              
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 6 }}>
+                  Số điện thoại *
+                </label>
+                <input
+                  type="tel"
+                  required
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    borderRadius: 8,
+                    border: '1px solid #D1D5DB',
+                    fontSize: 14,
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                  placeholder="0912345678"
+                />
+              </div>
+              
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 6 }}>
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    borderRadius: 8,
+                    border: '1px solid #D1D5DB',
+                    fontSize: 14,
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                  placeholder="example@email.com"
+                />
+              </div>
+              
+              <div style={{ marginBottom: 24 }}>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 6 }}>
+                  Ghi chú / Câu hỏi
+                </label>
+                <textarea
+                  value={formData.note}
+                  onChange={(e) => setFormData({ ...formData, note: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    borderRadius: 8,
+                    border: '1px solid #D1D5DB',
+                    fontSize: 14,
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                    minHeight: 80,
+                    resize: 'vertical'
+                  }}
+                  placeholder="Bạn có câu hỏi gì về trường?"
+                />
+              </div>
+              
+              <button
+                type="submit"
+                style={{
+                  width: '100%',
+                  padding: '14px 24px',
+                  background: '#003AB7',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 8,
+                  fontSize: 15,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'background 0.3s'
+                }}
+              >
+                Gửi yêu cầu tư vấn
+              </button>
+            </form>
+          </>
         )}
       </div>
     </div>
@@ -872,13 +1660,14 @@ export default function UniversityDetailRedesigned() {
   const rawVisaSystems = university?.koreanData?.visaSystemsDetail || {};
   
   // Normalize all visa system data - useMemo to prevent recreating on every render
+  // Use university?.id as dependency since rawVisaSystems creates new reference each render
   const visaSystems = useMemo(() => {
     const systems: Record<string, ReturnType<typeof normalizeVisaData>> = {};
     Object.keys(rawVisaSystems).forEach(key => {
       systems[key] = normalizeVisaData(rawVisaSystems[key]);
     });
     return systems;
-  }, [rawVisaSystems]);
+  }, [university?.id, JSON.stringify(rawVisaSystems)]);
   
   // Count available systems
   const availableCount = ALL_VISA_SYSTEMS.filter(v => visaSystems[v.key]?.available).length;
@@ -886,8 +1675,11 @@ export default function UniversityDetailRedesigned() {
   // State
   const [selectedVisa, setSelectedVisa] = useState(() => {
     const first = ALL_VISA_SYSTEMS.find(v => visaSystems[v.key]?.available);
-    return first?.key || 'D4-1';
+    return first?.key || ''; // Don't default to D4-1 if no visa available
   });
+  
+  // Modal state for contact form
+  const [showContactModal, setShowContactModal] = useState(false);
   
   const [topikLevel, setTopikLevel] = useState(0);
   const [ktxRoom, setKtxRoom] = useState(0);
@@ -925,60 +1717,118 @@ export default function UniversityDetailRedesigned() {
   
   const visaData = visaSystems[selectedVisa];
   const rawCommonFees = (university?.koreanData as any)?.commonFeesVND || (university?.koreanData as any)?.common_fees_vnd;
-  const admission = university?.koreanData?.admission;
   
   return (
-    <div style={{ background: '#F8F7F5', minHeight: '100vh', padding: '24px 0' }}>
-      <div style={{ maxWidth: 1000, margin: '0 auto', padding: '0 20px' }}>
-        
-        {/* Hero */}
-        <HeroSection university={university} availableCount={availableCount} />
-        
+    <div style={{ background: '#F8F7F5', minHeight: '100vh' }}>
+      {/* Full-width Hero */}
+      <HeroSection 
+        university={university} 
+        availableCount={availableCount} 
+        onContactClick={() => setShowContactModal(true)}
+      />
+      
+      {/* Contained Content */}
+      <div style={{ maxWidth: 1000, margin: '0 auto', padding: '24px 20px' }}>
         {/* Cost Preview Cards */}
         <VisaCostCards university={university} />
         
-        {/* Visa Selector */}
-        <VisaSelector 
-          university={university} 
-          selectedVisa={selectedVisa}
-          onSelect={setSelectedVisa}
-        />
+        {/* Visa Selector - only show if visa systems are configured */}
+        {availableCount > 0 && (
+          <VisaSelector 
+            university={university} 
+            selectedVisa={selectedVisa}
+            onSelect={setSelectedVisa}
+          />
+        )}
+        
+        {/* Show message if no visa systems configured */}
+        {availableCount === 0 && (
+          <div style={{
+            background: '#fff',
+            borderRadius: 12,
+            padding: 32,
+            border: '1px solid #E8E8E8',
+            textAlign: 'center',
+            marginBottom: 24
+          }}>
+            <div style={{ fontSize: 16, color: '#666', marginBottom: 8 }}>
+              Chưa có hệ visa nào được cấu hình
+            </div>
+            <div style={{ fontSize: 13, color: '#999' }}>
+              Vui lòng liên hệ để được tư vấn chi tiết
+            </div>
+          </div>
+        )}
         
         {/* Two Column Layout */}
-        <div style={{ display: 'grid', gridTemplateColumns: '360px 1fr', gap: 24 }}>
-          {/* Left: Controls */}
-          <CostControls
-            topikLevel={topikLevel}
-            setTopikLevel={setTopikLevel}
-            ktxRoom={ktxRoom}
-            setKtxRoom={setKtxRoom}
-            soTietKiem={soTietKiem}
-            setSoTietKiem={setSoTietKiem}
-            ktxVN={ktxVN}
-            setKtxVN={setKtxVN}
-            flight={flight}
-            setFlight={setFlight}
-            visaData={visaData}
-          />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 24 }}>
+          {/* Left: General Information Cards */}
+          <GeneralInfoCards university={university} visaSystems={visaSystems} />
           
-          {/* Right: Fee Breakdown */}
-          <FeeBreakdown
-            commonFees={rawCommonFees}
-            visaData={visaData}
-            topikLevel={topikLevel}
-            ktxRoom={ktxRoom}
-            soTietKiem={soTietKiem}
-            ktxVN={ktxVN}
-            flight={flight}
-          />
+          {/* Right: Student Info Card */}
+          <div>
+            <StudentInfoCard
+              name=""
+              phone=""
+              visaSystem={selectedVisa}
+              topikLevel={topikLevel}
+              onRegister={() => setShowContactModal(true)}
+            />
+          </div>
         </div>
         
-        {/* Admission Requirements */}
-        <AdmissionRequirements admission={admission} visaData={visaData} />
-        
-        {/* Additional Information - Missing fields from Detail.txt */}
-        <AdditionalInfoSection koreanData={university?.koreanData} />
+        {/* Cost Controls and Fee Breakdown Section - only show if visa configured */}
+        {availableCount > 0 ? (
+          <div style={{ display: 'grid', gridTemplateColumns: '360px 1fr', gap: 24, marginTop: 24 }}>
+            {/* Left: Controls */}
+            <CostControls
+              topikLevel={topikLevel}
+              setTopikLevel={setTopikLevel}
+              ktxRoom={ktxRoom}
+              setKtxRoom={setKtxRoom}
+              soTietKiem={setSoTietKiem}
+              ktxVN={ktxVN}
+              setKtxVN={setKtxVN}
+              flight={flight}
+              setFlight={setFlight}
+              visaData={visaData}
+            />
+            
+            {/* Right: Fee Breakdown */}
+            <FeeBreakdown
+              commonFees={rawCommonFees}
+              visaData={visaData}
+              topikLevel={topikLevel}
+              ktxRoom={ktxRoom}
+              soTietKiem={soTietKiem}
+              ktxVN={ktxVN}
+              flight={flight}
+            />
+          </div>
+        ) : (
+          <div style={{
+            background: '#f8f9fa',
+            borderRadius: 12,
+            padding: 40,
+            border: '1px dashed #ddd',
+            textAlign: 'center',
+            marginTop: 24
+          }}>
+            <div style={{ fontSize: 15, color: '#666' }}>
+              Thông tin chi phí đang được cập nhật
+            </div>
+          </div>
+        )}
       </div>
+      
+      {/* Contact Form Modal */}
+      <ContactFormModal 
+        isOpen={showContactModal}
+        onClose={() => setShowContactModal(false)}
+        universityName={university?.name}
+        universityId={university?.id}
+        selectedVisa={selectedVisa}
+      />
     </div>
   );
 }
