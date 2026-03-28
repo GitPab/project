@@ -1,0 +1,228 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "University Import Schema",
+  "description": "Schema cho import dữ liệu trường đại học Hàn Quốc vào Du Học Cost Manager",
+  "type": "object",
+  "required": [
+    "name",
+    "name_korean",
+    "country"
+  ],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Tên trường tiếng Việt, viết hoa"
+    },
+    "name_korean": {
+      "type": "string",
+      "description": "Tên trường tiếng Hàn (Hangul)"
+    },
+    "country": {
+      "type": "string",
+      "default": "South Korea"
+    },
+    "address": {
+      "type": "string",
+      "description": "Địa chỉ đầy đủ"
+    },
+    "area": {
+      "type": "string",
+      "description": "Thành phố / tỉnh (tự động tách từ address nếu trống)"
+    },
+    "ranking": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Xếp hạng (số nguyên, không cần /200)"
+    },
+    "top_tier": {
+      "type": "string",
+      "enum": [
+        "1",
+        "2",
+        "3"
+      ],
+      "description": "1=Dễ visa, 2=Trung bình, 3=Hạn chế"
+    },
+    "majors": {
+      "type": "string",
+      "description": "Chuyên ngành, phân cách bằng | (pipe)"
+    },
+    "fee_d4_1_krw": {
+      "type": [
+        "integer",
+        "string",
+        "null"
+      ],
+      "description": "Học phí D4-1 KRW/kỳ. Để trống = không có hệ"
+    },
+    "fee_d2_1_krw": {
+      "type": [
+        "integer",
+        "string",
+        "null"
+      ],
+      "description": "Học phí D2-1 KRW/kỳ"
+    },
+    "fee_d2_2_min_krw": {
+      "type": [
+        "integer",
+        "string",
+        "null"
+      ],
+      "description": "Học phí D2-2 tối thiểu KRW/kỳ"
+    },
+    "fee_d2_2_max_krw": {
+      "type": [
+        "integer",
+        "string",
+        "null"
+      ],
+      "description": "Học phí D2-2 tối đa KRW/kỳ"
+    },
+    "fee_d2_3m_min_krw": {
+      "type": [
+        "integer",
+        "string",
+        "null"
+      ],
+      "description": "Học phí D2-3 Thạc sĩ tối thiểu"
+    },
+    "fee_d2_3m_max_krw": {
+      "type": [
+        "integer",
+        "string",
+        "null"
+      ],
+      "description": "Học phí D2-3 Thạc sĩ tối đa"
+    },
+    "fee_d2_3p_min_krw": {
+      "type": [
+        "integer",
+        "string",
+        "null"
+      ],
+      "description": "Học phí D2-3 Tiến sĩ tối thiểu"
+    },
+    "fee_d2_3p_max_krw": {
+      "type": [
+        "integer",
+        "string",
+        "null"
+      ],
+      "description": "Học phí D2-3 Tiến sĩ tối đa"
+    },
+    "fee_d2_6_krw": {
+      "type": [
+        "integer",
+        "string",
+        "null"
+      ],
+      "description": "Học phí D2-6 KRW/kỳ"
+    },
+    "fee_exchange_krw": {
+      "type": [
+        "integer",
+        "string",
+        "null"
+      ],
+      "description": "Học phí Trao đổi KRW/kỳ"
+    },
+    "fee_short_krw": {
+      "type": [
+        "integer",
+        "string",
+        "null"
+      ],
+      "description": "Học phí Ngắn hạn KRW (flat)"
+    },
+    "admission_d4_gpa_min": {
+      "type": [
+        "number",
+        "string",
+        "null"
+      ],
+      "description": "GPA tối thiểu D4-1"
+    },
+    "admission_d4_gap_year": {
+      "type": [
+        "integer",
+        "string",
+        "null"
+      ],
+      "description": "Năm trống tối đa D4-1. 'unlimited' = không giới hạn"
+    },
+    "admission_d2_gpa_min": {
+      "type": [
+        "number",
+        "string",
+        "null"
+      ],
+      "description": "GPA tối thiểu D2"
+    },
+    "admission_d2_gap_year": {
+      "type": [
+        "integer",
+        "string",
+        "null"
+      ],
+      "description": "Năm trống tối đa D2. 'unlimited' = không giới hạn"
+    },
+    "scholarship_d4_1": {
+      "type": "string",
+      "description": "Học bổng D4-1. 'none' = không có. Dạng: TOPIK3:30|TOPIK4:50|TOPIK6:100 (level:pct%). Cũng chấp nhận IELTS5.5:30"
+    },
+    "scholarship_d2_2": {
+      "type": "string",
+      "description": "Học bổng D2-2. Cùng format"
+    },
+    "scholarship_d2_3": {
+      "type": "string",
+      "description": "Học bổng D2-3. Cùng format"
+    },
+    "ktx_room_types": {
+      "type": "string",
+      "description": "Tên các loại phòng, phân cách bằng |"
+    },
+    "ktx_prices_krw": {
+      "type": "string",
+      "description": "Giá KRW/kỳ tương ứng với ktx_room_types, phân cách bằng |"
+    },
+    "dormitory_info": {
+      "type": "string",
+      "description": "Mô tả tự do về KTX (dùng cho trang chi tiết)"
+    },
+    "part_time_info": {
+      "type": "string",
+      "description": "Mô tả cơ hội việc làm thêm"
+    },
+    "support_policies": {
+      "type": "string",
+      "description": "Chính sách hỗ trợ, phân cách bằng |"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Ghi chú nội bộ, không import vào hệ thống"
+    }
+  },
+  "examples": [
+    {
+      "name": "ĐẠI HỌC AJOU",
+      "name_korean": "아주대학교",
+      "country": "South Korea",
+      "area": "Gyeonggi (Suwon)",
+      "ranking": 20,
+      "top_tier": "1",
+      "majors": "Kỹ thuật|IT|Truyền thông",
+      "fee_d4_1_krw": 1500000,
+      "fee_d2_2_min_krw": 3928000,
+      "fee_d2_2_max_krw": 5323000,
+      "admission_d4_gpa_min": 7.0,
+      "admission_d4_gap_year": 2,
+      "admission_d2_gpa_min": 6.5,
+      "admission_d2_gap_year": "unlimited",
+      "scholarship_d2_2": "TOPIK3:30|TOPIK4:50|TOPIK5:70|TOPIK6:100",
+      "ktx_room_types": "Phòng 4 người|Phòng 2 người",
+      "ktx_prices_krw": "747000|1102000"
+    }
+  ]
+}

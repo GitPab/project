@@ -7,7 +7,87 @@ import {
   getContactRequests,
   getRegistrations,
   updateRegistrationStatus,
-  deleteRegistration
+  deleteRegistration,
+  saveStudentProgress,
+  getStudentProgress,
+  updateProgressStatus,
+  saveDocument,
+  getDocuments,
+  verifyDocument,
+  savePayment,
+  getPayments,
+  updatePaymentStatus,
+  createNotification,
+  getNotifications,
+  markNotificationAsRead,
+  createAuditLog,
+  saveStudentApplication,
+  getStudentApplications,
+  // Calendar & Appointments
+  saveAppointment,
+  getAppointments,
+  updateAppointmentStatus,
+  deleteAppointment,
+  // Scholarships
+  saveScholarship,
+  getScholarships,
+  saveScholarshipApplication,
+  // Visa
+  saveVisaApplication,
+  getVisaApplications,
+  // Reminders
+  saveScheduledReminder,
+  getScheduledReminders,
+  markReminderAsSent,
+  // Analytics
+  saveAnalyticsMetric,
+  getAnalyticsMetrics,
+  // RBAC
+  saveRole,
+  getRoles,
+  assignRoleToUser,
+  getUserRoles,
+  // Communication
+  saveCommunicationLog,
+  getCommunicationLogs,
+  // Feedback
+  saveUniversityRating,
+  getUniversityRatings,
+  approveRating,
+  saveServiceFeedback,
+  getServiceFeedback,
+  resolveFeedback,
+  // Email Templates
+  saveEmailTemplate,
+  getEmailTemplates,
+  getEmailTemplateByName,
+  deleteEmailTemplate,
+  // Workflow
+  saveWorkflowRule,
+  getWorkflowRules,
+  deleteWorkflowRule,
+  // User Preferences
+  saveUserPreferences,
+  getUserPreferences,
+  // 2FA
+  save2FASecret,
+  get2FASettings,
+  enable2FA,
+  disable2FA,
+  // Sessions
+  saveUserSession,
+  getUserSessions,
+  updateSessionActivity,
+  invalidateSession,
+  invalidateAllUserSessions,
+  // Bulk Operations
+  saveBulkOperation,
+  updateBulkOperationStatus,
+  getBulkOperations,
+  // Saved Filters
+  saveFilter,
+  getSavedFilters,
+  deleteSavedFilter,
 } from '../services/sqliteDatabase';
 import { getAllUniversities, saveUniversity, bulkInsertUniversities, getUniversityById } from '../services/universityService';
 import {
@@ -18,6 +98,29 @@ import {
   StudentProfile,
   StudentOnboardingData,
   ProgressStage,
+  Document,
+  Payment,
+  Notification,
+  StudentApplication,
+  AuditLog,
+  Appointment,
+  Scholarship,
+  ScholarshipApplication,
+  VisaApplication,
+  ScheduledReminder,
+  AnalyticsMetric,
+  Role,
+  UserRole,
+  CommunicationLog,
+  UniversityRating,
+  ServiceFeedback,
+  EmailTemplate,
+  WorkflowRule,
+  UserPreferences,
+  User2FA,
+  UserSession,
+  BulkOperation,
+  SavedFilter,
 } from '../../types';
 
 export type {
@@ -33,6 +136,29 @@ export type {
   OptionalAddon,
   KoreanUniversityData,
   AcademicProgram,
+  Document,
+  Payment,
+  Notification,
+  StudentApplication,
+  AuditLog,
+  Appointment,
+  Scholarship,
+  ScholarshipApplication,
+  VisaApplication,
+  ScheduledReminder,
+  AnalyticsMetric,
+  Role,
+  UserRole,
+  CommunicationLog,
+  UniversityRating,
+  ServiceFeedback,
+  EmailTemplate,
+  WorkflowRule,
+  UserPreferences,
+  User2FA,
+  UserSession,
+  BulkOperation,
+  SavedFilter,
 } from '../../types';
 
 interface AppContextType {
@@ -61,6 +187,116 @@ interface AppContextType {
   }) => void;
   studentProgress: StudentProgress[];
   updateProgress: (studentEmail: string, universityId: string, stages: ProgressStage[]) => void;
+  loadStudentProgress: (studentEmail: string, universityId?: string) => Promise<ProgressStage[]>;
+  saveProgressToDatabase: (studentEmail: string, universityId: string, stages: ProgressStage[], updatedBy?: string) => void;
+  // Documents
+  documents: Document[];
+  uploadDocument: (data: Omit<Document, 'id' | 'createdAt' | 'verified'>) => Promise<string>;
+  getStudentDocuments: (studentEmail: string) => Document[];
+  verifyDocument: (id: string, verifiedBy: string) => void;
+  deleteDocument: (id: string) => void;
+  // Payments
+  payments: Payment[];
+  addPayment: (data: Omit<Payment, 'id' | 'createdAt' | 'updatedAt'>) => Promise<string>;
+  getStudentPayments: (studentEmail: string) => Payment[];
+  updatePaymentStatus: (id: string, status: Payment['status']) => void;
+  // Notifications
+  notifications: Notification[];
+  unreadCount: number;
+  createNotification: (data: Omit<Notification, 'id' | 'createdAt' | 'isRead'>) => void;
+  markNotificationRead: (id: string) => void;
+  getNotifications: (recipientEmail?: string) => Notification[];
+  // Student Applications (Multi-university)
+  studentApplications: StudentApplication[];
+  addStudentApplication: (data: Omit<StudentApplication, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  updateApplicationStatus: (id: string, status: string) => void;
+  getStudentApplications: (studentEmail: string) => StudentApplication[];
+  getAllApplications: () => Promise<any[]>;
+  // Audit Log
+  createAuditLog: (data: Omit<AuditLog, 'id' | 'createdAt'>) => void;
+  getAuditLogs: (entityType?: string, studentEmail?: string, performedBy?: string, limit?: number) => Promise<any[]>;
+  // Analytics
+  saveAnalyticsMetric: (data: Omit<AnalyticsMetric, 'id' | 'recordedAt'>) => void;
+  getAnalyticsMetrics: (metricName?: string, startDate?: string, endDate?: string) => Promise<any[]>;
+  // Calendar & Appointments
+  appointments: Appointment[];
+  scheduleAppointment: (data: Omit<Appointment, 'id' | 'createdAt' | 'updatedAt'>) => Promise<string>;
+  getAppointments: (studentEmail?: string, adminEmail?: string) => Appointment[];
+  updateAppointmentStatus: (id: string, status: Appointment['status']) => void;
+  cancelAppointment: (id: string) => void;
+  // Scholarships
+  scholarships: Scholarship[];
+  addScholarship: (data: Omit<Scholarship, 'id' | 'createdAt' | 'updatedAt'>) => Promise<string>;
+  updateScholarship: (id: string, data: Partial<Scholarship>) => void;
+  deleteScholarship: (id: string) => void;
+  getScholarships: (universityId?: string) => Scholarship[];
+  applyForScholarship: (data: Omit<ScholarshipApplication, 'id' | 'appliedAt'>) => Promise<string>;
+  // Visa Applications
+  visaApplications: VisaApplication[];
+  addVisaApplication: (data: Omit<VisaApplication, 'id' | 'createdAt' | 'updatedAt'>) => Promise<string>;
+  getVisaApplications: (studentEmail?: string) => VisaApplication[];
+  updateVisaStatus: (id: string, status: VisaApplication['status']) => void;
+  deleteVisaApplication: (id: string) => void;
+  // Scheduled Reminders
+  scheduledReminders: ScheduledReminder[];
+  scheduleReminder: (data: Omit<ScheduledReminder, 'id' | 'createdAt' | 'isSent'>) => Promise<string>;
+  getScheduledReminders: (recipientEmail?: string) => ScheduledReminder[];
+  // Role-Based Access Control
+  roles: Role[];
+  userRoles: UserRole[];
+  createRole: (data: Omit<Role, 'id' | 'createdAt'>) => Promise<string>;
+  updateRole: (id: string, data: Partial<Role>) => void;
+  deleteRole: (id: string) => void;
+  assignUserRole: (data: Omit<UserRole, 'id' | 'assignedAt'>) => void;
+  getUserRoles: (userEmail: string) => Role[];
+  // Communication Logs
+  communicationLogs: CommunicationLog[];
+  logCommunication: (data: Omit<CommunicationLog, 'id' | 'createdAt'>) => Promise<string>;
+  // Student Feedback
+  universityRatings: UniversityRating[];
+  serviceFeedback: ServiceFeedback[];
+  submitUniversityRating: (data: Omit<UniversityRating, 'id' | 'createdAt' | 'isApproved'>) => Promise<string>;
+  submitServiceFeedback: (data: Omit<ServiceFeedback, 'id' | 'createdAt' | 'isResolved'>) => Promise<string>;
+  approveRating: (id: string, approvedBy: string) => void;
+  resolveFeedback: (id: string, resolvedBy: string, notes?: string) => void;
+  // Email Templates
+  emailTemplates: EmailTemplate[];
+  createEmailTemplate: (data: Omit<EmailTemplate, 'id' | 'createdAt' | 'updatedAt'>) => Promise<string>;
+  updateEmailTemplate: (id: string, data: Partial<EmailTemplate>) => void;
+  getEmailTemplates: (templateType?: string) => EmailTemplate[];
+  getEmailTemplateByName: (name: string) => EmailTemplate | undefined;
+  deleteEmailTemplate: (id: string) => void;
+  // Workflow Automation
+  workflowRules: WorkflowRule[];
+  createWorkflowRule: (data: Omit<WorkflowRule, 'id' | 'createdAt' | 'updatedAt'>) => Promise<string>;
+  updateWorkflowRule: (id: string, data: Partial<WorkflowRule>) => void;
+  getWorkflowRules: (triggerType?: string) => WorkflowRule[];
+  deleteWorkflowRule: (id: string) => void;
+  // User Preferences
+  userPreferences: UserPreferences | null;
+  saveUserPreferences: (data: Omit<UserPreferences, 'id' | 'updatedAt'>) => void;
+  getUserPreferences: (userEmail: string) => UserPreferences | null;
+  // 2FA
+  enable2FA: (userEmail: string, secret: string, backupCodes: string[]) => Promise<string>;
+  disable2FA: (userEmail: string) => void;
+  get2FASettings: (userEmail: string) => User2FA | null;
+  // Sessions
+  userSessions: UserSession[];
+  saveUserSession: (data: Omit<UserSession, 'id' | 'createdAt' | 'lastActivityAt'>) => Promise<string>;
+  getUserSessions: (userEmail: string) => UserSession[];
+  invalidateSession: (sessionToken: string) => void;
+  invalidateAllSessions: (userEmail: string, exceptToken?: string) => void;
+  // Bulk Operations
+  bulkOperations: BulkOperation[];
+  createBulkOperation: (data: Omit<BulkOperation, 'id' | 'startedAt' | 'operationStatus' | 'processedRecords' | 'successRecords' | 'failedRecords'>) => Promise<string>;
+  updateBulkOperationStatus: (id: string, status: BulkOperation['operationStatus'], processed?: number, success?: number, failed?: number) => void;
+  getBulkOperations: (limit?: number) => BulkOperation[];
+  // Saved Filters
+  savedFilters: SavedFilter[];
+  saveFilter: (data: Omit<SavedFilter, 'id' | 'createdAt' | 'updatedAt'>) => Promise<string>;
+  getSavedFilters: (filterType?: string) => SavedFilter[];
+  deleteSavedFilter: (id: string) => void;
+  // Legacy
   studentProfiles: StudentProfile[];
   updateStudentProfile: (email: string, updates: Partial<StudentProfile>) => void;
   studentOnboardings: StudentOnboardingData[];
@@ -120,6 +356,11 @@ const parseUniversity = (u: any): University => {
   // Ensure systems array exists
   const systems = u?.systems ?? koreanData?.systems ?? [];
   
+  // Extract display properties from korean_data or fallback to database fields
+  const thumbnail = koreanData?.thumbnail ?? u?.thumbnail ?? koreanData?.bannerImage ?? u?.banner_url ?? 'https://images.unsplash.com/photo-1562774053-701939374585?w=800&q=80';
+  const tagline = koreanData?.tagline ?? u?.tagline ?? u?.description ?? '';
+  const heroImage = koreanData?.heroImage ?? koreanData?.bannerImage ?? u?.banner_url ?? 'https://images.unsplash.com/photo-1562774053-701939374585?w=1200&q=80';
+  
   return {
     id: u.id,
     name: u.name,
@@ -130,6 +371,9 @@ const parseUniversity = (u: any): University => {
     top_tier: normalizedTier,
     ranking: u.ranking,
     description: u.description,
+    tagline: tagline,
+    thumbnail: thumbnail,
+    heroImage: heroImage,
     systems: Array.isArray(systems) ? systems : [],
     koreanData: {
       isKoreanUniversity: true,
@@ -141,6 +385,9 @@ const parseUniversity = (u: any): University => {
       visaSystemsDetail: koreanData?.visaSystemsDetail ?? {},
       supportPolicies: koreanData?.supportPolicies ?? [],
       commonFeesVND: koreanData?.commonFeesVND ?? [],
+      thumbnail: thumbnail,
+      tagline: tagline,
+      heroImage: heroImage,
       ...koreanData
     },
   };
@@ -155,6 +402,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [studentProgress, setStudentProgress] = useState<StudentProgress[]>([]);
   const [studentProfiles, setStudentProfiles] = useState<StudentProfile[]>([]);
   const [studentOnboardings, setStudentOnboardings] = useState<StudentOnboardingData[]>([]);
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [studentApplications, setStudentApplications] = useState<StudentApplication[]>([]);
+  // New state
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [scholarships, setScholarships] = useState<Scholarship[]>([]);
+  const [scholarshipApplications, setScholarshipApplications] = useState<ScholarshipApplication[]>([]);
+  const [visaApplications, setVisaApplications] = useState<VisaApplication[]>([]);
+  const [scheduledReminders, setScheduledReminders] = useState<ScheduledReminder[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [userRoles, setUserRoles] = useState<UserRole[]>([]);
+  const [communicationLogs, setCommunicationLogs] = useState<CommunicationLog[]>([]);
+  const [universityRatings, setUniversityRatings] = useState<UniversityRating[]>([]);
+  const [serviceFeedback, setServiceFeedback] = useState<ServiceFeedback[]>([]);
+  // New state for additional features
+  const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>([]);
+  const [workflowRules, setWorkflowRules] = useState<WorkflowRule[]>([]);
+  const [userPreferences, setUserPreferences] = useState<UserPreferences | null>(null);
+  const [userSessions, setUserSessions] = useState<UserSession[]>([]);
+  const [bulkOperations, setBulkOperations] = useState<BulkOperation[]>([]);
+  const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
   const [dbInitialized, setDbInitialized] = useState(false);
 
   // Initialize SQLite database and load universities
@@ -163,11 +432,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       try {
         await initDatabase();
         
-        // Load universities from SQLite
-        let dbUniversities = await getAllUniversities();
+        const { getDatabase } = await import('../services/sqliteDatabase');
+        const { bulkInsertUniversities, getAllUniversities } = await import('../services/universityService');
         
-        // If no universities in DB, seed with default data
-        if (dbUniversities.length === 0) {
+        // Check if universities exist - only seed if empty
+        const existingUniversities = await getAllUniversities();
+        
+        if (existingUniversities.length === 0) {
+          console.log('[AppContext] No universities found, seeding...');
+          
+          // Seed with complete CSV data
           const seedData = allUniversitiesData.map(u => ({
             id: u.id,
             name: u.name,
@@ -181,10 +455,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
             korean_data: JSON.stringify(u.koreanData)
           }));
           await bulkInsertUniversities(seedData);
-          dbUniversities = await getAllUniversities();
+          console.log('[AppContext] Seeded', seedData.length, 'universities');
+          
+          // Load fresh data
+          const dbUniversities = await getAllUniversities();
+          setUniversities(dbUniversities.map(parseUniversity));
+        } else {
+          console.log('[AppContext] Universities already exist:', existingUniversities.length);
+          setUniversities(existingUniversities.map(parseUniversity));
         }
         
-        setUniversities(dbUniversities.map(parseUniversity));
         setDbInitialized(true);
       } catch (error) {
         console.error('Failed to initialize database:', error);
@@ -220,6 +500,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const updateUniversity = async (id: string, updates: Partial<University>) => {
+    console.log('[AppContext] updateUniversity called:', id);
+    console.log('[AppContext] updates.koreanData:', updates.koreanData);
+    console.log('[AppContext] visaSystemsDetail keys:', Object.keys(updates.koreanData?.visaSystemsDetail || {}));
+    
     setUniversities(prev =>
       prev.map(uni => uni.id === id ? parseUniversity({ ...uni, ...updates }) : uni)
     );
@@ -227,7 +511,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // Save to SQLite
     if (dbInitialized) {
       try {
-        await saveUniversity({
+        const saveData = {
           id,
           name: updates.name || '',
           name_korean: updates.koreanName,
@@ -238,10 +522,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
           country_code: updates.countryCode,
           address: updates.koreanData?.address,
           korean_data: JSON.stringify(updates.koreanData)
-        });
+        };
+        console.log('[AppContext] Saving to SQLite:', saveData);
+        await saveUniversity(saveData);
+        console.log('[AppContext] SQLite save SUCCESS');
       } catch (error) {
-        console.error('Failed to save university to SQLite:', error);
+        console.error('[AppContext] Failed to save university to SQLite:', error);
       }
+    } else {
+      console.warn('[AppContext] Database not initialized, skipping SQLite save');
     }
   };
 
@@ -250,21 +539,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // Fetch fresh data from SQLite database
       const dbUniversity = await getUniversityById(id);
       
+      console.log('[fetchUniversity] Raw DB data:', dbUniversity);
+      console.log('[fetchUniversity] korean_data from DB:', dbUniversity?.korean_data);
+      
       if (!dbUniversity) {
         console.error('University not found in database:', id);
         return null;
       }
+
+      // Parse and update the university in state
+      const parsed = parseUniversity({
+        ...dbUniversity,
+        koreanData: dbUniversity.korean_data  // Map snake_case to camelCase
+      });
       
-      const parsed = parseUniversity(dbUniversity);
+      console.log('[fetchUniversity] Parsed university:', parsed);
+      console.log('[fetchUniversity] parsed.koreanData:', parsed.koreanData);
       
-      // Update the specific university in the list with fresh data
-      setUniversities(prev =>
-        prev.map(uni => uni.id === id ? parsed : uni)
+      setUniversities(prev => 
+        prev.map(u => u.id === id ? parsed : u)
       );
       
       return parsed;
     } catch (error) {
-      console.error('Error fetching university from database:', error);
+      console.error('Failed to fetch university from database:', error);
       return null;
     }
   }, []);
@@ -443,6 +741,1437 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return [];
   };
 
+  // ============================================
+  // ENHANCED PROGRESS TRACKING WITH DATABASE
+  // ============================================
+
+  const loadStudentProgress = async (studentEmail: string, universityId?: string): Promise<ProgressStage[]> => {
+    if (!dbInitialized) return [];
+    
+    try {
+      const dbProgress = await import('../services/sqliteDatabase').then(m => m.getStudentProgress(studentEmail, universityId));
+      
+      if (dbProgress && dbProgress.length > 0) {
+        // Convert DB format to ProgressStage format
+        const stages: ProgressStage[] = dbProgress.map((p: any) => ({
+          id: p.stage_id,
+          status: p.status,
+          startDate: p.start_date,
+          completedDate: p.completed_date,
+          notes: p.notes
+        }));
+        
+        // Update local state
+        const existing = studentProgress.find(sp => sp.studentEmail === studentEmail && sp.universityId === universityId);
+        if (existing) {
+          setStudentProgress(prev => prev.map(sp => 
+            sp.studentEmail === studentEmail && sp.universityId === universityId
+              ? { ...sp, stages, overallProgress: calculateOverallProgress(stages) }
+              : sp
+          ));
+        } else {
+          setStudentProgress(prev => [...prev, {
+            studentEmail,
+            universityId: universityId || '',
+            stages,
+            overallProgress: calculateOverallProgress(stages)
+          }]);
+        }
+        
+        return stages;
+      }
+      return [];
+    } catch (error) {
+      console.error('Failed to load student progress:', error);
+      return [];
+    }
+  };
+
+  const saveProgressToDatabase = (studentEmail: string, universityId: string, stages: ProgressStage[], updatedBy?: string) => {
+    if (!dbInitialized) return;
+    
+    try {
+      stages.forEach(stage => {
+        saveStudentProgress({
+          id: `${studentEmail}_${universityId}_${stage.id}`,
+          studentEmail,
+          universityId,
+          stageId: stage.id,
+          stageName: `Stage ${stage.id}`,
+          status: stage.status as 'pending' | 'in-progress' | 'completed',
+          startDate: stage.startDate,
+          completedDate: stage.completedDate,
+          notes: stage.notes,
+          updatedBy
+        });
+      });
+      
+      // Also update local state
+      updateProgress(studentEmail, universityId, stages);
+    } catch (error) {
+      console.error('Failed to save progress to database:', error);
+    }
+  };
+
+  // ============================================
+  // DOCUMENT FUNCTIONS
+  // ============================================
+
+  const uploadDocument = async (data: Omit<Document, 'id' | 'createdAt' | 'verified'>): Promise<string> => {
+    const id = crypto.randomUUID();
+    const newDoc: Document = {
+      ...data,
+      id,
+      verified: false,
+      createdAt: new Date().toISOString()
+    };
+    
+    setDocuments(prev => [newDoc, ...prev]);
+    
+    if (dbInitialized) {
+      try {
+        saveDocument({
+          id,
+          studentEmail: data.studentEmail,
+          universityId: data.universityId,
+          documentType: data.documentType,
+          documentName: data.documentName,
+          fileData: data.fileData,
+          fileSize: data.fileSize,
+          mimeType: data.mimeType,
+          uploadType: data.uploadType,
+          uploadedBy: data.uploadedBy,
+          notes: data.notes
+        });
+      } catch (error) {
+        console.error('Failed to save document to database:', error);
+      }
+    }
+    
+    return id;
+  };
+
+  const getStudentDocuments = (studentEmail: string): Document[] => {
+    return documents.filter(d => d.studentEmail === studentEmail);
+  };
+
+  const handleVerifyDocument = (id: string, verifiedBy: string) => {
+    setDocuments(prev => prev.map(d => 
+      d.id === id ? { ...d, verified: true, verifiedBy, verifiedAt: new Date().toISOString() } : d
+    ));
+    
+    if (dbInitialized) {
+      try {
+        verifyDocument(id, verifiedBy);
+      } catch (error) {
+        console.error('Failed to verify document:', error);
+      }
+    }
+  };
+
+  const handleDeleteDocument = (id: string) => {
+    setDocuments(prev => prev.filter(d => d.id !== id));
+    
+    if (dbInitialized) {
+      try {
+        import('../services/sqliteDatabase').then(m => m.deleteDocument(id));
+      } catch (error) {
+        console.error('Failed to delete document:', error);
+      }
+    }
+  };
+
+  // ============================================
+  // PAYMENT FUNCTIONS
+  // ============================================
+
+  const addPayment = async (data: Omit<Payment, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
+    const newPayment: Payment = {
+      ...data,
+      id,
+      createdAt: now,
+      updatedAt: now
+    };
+    
+    setPayments(prev => [newPayment, ...prev]);
+    
+    if (dbInitialized) {
+      try {
+        savePayment({
+          id,
+          studentEmail: data.studentEmail,
+          universityId: data.universityId,
+          paymentType: data.paymentType,
+          amountVnd: data.amountVnd,
+          amountKrw: data.amountKrw,
+          amountUsd: data.amountUsd,
+          paymentMethod: data.paymentMethod,
+          transactionId: data.transactionId,
+          paymentDate: data.paymentDate,
+          dueDate: data.dueDate,
+          status: data.status,
+          proofDocumentId: data.proofDocumentId,
+          notes: data.notes,
+          createdBy: data.createdBy
+        });
+      } catch (error) {
+        console.error('Failed to save payment to database:', error);
+      }
+    }
+    
+    return id;
+  };
+
+  const getStudentPayments = (studentEmail: string): Payment[] => {
+    return payments.filter(p => p.studentEmail === studentEmail);
+  };
+
+  const handleUpdatePaymentStatus = (id: string, status: Payment['status']) => {
+    setPayments(prev => prev.map(p => 
+      p.id === id ? { ...p, status, updatedAt: new Date().toISOString() } : p
+    ));
+    
+    if (dbInitialized) {
+      try {
+        updatePaymentStatus(id, status);
+      } catch (error) {
+        console.error('Failed to update payment status:', error);
+      }
+    }
+  };
+
+  // ============================================
+  // NOTIFICATION FUNCTIONS
+  // ============================================
+
+  const handleCreateNotification = (data: Omit<Notification, 'id' | 'createdAt' | 'isRead'>) => {
+    const id = crypto.randomUUID();
+    const newNotification: Notification = {
+      ...data,
+      id,
+      isRead: false,
+      createdAt: new Date().toISOString()
+    };
+    
+    setNotifications(prev => [newNotification, ...prev]);
+    
+    if (dbInitialized) {
+      try {
+        createNotification({
+          id,
+          recipientEmail: data.recipientEmail,
+          recipientRole: data.recipientRole,
+          title: data.title,
+          message: data.message,
+          type: data.type,
+          relatedEntityType: data.relatedEntityType,
+          relatedEntityId: data.relatedEntityId,
+          createdBy: data.createdBy
+        });
+      } catch (error) {
+        console.error('Failed to create notification:', error);
+      }
+    }
+  };
+
+  const handleMarkNotificationRead = (id: string) => {
+    setNotifications(prev => prev.map(n => 
+      n.id === id ? { ...n, isRead: true, readAt: new Date().toISOString() } : n
+    ));
+    
+    if (dbInitialized) {
+      try {
+        markNotificationAsRead(id);
+      } catch (error) {
+        console.error('Failed to mark notification as read:', error);
+      }
+    }
+  };
+
+  const handleGetNotifications = (recipientEmail?: string): Notification[] => {
+    if (recipientEmail) {
+      return notifications.filter(n => n.recipientEmail === recipientEmail);
+    }
+    return notifications;
+  };
+
+  const unreadCount = notifications.filter(n => !n.isRead).length;
+
+  // ============================================
+  // STUDENT APPLICATIONS (Multi-University)
+  // ============================================
+
+  const addStudentApplication = (data: Omit<StudentApplication, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
+    const newApp: StudentApplication = {
+      ...data,
+      id,
+      createdAt: now,
+      updatedAt: now
+    };
+    
+    setStudentApplications(prev => [newApp, ...prev]);
+    
+    if (dbInitialized) {
+      try {
+        saveStudentApplication({
+          id,
+          studentEmail: data.studentEmail,
+          universityId: data.universityId,
+          trackingCode: data.trackingCode,
+          applicationStatus: data.applicationStatus,
+          priority: data.priority,
+          isPrimary: data.isPrimary,
+          notes: data.notes
+        });
+      } catch (error) {
+        console.error('Failed to save student application:', error);
+      }
+    }
+  };
+
+  const handleUpdateApplicationStatus = (id: string, status: string) => {
+    setStudentApplications(prev => prev.map(a => 
+      a.id === id ? { ...a, applicationStatus: status, updatedAt: new Date().toISOString() } : a
+    ));
+    
+    if (dbInitialized) {
+      try {
+        import('../services/sqliteDatabase').then(m => m.updateApplicationStatus(id, status));
+      } catch (error) {
+        console.error('Failed to update application status:', error);
+      }
+    }
+  };
+
+  const handleGetAllApplications = async (): Promise<any[]> => {
+    if (dbInitialized) {
+      try {
+        const result = await import('../services/sqliteDatabase').then(m => m.getAllApplications());
+        return result || [];
+      } catch (error) {
+        console.error('Failed to get all applications:', error);
+        return [];
+      }
+    }
+    return [];
+  };
+  const handleGetStudentApplications = (studentEmail: string): StudentApplication[] => {
+    return studentApplications.filter(a => a.studentEmail === studentEmail);
+  };
+
+  // ============================================
+  // AUDIT LOG FUNCTIONS
+  // ============================================
+
+  const handleCreateAuditLog = (data: Omit<AuditLog, 'id' | 'createdAt'>) => {
+    const id = crypto.randomUUID();
+    
+    if (dbInitialized) {
+      try {
+        createAuditLog({
+          id,
+          action: data.action,
+          entityType: data.entityType,
+          entityId: data.entityId,
+          studentEmail: data.studentEmail,
+          oldValues: data.oldValues,
+          newValues: data.newValues,
+          performedBy: data.performedBy,
+          performedByEmail: data.performedByEmail,
+          ipAddress: data.ipAddress,
+          userAgent: data.userAgent
+        });
+      } catch (error) {
+        console.error('Failed to create audit log:', error);
+      }
+    }
+  };
+
+  // ============================================
+  // CALENDAR & APPOINTMENTS FUNCTIONS
+  // ============================================
+
+  const scheduleAppointment = async (data: Omit<Appointment, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
+    const newAppointment: Appointment = {
+      ...data,
+      id,
+      createdAt: now,
+      updatedAt: now
+    };
+    
+    setAppointments(prev => [newAppointment, ...prev]);
+    
+    if (dbInitialized) {
+      try {
+        saveAppointment({
+          id,
+          studentEmail: data.studentEmail,
+          adminEmail: data.adminEmail,
+          title: data.title,
+          description: data.description,
+          appointmentType: data.appointmentType,
+          startTime: data.startTime,
+          endTime: data.endTime,
+          location: data.location,
+          isOnline: data.isOnline,
+          meetingLink: data.meetingLink,
+          status: data.status,
+          notes: data.notes
+        });
+      } catch (error) {
+        console.error('Failed to save appointment:', error);
+      }
+    }
+    
+    return id;
+  };
+
+  const handleGetAppointments = (studentEmail?: string, adminEmail?: string): Appointment[] => {
+    return appointments.filter(a => {
+      if (studentEmail && a.studentEmail !== studentEmail) return false;
+      if (adminEmail && a.adminEmail !== adminEmail) return false;
+      return true;
+    });
+  };
+
+  const handleUpdateAppointmentStatus = (id: string, status: Appointment['status']) => {
+    setAppointments(prev => prev.map(a => 
+      a.id === id ? { ...a, status, updatedAt: new Date().toISOString() } : a
+    ));
+    
+    if (dbInitialized) {
+      try {
+        updateAppointmentStatus(id, status);
+      } catch (error) {
+        console.error('Failed to update appointment status:', error);
+      }
+    }
+  };
+
+  const cancelAppointment = (id: string) => {
+    handleUpdateAppointmentStatus(id, 'cancelled');
+  };
+
+  // ============================================
+  // SCHOLARSHIP FUNCTIONS
+  // ============================================
+
+  const addScholarship = async (data: Omit<Scholarship, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
+    const newScholarship: Scholarship = {
+      ...data,
+      id,
+      createdAt: now,
+      updatedAt: now
+    };
+    
+    setScholarships(prev => [newScholarship, ...prev]);
+    
+    if (dbInitialized) {
+      try {
+        saveScholarship({
+          id,
+          universityId: data.universityId,
+          name: data.name,
+          nameKorean: data.nameKorean,
+          description: data.description,
+          amountVnd: data.amountVnd,
+          amountKrw: data.amountKrw,
+          eligibilityCriteria: data.eligibilityCriteria,
+          applicationDeadline: data.applicationDeadline,
+          requirements: data.requirements,
+          isActive: data.isActive
+        });
+      } catch (error) {
+        console.error('Failed to save scholarship:', error);
+      }
+    }
+    
+    return id;
+  };
+
+  const handleGetScholarships = (universityId?: string): Scholarship[] => {
+    if (universityId) {
+      return scholarships.filter(s => s.universityId === universityId);
+    }
+    return scholarships;
+  };
+
+  const handleDeleteScholarship = (id: string) => {
+    setScholarships(prev => prev.filter(s => s.id !== id));
+    
+    if (dbInitialized) {
+      try {
+        import('../services/sqliteDatabase').then(m => m.deleteScholarship(id));
+      } catch (error) {
+        console.error('Failed to delete scholarship:', error);
+      }
+    }
+  };
+
+  const handleUpdateScholarship = (id: string, data: Partial<Scholarship>) => {
+    setScholarships(prev => prev.map(s => 
+      s.id === id ? { ...s, ...data, updatedAt: new Date().toISOString() } : s
+    ));
+    
+    if (dbInitialized) {
+      try {
+        import('../services/sqliteDatabase').then(m => {
+          const db = m.getDatabase();
+          // Build dynamic update query based on provided data
+          const fields: string[] = [];
+          const values: any[] = [];
+          
+          if (data.name !== undefined) { fields.push('name = ?'); values.push(data.name); }
+          if (data.nameKorean !== undefined) { fields.push('name_korean = ?'); values.push(data.nameKorean); }
+          if (data.description !== undefined) { fields.push('description = ?'); values.push(data.description); }
+          if (data.amountVnd !== undefined) { fields.push('amount_vnd = ?'); values.push(data.amountVnd); }
+          if (data.amountKrw !== undefined) { fields.push('amount_krw = ?'); values.push(data.amountKrw); }
+          if (data.eligibilityCriteria !== undefined) { fields.push('eligibility_criteria = ?'); values.push(data.eligibilityCriteria); }
+          if (data.applicationDeadline !== undefined) { fields.push('application_deadline = ?'); values.push(data.applicationDeadline); }
+          if (data.requirements !== undefined) { fields.push('requirements = ?'); values.push(data.requirements); }
+          if (data.isActive !== undefined) { fields.push('is_active = ?'); values.push(data.isActive ? 1 : 0); }
+          
+          if (fields.length > 0) {
+            const stmt = db.prepare(`
+              UPDATE scholarships SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+            `);
+            stmt.bind([...values, id]);
+            stmt.step();
+            stmt.free();
+            m.saveDatabase();
+          }
+        });
+      } catch (error) {
+        console.error('Failed to update scholarship:', error);
+      }
+    }
+  };
+
+  const applyForScholarship = async (data: Omit<ScholarshipApplication, 'id' | 'appliedAt'>): Promise<string> => {
+    const id = crypto.randomUUID();
+    const newApplication: ScholarshipApplication = {
+      ...data,
+      id,
+      appliedAt: new Date().toISOString()
+    };
+    
+    setScholarshipApplications(prev => [newApplication, ...prev]);
+    
+    if (dbInitialized) {
+      try {
+        saveScholarshipApplication({
+          id,
+          scholarshipId: data.scholarshipId,
+          studentEmail: data.studentEmail,
+          studentApplicationId: data.studentApplicationId,
+          status: data.status,
+          documents: data.documents,
+          amountAwardedVnd: data.amountAwardedVnd,
+          amountAwardedKrw: data.amountAwardedKrw
+        });
+      } catch (error) {
+        console.error('Failed to save scholarship application:', error);
+      }
+    }
+    
+    return id;
+  };
+
+  // ============================================
+  // VISA APPLICATION FUNCTIONS
+  // ============================================
+
+  const addVisaApplication = async (data: Omit<VisaApplication, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
+    const newVisa: VisaApplication = {
+      ...data,
+      id,
+      createdAt: now,
+      updatedAt: now
+    };
+    
+    setVisaApplications(prev => [newVisa, ...prev]);
+    
+    if (dbInitialized) {
+      try {
+        saveVisaApplication({
+          id,
+          studentEmail: data.studentEmail,
+          studentApplicationId: data.studentApplicationId,
+          visaType: data.visaType,
+          embassyLocation: data.embassyLocation,
+          submissionDate: data.submissionDate,
+          appointmentDate: data.appointmentDate,
+          appointmentTime: data.appointmentTime,
+          status: data.status,
+          visaNumber: data.visaNumber,
+          issueDate: data.issueDate,
+          expiryDate: data.expiryDate,
+          documentsSubmitted: data.documentsSubmitted,
+          interviewRequired: data.interviewRequired,
+          interviewDate: data.interviewDate,
+          interviewNotes: data.interviewNotes,
+          rejectionReason: data.rejectionReason,
+          trackingNumber: data.trackingNumber,
+          notes: data.notes
+        });
+      } catch (error) {
+        console.error('Failed to save visa application:', error);
+      }
+    }
+    
+    return id;
+  };
+
+  const handleGetVisaApplications = (studentEmail?: string): VisaApplication[] => {
+    if (studentEmail) {
+      return visaApplications.filter(v => v.studentEmail === studentEmail);
+    }
+    return visaApplications;
+  };
+
+  const handleUpdateVisaStatus = (id: string, status: string) => {
+    setVisaApplications(prev => prev.map(v => 
+      v.id === id ? { ...v, status, updatedAt: new Date().toISOString() } : v
+    ));
+    
+    if (dbInitialized) {
+      try {
+        import('../services/sqliteDatabase').then(m => {
+          const stmt = m.getDatabase().prepare(`
+            UPDATE visa_applications SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+          `);
+          stmt.bind([status, id]);
+          stmt.step();
+          stmt.free();
+          m.saveDatabase();
+        });
+      } catch (error) {
+        console.error('Failed to update visa status:', error);
+      }
+    }
+  };
+
+  const handleDeleteVisaApplication = (id: string) => {
+    setVisaApplications(prev => prev.filter(v => v.id !== id));
+    
+    if (dbInitialized) {
+      try {
+        import('../services/sqliteDatabase').then(m => {
+          const stmt = m.getDatabase().prepare(`
+            DELETE FROM visa_applications WHERE id = ?
+          `);
+          stmt.bind([id]);
+          stmt.step();
+          stmt.free();
+          m.saveDatabase();
+        });
+      } catch (error) {
+        console.error('Failed to delete visa application:', error);
+      }
+    }
+  };
+
+  // ============================================
+  // SCHEDULED REMINDERS FUNCTIONS
+  // ============================================
+
+  const scheduleReminder = async (data: Omit<ScheduledReminder, 'id' | 'createdAt' | 'isSent'>): Promise<string> => {
+    const id = crypto.randomUUID();
+    const newReminder: ScheduledReminder = {
+      ...data,
+      id,
+      isSent: false,
+      createdAt: new Date().toISOString()
+    };
+    
+    setScheduledReminders(prev => [newReminder, ...prev]);
+    
+    if (dbInitialized) {
+      try {
+        saveScheduledReminder({
+          id,
+          recipientEmail: data.recipientEmail,
+          recipientRole: data.recipientRole,
+          title: data.title,
+          message: data.message,
+          reminderType: data.reminderType,
+          relatedEntityType: data.relatedEntityType,
+          relatedEntityId: data.relatedEntityId,
+          scheduledDate: data.scheduledDate,
+          isRecurring: data.isRecurring,
+          recurrencePattern: data.recurrencePattern,
+          createdBy: data.createdBy
+        });
+      } catch (error) {
+        console.error('Failed to schedule reminder:', error);
+      }
+    }
+    
+    return id;
+  };
+
+  const handleGetScheduledReminders = (recipientEmail?: string): ScheduledReminder[] => {
+    if (recipientEmail) {
+      return scheduledReminders.filter(r => r.recipientEmail === recipientEmail);
+    }
+    return scheduledReminders;
+  };
+
+  // ============================================
+  // ROLE-BASED ACCESS CONTROL FUNCTIONS
+  // ============================================
+
+  const createRole = async (data: Omit<Role, 'id' | 'createdAt'>): Promise<string> => {
+    const id = crypto.randomUUID();
+    const newRole: Role = {
+      ...data,
+      id,
+      createdAt: new Date().toISOString()
+    };
+    
+    setRoles(prev => [newRole, ...prev]);
+    
+    if (dbInitialized) {
+      try {
+        saveRole({
+          id,
+          name: data.name,
+          description: data.description,
+          permissions: data.permissions
+        });
+      } catch (error) {
+        console.error('Failed to create role:', error);
+      }
+    }
+    
+    return id;
+  };
+
+  const assignUserRole = (data: Omit<UserRole, 'id' | 'assignedAt'>) => {
+    const id = crypto.randomUUID();
+    const newUserRole: UserRole = {
+      ...data,
+      id,
+      assignedAt: new Date().toISOString()
+    };
+    
+    setUserRoles(prev => [newUserRole, ...prev]);
+    
+    if (dbInitialized) {
+      try {
+        assignRoleToUser({
+          id,
+          userEmail: data.userEmail,
+          roleId: data.roleId,
+          assignedBy: data.assignedBy
+        });
+      } catch (error) {
+        console.error('Failed to assign user role:', error);
+      }
+    }
+  };
+
+  const handleGetUserRoles = (userEmail: string): Role[] => {
+    const userRoleIds = userRoles
+      .filter(ur => ur.userEmail === userEmail)
+      .map(ur => ur.roleId);
+    return roles.filter(r => userRoleIds.includes(r.id));
+  };
+
+  const handleUpdateRole = (id: string, data: Partial<Role>) => {
+    setRoles(prev => prev.map(r => 
+      r.id === id ? { ...r, ...data, updatedAt: new Date().toISOString() } : r
+    ));
+    
+    if (dbInitialized) {
+      try {
+        import('../services/sqliteDatabase').then(m => {
+          const db = m.getDatabase();
+          const fields: string[] = [];
+          const values: any[] = [];
+          
+          if (data.name !== undefined) { fields.push('name = ?'); values.push(data.name); }
+          if (data.description !== undefined) { fields.push('description = ?'); values.push(data.description); }
+          if (data.permissions !== undefined) { fields.push('permissions = ?'); values.push(JSON.stringify(data.permissions)); }
+          
+          if (fields.length > 0) {
+            const stmt = db.prepare(`
+              UPDATE roles SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+            `);
+            stmt.bind([...values, id]);
+            stmt.step();
+            stmt.free();
+            m.saveDatabase();
+          }
+        });
+      } catch (error) {
+        console.error('Failed to update role:', error);
+      }
+    }
+  };
+
+  const handleDeleteRole = (id: string) => {
+    setRoles(prev => prev.filter(r => r.id !== id));
+    
+    if (dbInitialized) {
+      try {
+        import('../services/sqliteDatabase').then(m => {
+          const stmt = m.getDatabase().prepare(`
+            DELETE FROM roles WHERE id = ?
+          `);
+          stmt.bind([id]);
+          stmt.step();
+          stmt.free();
+          m.saveDatabase();
+        });
+      } catch (error) {
+        console.error('Failed to delete role:', error);
+      }
+    }
+  };
+
+  // ============================================
+  // COMMUNICATION LOGS FUNCTIONS
+  // ============================================
+
+  const logCommunication = async (data: Omit<CommunicationLog, 'id' | 'createdAt'>): Promise<string> => {
+    const id = crypto.randomUUID();
+    const newLog: CommunicationLog = {
+      ...data,
+      id,
+      createdAt: new Date().toISOString()
+    };
+    
+    setCommunicationLogs(prev => [newLog, ...prev]);
+    
+    if (dbInitialized) {
+      try {
+        saveCommunicationLog({
+          id,
+          recipientEmail: data.recipientEmail,
+          recipientPhone: data.recipientPhone,
+          communicationType: data.communicationType,
+          subject: data.subject,
+          content: data.content,
+          status: data.status,
+          templateUsed: data.templateUsed
+        });
+      } catch (error) {
+        console.error('Failed to log communication:', error);
+      }
+    }
+    
+    return id;
+  };
+
+  // ============================================
+  // STUDENT FEEDBACK FUNCTIONS
+  // ============================================
+
+  const submitUniversityRating = async (data: Omit<UniversityRating, 'id' | 'createdAt' | 'isApproved'>): Promise<string> => {
+    const id = crypto.randomUUID();
+    const newRating: UniversityRating = {
+      ...data,
+      id,
+      isApproved: false,
+      createdAt: new Date().toISOString()
+    };
+    
+    setUniversityRatings(prev => [newRating, ...prev]);
+    
+    if (dbInitialized) {
+      try {
+        saveUniversityRating({
+          id,
+          universityId: data.universityId,
+          studentEmail: data.studentEmail,
+          studentApplicationId: data.studentApplicationId,
+          overallRating: data.overallRating,
+          teachingQuality: data.teachingQuality,
+          facilities: data.facilities,
+          supportServices: data.supportServices,
+          valueForMoney: data.valueForMoney,
+          reviewTitle: data.reviewTitle,
+          reviewText: data.reviewText
+        });
+      } catch (error) {
+        console.error('Failed to submit university rating:', error);
+      }
+    }
+    
+    return id;
+  };
+
+  const submitServiceFeedback = async (data: Omit<ServiceFeedback, 'id' | 'createdAt' | 'isResolved'>): Promise<string> => {
+    const id = crypto.randomUUID();
+    const newFeedback: ServiceFeedback = {
+      ...data,
+      id,
+      isResolved: false,
+      createdAt: new Date().toISOString()
+    };
+    
+    setServiceFeedback(prev => [newFeedback, ...prev]);
+    
+    if (dbInitialized) {
+      try {
+        saveServiceFeedback({
+          id,
+          studentEmail: data.studentEmail,
+          feedbackType: data.feedbackType,
+          rating: data.rating,
+          feedbackText: data.feedbackText
+        });
+      } catch (error) {
+        console.error('Failed to submit service feedback:', error);
+      }
+    }
+    
+    return id;
+  };
+
+  const handleApproveRating = (id: string, approvedBy: string) => {
+    setUniversityRatings(prev => prev.map(r => 
+      r.id === id ? { ...r, isApproved: true, approvedBy, approvedAt: new Date().toISOString() } : r
+    ));
+    
+    if (dbInitialized) {
+      try {
+        approveRating(id, approvedBy);
+      } catch (error) {
+        console.error('Failed to approve rating:', error);
+      }
+    }
+  };
+
+  const handleResolveFeedback = (id: string, resolvedBy: string, notes?: string) => {
+    setServiceFeedback(prev => prev.map(f => 
+      f.id === id ? { ...f, isResolved: true, resolvedBy, resolvedAt: new Date().toISOString(), resolutionNotes: notes } : f
+    ));
+    
+    if (dbInitialized) {
+      try {
+        resolveFeedback(id, resolvedBy, notes);
+      } catch (error) {
+        console.error('Failed to resolve feedback:', error);
+      }
+    }
+  };
+
+  // ============================================
+  // EMAIL TEMPLATES FUNCTIONS
+  // ============================================
+
+  const createEmailTemplate = async (data: Omit<EmailTemplate, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
+    const newTemplate: EmailTemplate = {
+      ...data,
+      id,
+      createdAt: now,
+      updatedAt: now
+    };
+    
+    setEmailTemplates(prev => [newTemplate, ...prev]);
+    
+    if (dbInitialized) {
+      try {
+        saveEmailTemplate({
+          id,
+          name: data.name,
+          subject: data.subject,
+          content: data.content,
+          templateType: data.templateType,
+          variables: data.variables,
+          isActive: data.isActive,
+          createdBy: data.createdBy
+        });
+      } catch (error) {
+        console.error('Failed to save email template:', error);
+      }
+    }
+    
+    return id;
+  };
+
+  const handleGetEmailTemplates = (templateType?: string): EmailTemplate[] => {
+    if (templateType) {
+      return emailTemplates.filter(t => t.templateType === templateType);
+    }
+    return emailTemplates;
+  };
+
+  const handleGetEmailTemplateByName = (name: string): EmailTemplate | undefined => {
+    return emailTemplates.find(t => t.name === name && t.isActive);
+  };
+
+  const handleDeleteEmailTemplate = (id: string) => {
+    setEmailTemplates(prev => prev.filter(t => t.id !== id));
+    
+    if (dbInitialized) {
+      try {
+        deleteEmailTemplate(id);
+      } catch (error) {
+        console.error('Failed to delete email template:', error);
+      }
+    }
+  };
+
+  const handleUpdateEmailTemplate = (id: string, data: Partial<EmailTemplate>) => {
+    setEmailTemplates(prev => prev.map(t => 
+      t.id === id ? { ...t, ...data, updatedAt: new Date().toISOString() } : t
+    ));
+    
+    if (dbInitialized) {
+      try {
+        import('../services/sqliteDatabase').then(m => {
+          const db = m.getDatabase();
+          const fields: string[] = [];
+          const values: any[] = [];
+          
+          if (data.name !== undefined) { fields.push('name = ?'); values.push(data.name); }
+          if (data.subject !== undefined) { fields.push('subject = ?'); values.push(data.subject); }
+          if (data.content !== undefined) { fields.push('content = ?'); values.push(data.content); }
+          if (data.templateType !== undefined) { fields.push('template_type = ?'); values.push(data.templateType); }
+          if (data.variables !== undefined) { fields.push('variables = ?'); values.push(JSON.stringify(data.variables)); }
+          if (data.isActive !== undefined) { fields.push('is_active = ?'); values.push(data.isActive ? 1 : 0); }
+          
+          if (fields.length > 0) {
+            const stmt = db.prepare(`UPDATE email_templates SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`);
+            stmt.bind([...values, id]);
+            stmt.step();
+            stmt.free();
+            m.saveDatabase();
+          }
+        });
+      } catch (error) {
+        console.error('Failed to update email template:', error);
+      }
+    }
+  };
+
+  // ============================================
+  // WORKFLOW AUTOMATION FUNCTIONS
+  // ============================================
+
+  const createWorkflowRule = async (data: Omit<WorkflowRule, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
+    const newRule: WorkflowRule = {
+      ...data,
+      id,
+      createdAt: now,
+      updatedAt: now
+    };
+    
+    setWorkflowRules(prev => [newRule, ...prev]);
+    
+    if (dbInitialized) {
+      try {
+        saveWorkflowRule({
+          id,
+          name: data.name,
+          description: data.description,
+          triggerType: data.triggerType,
+          triggerCondition: data.triggerCondition,
+          actionType: data.actionType,
+          actionConfig: data.actionConfig,
+          isActive: data.isActive,
+          priority: data.priority,
+          createdBy: data.createdBy
+        });
+      } catch (error) {
+        console.error('Failed to save workflow rule:', error);
+      }
+    }
+    
+    return id;
+  };
+
+  const handleGetWorkflowRules = (triggerType?: string): WorkflowRule[] => {
+    if (triggerType) {
+      return workflowRules.filter(r => r.triggerType === triggerType && r.isActive);
+    }
+    return workflowRules.filter(r => r.isActive);
+  };
+
+  const handleDeleteWorkflowRule = (id: string) => {
+    setWorkflowRules(prev => prev.filter(r => r.id !== id));
+    
+    if (dbInitialized) {
+      try {
+        deleteWorkflowRule(id);
+      } catch (error) {
+        console.error('Failed to delete workflow rule:', error);
+      }
+    }
+  };
+
+  const handleUpdateWorkflowRule = (id: string, data: Partial<WorkflowRule>) => {
+    setWorkflowRules(prev => prev.map(r => 
+      r.id === id ? { ...r, ...data, updatedAt: new Date().toISOString() } : r
+    ));
+    
+    if (dbInitialized) {
+      try {
+        import('../services/sqliteDatabase').then(m => {
+          const db = m.getDatabase();
+          const fields: string[] = [];
+          const values: any[] = [];
+          
+          if (data.name !== undefined) { fields.push('name = ?'); values.push(data.name); }
+          if (data.description !== undefined) { fields.push('description = ?'); values.push(data.description); }
+          if (data.triggerType !== undefined) { fields.push('trigger_type = ?'); values.push(data.triggerType); }
+          if (data.triggerCondition !== undefined) { fields.push('trigger_condition = ?'); values.push(data.triggerCondition); }
+          if (data.actionType !== undefined) { fields.push('action_type = ?'); values.push(data.actionType); }
+          if (data.actionConfig !== undefined) { fields.push('action_config = ?'); values.push(JSON.stringify(data.actionConfig)); }
+          if (data.isActive !== undefined) { fields.push('is_active = ?'); values.push(data.isActive ? 1 : 0); }
+          if (data.priority !== undefined) { fields.push('priority = ?'); values.push(data.priority); }
+          
+          if (fields.length > 0) {
+            const stmt = db.prepare(`UPDATE workflow_rules SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`);
+            stmt.bind([...values, id]);
+            stmt.step();
+            stmt.free();
+            m.saveDatabase();
+          }
+        });
+      } catch (error) {
+        console.error('Failed to update workflow rule:', error);
+      }
+    }
+  };
+
+  // ============================================
+  // USER PREFERENCES FUNCTIONS
+  // ============================================
+
+  const handleSaveUserPreferences = (data: Partial<UserPreferences> & { userEmail: string }) => {
+    const id = data.id || crypto.randomUUID();
+    const now = new Date().toISOString();
+    const newPrefs: UserPreferences = {
+      userEmail: data.userEmail,
+      language: data.language || 'vi',
+      theme: data.theme || 'light',
+      emailNotifications: data.emailNotifications ?? true,
+      smsNotifications: data.smsNotifications ?? false,
+      pushNotifications: data.pushNotifications ?? true,
+      timezone: data.timezone || 'Asia/Ho_Chi_Minh',
+      dateFormat: data.dateFormat || 'DD/MM/YYYY',
+      preferencesData: data.preferencesData || {},
+      id,
+      updatedAt: now
+    };
+    
+    setUserPreferences(newPrefs);
+    
+    if (dbInitialized) {
+      try {
+        saveUserPreferences({
+          id,
+          userEmail: data.userEmail,
+          language: data.language,
+          theme: data.theme,
+          emailNotifications: data.emailNotifications,
+          smsNotifications: data.smsNotifications,
+          pushNotifications: data.pushNotifications,
+          timezone: data.timezone,
+          dateFormat: data.dateFormat,
+          preferencesData: data.preferencesData
+        });
+      } catch (error) {
+        console.error('Failed to save user preferences:', error);
+      }
+    }
+  };
+
+  const handleGetUserPreferences = (userEmail: string): UserPreferences | null => {
+    if (userPreferences?.userEmail === userEmail) {
+      return userPreferences;
+    }
+    
+    if (dbInitialized) {
+      try {
+        const prefs = getUserPreferences(userEmail);
+        if (prefs) {
+          setUserPreferences(prefs);
+          return prefs;
+        }
+      } catch (error) {
+        console.error('Failed to get user preferences:', error);
+      }
+    }
+    return null;
+  };
+
+  // ============================================
+  // 2FA FUNCTIONS
+  // ============================================
+
+  const handleEnable2FA = async (userEmail: string, secret: string, backupCodes: string[]): Promise<string> => {
+    const id = crypto.randomUUID();
+    
+    if (dbInitialized) {
+      try {
+        save2FASecret({
+          id,
+          userEmail,
+          secret,
+          backupCodes,
+          isEnabled: true
+        });
+      } catch (error) {
+        console.error('Failed to enable 2FA:', error);
+      }
+    }
+    
+    return id;
+  };
+
+  const handleDisable2FA = (userEmail: string) => {
+    if (dbInitialized) {
+      try {
+        disable2FA(userEmail);
+      } catch (error) {
+        console.error('Failed to disable 2FA:', error);
+      }
+    }
+  };
+
+  const handleGet2FASettings = (userEmail: string): User2FA | null => {
+    if (dbInitialized) {
+      try {
+        return get2FASettings(userEmail);
+      } catch (error) {
+        console.error('Failed to get 2FA settings:', error);
+      }
+    }
+    return null;
+  };
+
+  // ============================================
+  // SESSIONS FUNCTIONS
+  // ============================================
+
+  const handleSaveUserSession = async (data: Omit<UserSession, 'id' | 'createdAt' | 'lastActivityAt'>): Promise<string> => {
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
+    const newSession: UserSession = {
+      ...data,
+      id,
+      createdAt: now,
+      lastActivityAt: now
+    };
+    
+    setUserSessions(prev => [newSession, ...prev]);
+    
+    if (dbInitialized) {
+      try {
+        saveUserSession({
+          id,
+          userEmail: data.userEmail,
+          sessionToken: data.sessionToken,
+          ipAddress: data.ipAddress,
+          userAgent: data.userAgent,
+          deviceInfo: data.deviceInfo,
+          expiresAt: data.expiresAt
+        });
+      } catch (error) {
+        console.error('Failed to save user session:', error);
+      }
+    }
+    
+    return id;
+  };
+
+  const handleGetUserSessions = (userEmail: string): UserSession[] => {
+    return userSessions.filter(s => s.userEmail === userEmail && s.isActive);
+  };
+
+  const handleInvalidateSession = (sessionToken: string) => {
+    setUserSessions(prev => prev.map(s => 
+      s.sessionToken === sessionToken ? { ...s, isActive: false } : s
+    ));
+    
+    if (dbInitialized) {
+      try {
+        invalidateSession(sessionToken);
+      } catch (error) {
+        console.error('Failed to invalidate session:', error);
+      }
+    }
+  };
+
+  const handleInvalidateAllSessions = (userEmail: string, exceptToken?: string) => {
+    setUserSessions(prev => prev.map(s => 
+      s.userEmail === userEmail && s.sessionToken !== exceptToken ? { ...s, isActive: false } : s
+    ));
+    
+    if (dbInitialized) {
+      try {
+        invalidateAllUserSessions(userEmail, exceptToken);
+      } catch (error) {
+        console.error('Failed to invalidate all sessions:', error);
+      }
+    }
+  };
+
+  // ============================================
+  // BULK OPERATIONS FUNCTIONS
+  // ============================================
+
+  const createBulkOperation = async (data: Omit<BulkOperation, 'id' | 'startedAt' | 'operationStatus' | 'processedRecords' | 'successRecords' | 'failedRecords'>): Promise<string> => {
+    const id = crypto.randomUUID();
+    const newOperation: BulkOperation = {
+      ...data,
+      id,
+      startedAt: new Date().toISOString(),
+      operationStatus: 'pending',
+      processedRecords: 0,
+      successRecords: 0,
+      failedRecords: 0
+    };
+    
+    setBulkOperations(prev => [newOperation, ...prev]);
+    
+    if (dbInitialized) {
+      try {
+        saveBulkOperation({
+          id,
+          operationType: data.operationType,
+          totalRecords: data.totalRecords,
+          inputData: data.inputData,
+          performedBy: data.performedBy
+        });
+      } catch (error) {
+        console.error('Failed to save bulk operation:', error);
+      }
+    }
+    
+    return id;
+  };
+
+  const handleUpdateBulkOperationStatus = (id: string, status: BulkOperation['operationStatus'], processed?: number, success?: number, failed?: number) => {
+    setBulkOperations(prev => prev.map(op => 
+      op.id === id ? { 
+        ...op, 
+        operationStatus: status, 
+        processedRecords: processed ?? op.processedRecords,
+        successRecords: success ?? op.successRecords,
+        failedRecords: failed ?? op.failedRecords
+      } : op
+    ));
+    
+    if (dbInitialized) {
+      try {
+        updateBulkOperationStatus(id, status, processed, success, failed);
+      } catch (error) {
+        console.error('Failed to update bulk operation status:', error);
+      }
+    }
+  };
+
+  const handleGetBulkOperations = (limit: number = 50): BulkOperation[] => {
+    return bulkOperations.slice(0, limit);
+  };
+
+  // ============================================
+  // SAVED FILTERS FUNCTIONS
+  // ============================================
+
+  const handleSaveFilter = async (data: Omit<SavedFilter, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
+    const newFilter: SavedFilter = {
+      ...data,
+      id,
+      createdAt: now,
+      updatedAt: now
+    };
+    
+    setSavedFilters(prev => [newFilter, ...prev]);
+    
+    if (dbInitialized) {
+      try {
+        saveFilter({
+          id,
+          userEmail: data.userEmail,
+          filterName: data.filterName,
+          filterType: data.filterType,
+          filterCriteria: data.filterCriteria,
+          isDefault: data.isDefault
+        });
+      } catch (error) {
+        console.error('Failed to save filter:', error);
+      }
+    }
+    
+    return id;
+  };
+
+  const handleGetSavedFilters = (filterType?: string): SavedFilter[] => {
+    if (filterType) {
+      return savedFilters.filter(f => f.filterType === filterType);
+    }
+    return savedFilters;
+  };
+
+  const handleDeleteSavedFilter = (id: string) => {
+    setSavedFilters(prev => prev.filter(f => f.id !== id));
+    
+    if (dbInitialized) {
+      try {
+        deleteSavedFilter(id);
+      } catch (error) {
+        console.error('Failed to delete saved filter:', error);
+      }
+    }
+  };
+
+  // Load data on mount
+  useEffect(() => {
+    if (dbInitialized && user) {
+      // Load notifications for current user
+      const loadNotifications = async () => {
+        try {
+          const notifs = await import('../services/sqliteDatabase').then(m => 
+            m.getNotifications(user.email)
+          );
+          if (notifs && notifs.length > 0) {
+            setNotifications(notifs.map((n: any) => ({
+              id: n.id,
+              recipientEmail: n.recipient_email,
+              recipientRole: n.recipient_role,
+              title: n.title,
+              message: n.message,
+              type: n.type,
+              relatedEntityType: n.related_entity_type,
+              relatedEntityId: n.related_entity_id,
+              isRead: !!n.is_read,
+              readAt: n.read_at,
+              createdBy: n.created_by,
+              createdAt: n.created_at
+            })));
+          }
+        } catch (error) {
+          console.error('Failed to load notifications:', error);
+        }
+      };
+      
+      loadNotifications();
+    }
+  }, [dbInitialized, user]);
+
   return (
     <AppContext.Provider
       value={{
@@ -461,12 +2190,163 @@ export function AppProvider({ children }: { children: ReactNode }) {
         updateRegistration,
         studentProgress,
         updateProgress,
+        loadStudentProgress,
+        saveProgressToDatabase,
         studentProfiles,
         updateStudentProfile,
         studentOnboardings,
         addStudentOnboarding,
         updateStudentOnboardingStatus,
         deleteStudentOnboarding,
+        // Documents
+        documents,
+        uploadDocument,
+        getStudentDocuments,
+        verifyDocument: handleVerifyDocument,
+        deleteDocument: handleDeleteDocument,
+        // Payments
+        payments,
+        addPayment,
+        getStudentPayments,
+        updatePaymentStatus: handleUpdatePaymentStatus,
+        // Notifications
+        notifications,
+        unreadCount,
+        createNotification: handleCreateNotification,
+        markNotificationRead: handleMarkNotificationRead,
+        getNotifications: handleGetNotifications,
+        // Student Applications
+        studentApplications,
+        addStudentApplication,
+        updateApplicationStatus: handleUpdateApplicationStatus,
+        getStudentApplications: handleGetStudentApplications,
+        getAllApplications: handleGetAllApplications,
+        // Audit Log
+        createAuditLog: handleCreateAuditLog,
+        getAuditLogs: async (entityType?: string, studentEmail?: string, performedBy?: string, limit?: number) => {
+          try {
+            const result = await import('../services/sqliteDatabase').then(m => 
+              m.getAuditLogs(entityType, studentEmail, performedBy, limit)
+            );
+            return result;
+          } catch (error) {
+            console.error('Failed to get audit logs:', error);
+            return [];
+          }
+        },
+        // Analytics
+        saveAnalyticsMetric: (data: Omit<AnalyticsMetric, 'id' | 'recordedAt'>) => {
+          if (dbInitialized) {
+            try {
+              import('../services/sqliteDatabase').then(m => {
+                m.saveAnalyticsMetric({
+                  id: crypto.randomUUID(),
+                  metricName: data.metricName,
+                  metricCategory: data.metricCategory,
+                  metricValue: data.metricValue,
+                  metricData: data.metricData,
+                  dimension1: data.dimension1,
+                  dimension2: data.dimension2
+                });
+              });
+            } catch (error) {
+              console.error('Failed to save analytics metric:', error);
+            }
+          }
+        },
+        getAnalyticsMetrics: async (metricName?: string, startDate?: string, endDate?: string) => {
+          if (dbInitialized) {
+            try {
+              const result = await import('../services/sqliteDatabase').then(m => 
+                m.getAnalyticsMetrics(metricName, startDate, endDate)
+              );
+              return result || [];
+            } catch (error) {
+              console.error('Failed to get analytics metrics:', error);
+              return [];
+            }
+          }
+          return [];
+        },
+        // Calendar & Appointments
+        appointments,
+        scheduleAppointment,
+        getAppointments: handleGetAppointments,
+        updateAppointmentStatus: handleUpdateAppointmentStatus,
+        cancelAppointment,
+        // Scholarships
+        scholarships,
+        addScholarship,
+        updateScholarship: handleUpdateScholarship,
+        deleteScholarship: handleDeleteScholarship,
+        getScholarships: handleGetScholarships,
+        applyForScholarship,
+        // Visa Applications
+        visaApplications,
+        addVisaApplication,
+        getVisaApplications: handleGetVisaApplications,
+        updateVisaStatus: handleUpdateVisaStatus,
+        deleteVisaApplication: handleDeleteVisaApplication,
+        // Scheduled Reminders
+        scheduledReminders,
+        scheduleReminder,
+        getScheduledReminders: handleGetScheduledReminders,
+        // Role-Based Access Control
+        roles,
+        userRoles,
+        createRole,
+        updateRole: handleUpdateRole,
+        deleteRole: handleDeleteRole,
+        assignUserRole,
+        getUserRoles: handleGetUserRoles,
+        // Communication Logs
+        communicationLogs,
+        logCommunication,
+        // Student Feedback
+        universityRatings,
+        serviceFeedback,
+        submitUniversityRating,
+        submitServiceFeedback,
+        approveRating: handleApproveRating,
+        resolveFeedback: handleResolveFeedback,
+        // Email Templates
+        emailTemplates,
+        createEmailTemplate,
+        updateEmailTemplate: handleUpdateEmailTemplate,
+        getEmailTemplates: handleGetEmailTemplates,
+        getEmailTemplateByName: handleGetEmailTemplateByName,
+        deleteEmailTemplate: handleDeleteEmailTemplate,
+        // Workflow Automation
+        workflowRules,
+        createWorkflowRule,
+        updateWorkflowRule: handleUpdateWorkflowRule,
+        getWorkflowRules: handleGetWorkflowRules,
+        deleteWorkflowRule: handleDeleteWorkflowRule,
+        // User Preferences
+        userPreferences,
+        saveUserPreferences: handleSaveUserPreferences,
+        getUserPreferences: handleGetUserPreferences,
+        // 2FA
+        enable2FA: handleEnable2FA,
+        disable2FA: handleDisable2FA,
+        get2FASettings: handleGet2FASettings,
+        // Sessions
+        userSessions,
+        saveUserSession: handleSaveUserSession,
+        getUserSessions: handleGetUserSessions,
+        invalidateSession: handleInvalidateSession,
+        invalidateAllSessions: handleInvalidateAllSessions,
+        // Bulk Operations
+        bulkOperations,
+        createBulkOperation,
+        updateBulkOperationStatus: handleUpdateBulkOperationStatus,
+        getBulkOperations: handleGetBulkOperations,
+        // Saved Filters
+        savedFilters,
+        saveFilter: handleSaveFilter,
+        getSavedFilters: handleGetSavedFilters,
+        deleteSavedFilter: handleDeleteSavedFilter,
+        // Contact
         saveContactRequest: handleSaveContactRequest,
         getContactRequests: handleGetContactRequests
       }}

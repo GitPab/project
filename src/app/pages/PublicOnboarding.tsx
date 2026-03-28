@@ -5,6 +5,7 @@ import { useCurrency } from '../context/CurrencyContext';
 import { useLanguage } from '../context/LanguageContext';
 import { generateUniqueTrackingCode } from '../services/trackingCodeService';
 import { createTrackingCode } from '../services/trackingCodeSqliteService';
+import { getAllUniversities } from '../services/universityService';
 import TBTLogo from '../components/TBTLogo';
 import Statistics from '../components/Statistics';
 import UniversityPartners from '../components/UniversityPartners';
@@ -43,9 +44,31 @@ const VISA_SYSTEM_OPTIONS = VISA_SYSTEMS.map(system => ({
 
 export default function PublicOnboarding() {
   const navigate = useNavigate();
-  const { universities, addStudentOnboarding, login } = useApp();
+  const { universities, setUniversities, addStudentOnboarding, login } = useApp();
   const { formatFrom, convertAmount, currency } = useCurrency();
   const { language } = useLanguage();
+
+  // Reload universities from SQLite on mount
+  useEffect(() => {
+    const reloadUniversities = async () => {
+      try {
+        const dbUniversities = await getAllUniversities();
+        if (dbUniversities.length > 0) {
+          const parsedUniversities = dbUniversities.map((u: any) => ({
+            ...u,
+            koreanData: typeof u.korean_data === 'string' 
+              ? JSON.parse(u.korean_data) 
+              : u.koreanData || u.korean_data || {}
+          }));
+          setUniversities(() => parsedUniversities);
+        }
+      } catch (error) {
+        console.error('Failed to reload universities:', error);
+      }
+    };
+
+    reloadUniversities();
+  }, []);
 
   // Form state
   const [fullName, setFullName] = useState('');
@@ -545,12 +568,6 @@ export default function PublicOnboarding() {
 
       {/* Footer Links */}
       <div className="text-center space-y-4 mb-8">
-        <button
-          onClick={() => navigate('/student/lookup')}
-          className="block text-sm text-[#003AB7] hover:text-[#002A8F] transition-colors underline mx-auto font-['Be_Vietnam_Pro']"
-        >
-          📊 Tra Cứu Trạng Thái Hồ Sơ
-        </button>
         <button
           onClick={() => navigate('/login')}
           className="block text-sm text-[#4D4D4D] hover:text-[#003AB7] transition-colors underline mx-auto font-['Be_Vietnam_Pro']"

@@ -1,5 +1,5 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router';
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router';
 import { useApp } from '../context/AppContext';
 import { useLanguage } from '../context/LanguageContext';
 import {
@@ -17,11 +17,15 @@ import {
   Bell,
   CalendarCheck,
   CheckCircle,
+  ArrowLeft,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getTrackingCode, searchTrackingCodesByEmail } from '../services/trackingCodeService';
 import type { TrackingCode } from '@/types/tracking';
 import type { ProgressStage, StudentProgress } from '@/types';
+import { useCurrency } from '../context/CurrencyContext';
 
 interface StageDetailModalProps {
   stageId: number;
@@ -178,15 +182,31 @@ const calculateOverallProgress = (stages: ProgressStage[]): number => {
 
 export default function ProgressTracker() {
   const { user, universities, studentProgress, studentOnboardings, updateProgress } = useApp();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const { format } = useCurrency();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const urlTrackingCode = searchParams.get('code');
+  
   const [selectedStage, setSelectedStage] = useState<{ id: number; data: ProgressStage } | null>(null);
   const [notifications, setNotifications] = useState<string[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [trackingInfo, setTrackingInfo] = useState<TrackingCode | null>(null);
+  const [copied, setCopied] = useState(false);
+  const progressInitializedRef = useRef(false);
 
   useEffect(() => {
     const loadTracking = async () => {
+      // First try URL param
+      if (urlTrackingCode) {
+        const data = await getTrackingCode(urlTrackingCode);
+        if (data) {
+          setTrackingInfo(data);
+          return;
+        }
+      }
+      
+      // Then try user's tracking code
       if (!user) return;
 
       if (user.trackingCode) {
@@ -204,7 +224,7 @@ export default function ProgressTracker() {
     };
 
     loadTracking();
-  }, [user]);
+  }, [user, urlTrackingCode]);
 
   const contextProgress = useMemo(() => {
     if (!user) return null;
@@ -236,8 +256,10 @@ export default function ProgressTracker() {
     };
   }, [contextProgress, trackingInfo, latestOnboarding, user]);
 
+  // Only update progress once on initial load, not on every render
   useEffect(() => {
-    if (contextProgress || !derivedProgress || !derivedProgress.studentEmail) return;
+    if (contextProgress || !derivedProgress || !derivedProgress.studentEmail || progressInitializedRef.current) return;
+    progressInitializedRef.current = true;
     updateProgress(derivedProgress.studentEmail, derivedProgress.universityId, derivedProgress.stages);
   }, [contextProgress, derivedProgress, updateProgress]);
 
@@ -271,6 +293,14 @@ export default function ProgressTracker() {
   const handleDocumentUpload = (stageId: number, fileName: string) => {
     const newNotification = `${t('progress.documentUploaded')}: ${t(`stage.${stageId}.title`)}`;
     setNotifications([newNotification, ...notifications]);
+  };
+
+  const handleCopyCode = () => {
+    if (trackingInfo?.code) {
+      navigator.clipboard.writeText(trackingInfo.code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   if (!userProgress) {
@@ -435,6 +465,59 @@ export default function ProgressTracker() {
           </div>
         )}
       </div>
+
+      {/* Tracking Info Card - Shows when tracking code exists */}
+      {trackingInfo && (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                <CheckCircle className="w-6 h-6 text-green-600" />
+                {language === 'vi' ? 'Thông tin đăng ký' : 'Registration Info'}
+              </h2>
+              <p className="text-sm text-slate-500 mt-1">
+                {language === 'vi' ? 'Đăng ký tư vấn thành công - Giai đoạn 1 đã hoàn thành' : 'Consultation registered - Stage 1 completed'}
+              </p>
+            </div>
+            <button
+              onClick={handleCopyCode}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+              title={language === 'vi' ? 'Sao chép mã' : 'Copy code'}
+            >
+              {copied ? (
+                <>
+                  <Check className="w-4 h-4 text-green-600" />
+                  <span className="text-sm text-green-600">{language === 'vi' ? 'Đã sao chép' : 'Copied'}</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-4 h-4 text-slate-600" />
+                  <span className="text-sm text-slate-600">{trackingInfo.code}</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase mb-1">{language === 'vi' ? 'Họ tên' : 'Name'}</p>
+              <p className="text-lg font-semibold text-slate-900">{trackingInfo.studentName}</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase mb-1">{language === 'vi' ? 'Trường đăng ký' : 'University'}</p>
+              <p className="text-lg font-semibold text-slate-900">{trackingInfo.desiredUniversityName}</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase mb-1">{language === 'vi' ? 'Hệ visa' : 'Visa System'}</p>
+              <p className="text-lg font-semibold text-slate-900">{trackingInfo.visaSystem}</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase mb-1">{language === 'vi' ? 'Chi phí ước tính' : 'Est. Cost'}</p>
+              <p className="text-lg font-bold text-primary">{format(trackingInfo.initialTotalCostVnd)}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 md:p-8">
         <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">

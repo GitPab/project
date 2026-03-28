@@ -70,11 +70,17 @@ const formSchema = z.object({
   selectedVisaType: z.string().optional(),
   fixedCosts: z.array(fixedCostSchema).optional(),
   optionalAddons: z.array(addonSchema).optional(),
+  // Image fields
+  heroImage: z.string().optional(),
+  thumbnail: z.string().optional(),
+  logo: z.string().optional(),
+  listLogo: z.string().optional(),
   // Missing fields from Detail.txt spec
   supportPolicies: z.array(z.string()).optional(),
   refundPolicy: z.string().optional(),
   admissionsType: z.string().optional(),
   partTimeInfo: z.string().optional(),
+  majors: z.string().optional(), // Chuyên ngành - one per line
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -121,11 +127,17 @@ export default function EditUniversityModal({
         amount: addon.amount,
         type: addon.type || 'other',
       })),
+      // Image fields
+      heroImage: university?.heroImage || '',
+      thumbnail: university?.thumbnail || '',
+      logo: university?.koreanData?.logo || '',
+      listLogo: university?.koreanData?.listLogo || '',
       // Missing fields from Detail.txt
       supportPolicies: university?.koreanData?.supportPolicies || [],
       refundPolicy: university?.koreanData?.refundPolicy || '',
       admissionsType: university?.koreanData?.admissionsType || '',
       partTimeInfo: university?.koreanData?.partTimeInfo || '',
+      majors: (university?.koreanData?.majors || []).join('\n'), // Chuyên ngành as textarea
     }),
     [university?.id] // Only recompute when university ID changes
   );
@@ -259,7 +271,9 @@ export default function EditUniversityModal({
           supportPolicies: values.supportPolicies || [],
           refundPolicy: values.refundPolicy || '',
           admissionsType: values.admissionsType || '',
-          partTimeInfo: values.partTimeInfo || '',
+          // Image fields
+          logo: values.logo,
+          listLogo: values.listLogo,
         },
       };
 
@@ -508,10 +522,149 @@ export default function EditUniversityModal({
             </div>
           </div>
 
+          {/* Image Upload Section */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-slate-900">Hình ảnh trường</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Hero Image - Background */}
+              <div className="space-y-2">
+                <Label htmlFor="heroImage">Ảnh nền header (Hero Image)</Label>
+                <Controller
+                  control={control}
+                  name="heroImage"
+                  render={({ field }) => (
+                    <div className="space-y-2">
+                      <Input 
+                        id="heroImage" 
+                        {...field} 
+                        placeholder="https://... hoặc /images/..." 
+                      />
+                      {field.value && (
+                        <div className="w-full h-32 rounded-lg overflow-hidden border">
+                          <img 
+                            src={field.value} 
+                            alt="Hero preview" 
+                            className="w-full h-full object-cover"
+                            onError={(e) => (e.currentTarget.style.display = 'none')}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                />
+                <p className="text-xs text-slate-500">Ảnh nền cho header trường</p>
+              </div>
+
+              {/* Thumbnail/Logo - Circle in header */}
+              <div className="space-y-2">
+                <Label htmlFor="thumbnail">Logo trường (Thumbnail)</Label>
+                <Controller
+                  control={control}
+                  name="thumbnail"
+                  render={({ field }) => (
+                    <div className="space-y-2">
+                      <Input 
+                        id="thumbnail" 
+                        {...field} 
+                        placeholder="https://... hoặc /images/..." 
+                      />
+                      {field.value && (
+                        <div className="w-16 h-16 rounded-full overflow-hidden border mx-auto">
+                          <img 
+                            src={field.value} 
+                            alt="Logo preview" 
+                            className="w-full h-full object-cover"
+                            onError={(e) => (e.currentTarget.style.display = 'none')}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                />
+                <p className="text-xs text-slate-500">Logo hiển thị trong vòng tròn header</p>
+              </div>
+
+              {/* List Logo */}
+              <div className="space-y-2">
+                <Label htmlFor="listLogo">Logo danh sách (List Logo)</Label>
+                <Controller
+                  control={control}
+                  name="listLogo"
+                  render={({ field }) => (
+                    <div className="space-y-2">
+                      <Input 
+                        id="listLogo" 
+                        {...field} 
+                        placeholder="https://... hoặc /images/..." 
+                      />
+                      {field.value && (
+                        <div className="w-12 h-12 rounded-lg overflow-hidden border">
+                          <img 
+                            src={field.value} 
+                            alt="List logo preview" 
+                            className="w-full h-full object-cover"
+                            onError={(e) => (e.currentTarget.style.display = 'none')}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                />
+                <p className="text-xs text-slate-500">Logo hiển thị trong danh sách trường</p>
+              </div>
+
+              {/* Gallery Images */}
+              <div className="space-y-2">
+                <Label htmlFor="logo">Logo chính (Main Logo)</Label>
+                <Controller
+                  control={control}
+                  name="logo"
+                  render={({ field }) => (
+                    <div className="space-y-2">
+                      <Input 
+                        id="logo" 
+                        {...field} 
+                        placeholder="https://... hoặc /images/..." 
+                      />
+                      {field.value && (
+                        <div className="w-20 h-20 rounded-lg overflow-hidden border">
+                          <img 
+                            src={field.value} 
+                            alt="Main logo preview" 
+                            className="w-full h-full object-contain"
+                            onError={(e) => (e.currentTarget.style.display = 'none')}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                />
+                <p className="text-xs text-slate-500">Logo chính của trường</p>
+              </div>
+            </div>
+          </div>
+
           {/* Additional Information Section - Missing fields from Detail.txt */}
           <div className="space-y-4">
             <h3 className="text-sm font-semibold text-slate-900">Thông tin bổ sung</h3>
             
+            {/* Majors / Chuyên ngành */}
+            <div className="space-y-2">
+              <Label htmlFor="majors">Chuyên ngành (mỗi dòng một ngành)</Label>
+              <Controller
+                control={control}
+                name="majors"
+                render={({ field }) => (
+                  <Textarea
+                    id="majors"
+                    {...field}
+                    rows={3}
+                    placeholder="Kinh tế&#10;Công nghệ thông tin&#10;Y học"
+                  />
+                )}
+              />
+            </div>
+
             {/* Part-time Work Info */}
             <div className="space-y-2">
               <Label htmlFor="partTimeInfo">Việc làm thêm</Label>

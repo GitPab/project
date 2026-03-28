@@ -1,5 +1,7 @@
-import React from 'react';
-import { GraduationCap, Users, Globe, Award, TrendingUp } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { GraduationCap, Users, Globe, Award } from 'lucide-react';
+import { useApp } from '../context/AppContext';
+import { getAllUsers } from '../services/sqliteDatabase';
 
 interface StatProps {
   icon: React.ReactNode;
@@ -29,16 +31,33 @@ interface StatisticsProps {
 }
 
 export default function Statistics({ className = '' }: StatisticsProps) {
+  const { universities } = useApp();
+  const [studentCount, setStudentCount] = useState(0);
+  const [avgRating, setAvgRating] = useState(4.8);
+
+  useEffect(() => {
+    const loadStats = async () => {
+      try {
+        const users = await getAllUsers();
+        const students = users.filter((u: any) => u.role === 'student');
+        setStudentCount(students.length);
+      } catch (error) {
+        console.error('Failed to load user stats:', error);
+      }
+    };
+    loadStats();
+  }, []);
+
   const stats = [
     {
       icon: <GraduationCap className="w-8 h-8" />,
-      number: "50+",
+      number: `${universities.length}+`,
       label: "Trường Đại Học",
       color: "#003AB7"
     },
     {
       icon: <Users className="w-8 h-8" />,
-      number: "10,000+",
+      number: studentCount > 0 ? `${studentCount.toLocaleString()}+` : "1000+",
       label: "Sinh Viên Việt Nam",
       color: "#558EFF"
     },
@@ -50,8 +69,8 @@ export default function Statistics({ className = '' }: StatisticsProps) {
     },
     {
       icon: <Award className="w-8 h-8" />,
-      number: "4.8/5.0",
-      label: "Điểm Satisfy Trung Bình",
+      number: `${avgRating.toFixed(1)}/5.0`,
+      label: "Điểm Hài Lòng Trung Bình",
       color: "#FFC107"
     }
   ];

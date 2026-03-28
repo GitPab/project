@@ -10,6 +10,7 @@ import EditUniversityModal from './EditUniversityModal';
 import QuickInfoModal from './QuickInfoModal';
 import ImportUniversitiesModal from './ImportUniversitiesModal';
 import type { University } from '../context/AppContext';
+import { getAllUniversities } from '../services/universityService';
 
 interface UniversityRowProps {
   university: University;
@@ -100,14 +101,27 @@ function UniversityRow({ university, onEdit, onQuickInfo, palette }: UniversityR
             width: 48,
             height: 48,
             borderRadius: 10,
-            background: 'linear-gradient(135deg, #F4EEE7 0%, #E7DFD6 100%)',
+            background: university?.koreanData?.listLogo || university?.thumbnail 
+              ? 'transparent' 
+              : 'linear-gradient(135deg, #F4EEE7 0%, #E7DFD6 100%)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             fontSize: 20,
             flexShrink: 0,
+            overflow: 'hidden',
           }}>
-            🏫
+            {university?.koreanData?.listLogo || university?.thumbnail ? (
+              <img 
+                src={university?.koreanData?.listLogo || university?.thumbnail} 
+                alt={university.name}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).style.display = 'none';
+                  (e.currentTarget.parentElement as HTMLElement).textContent = '🏫';
+                }}
+              />
+            ) : '🏫'}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
@@ -418,6 +432,35 @@ export default function UniversitiesListEnhancedRedesigned() {
     { key: '3', label: 'Top 3', count: tierCounts['3'] }
   ];
 
+  // Reload universities from SQLite on mount to get latest updates
+  useEffect(() => {
+    const reloadUniversities = async () => {
+      try {
+        const dbUniversities = await getAllUniversities();
+        if (dbUniversities.length > 0) {
+          // Parse the universities to match the expected format
+          const parsedUniversities = dbUniversities.map((u: any) => ({
+            ...u,
+            koreanData: typeof u.korean_data === 'string' 
+              ? JSON.parse(u.korean_data) 
+              : u.koreanData || u.korean_data || {}
+          }));
+          setUniversities(() => parsedUniversities);
+        }
+      } catch (error) {
+        console.error('Failed to reload universities:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    reloadUniversities();
+  }, []);
+
+  useEffect(() => {
+    setLoading(false);
+  }, [filteredUniversities]);
+
   return (
     <div style={{ padding: '24px 28px 32px', background: 'linear-gradient(180deg, #FBF7F2 0%, #F4EEE7 100%)', minHeight: '100%' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginBottom: 18, flexWrap: 'wrap' }}>
@@ -633,7 +676,46 @@ export default function UniversitiesListEnhancedRedesigned() {
       {showAddModal && (
         <UniversityForm
           onClose={() => setShowAddModal(false)}
-          onSave={() => { toast.success('Thêm trường thành công!'); setShowAddModal(false); }}
+          onSave={(data) => {
+            // Cast data to access form fields
+            const formData = data as any;
+            // Create complete university object
+            const newUniversity: University = {
+              id: `uni-${Date.now()}`,
+              name: formData.name || '',
+              koreanName: formData.koreanName,
+              country: formData.country || 'South Korea',
+              countryCode: '🇰🇷',
+              region: formData.region,
+              ranking: formData.ranking,
+              top_tier: formData.topTier,
+              description: formData.overview,
+              systems: [] as any[],
+              majors: formData.majors || [],
+              overview: formData.overview,
+              galleryImages: formData.galleryImages,
+              generalTuition: formData.generalTuition,
+              visaFee: formData.visaFee,
+              accommodationFee: formData.accommodationFee,
+              insuranceFee: formData.insuranceFee,
+              additionalFees: formData.additionalFees,
+              koreanData: {
+                isKoreanUniversity: true,
+                topTier: formData.topTier || 'Top2',
+                address: formData.region,
+                koreanRanking: formData.ranking,
+                majors: formData.majors || [],
+                jobOpportunities: formData.partTimeInfo,
+                workOpportunity: formData.partTimeInfo,
+                supportPolicies: formData.supportPolicies || [],
+                refundPolicy: formData.refundPolicy,
+                admissionsType: formData.admissionsType
+              } as any
+            };
+            addUniversities([newUniversity]);
+            toast.success('Thêm trường thành công!');
+            setShowAddModal(false);
+          }}
         />
       )}
 
@@ -653,7 +735,11 @@ export default function UniversitiesListEnhancedRedesigned() {
         <EditUniversityModal
           university={editingUniversity}
           onClose={() => setEditingUniversity(null)}
-          onSave={async () => { toast.success('Cập nhật trường thành công!'); setEditingUniversity(null); }}
+          onSave={async (data) => {
+            await updateUniversity(editingUniversity.id, data);
+            toast.success('Cập nhật trường thành công!');
+            setEditingUniversity(null);
+          }}
         />
       )}
 

@@ -1,13 +1,28 @@
 import React from 'react';
 import { GraduationCap } from 'lucide-react';
 import TBTLogo from './TBTLogo';
+import { useApp } from '../context/AppContext';
 
 interface UniversityPartnersProps {
   className?: string;
 }
 
 export default function UniversityPartners({ className = '' }: UniversityPartnersProps) {
-  const partners = [
+  const { universities } = useApp();
+  
+  // Get Top 1 universities as partners
+  const partners = universities
+    .filter(u => u.koreanData?.topTier === 'Top1' || u.top_tier === 'Top1')
+    .slice(0, 4)
+    .map(u => ({
+      name: u.name,
+      koreanName: (u as any).koreanName || (u.koreanData as any)?.koreanName || '',
+      logo: (u as any).logo || (u.koreanData as any)?.logo || '/img/university-placeholder.jpg',
+      description: (u.koreanData as any)?.description || (u as any).description || 'Đối tác chiến lược'
+    }));
+  
+  // Fallback if no Top 1 universities
+  const displayPartners = partners.length > 0 ? partners : [
     {
       name: "Konkuk University",
       koreanName: "건국대학교",
@@ -50,7 +65,7 @@ export default function UniversityPartners({ className = '' }: UniversityPartner
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          {partners.map((partner, index) => (
+          {displayPartners.map((partner, index) => (
             <div 
               key={index}
               className="bg-white rounded-[20px] border-2 border-[#558EFF] shadow-[14px_22px_25px_-9px_rgba(85,142,255,0.25)] p-6 text-center group hover:shadow-xl transition-all cursor-pointer"

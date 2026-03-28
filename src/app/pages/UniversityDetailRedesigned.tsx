@@ -127,10 +127,24 @@ const normalizeCommonFees = (rawData: any) => {
 // Hero Section Component - Modern Konkuk Style
 const HeroSection = ({ university, availableCount, onContactClick }: { university: any; availableCount: number; onContactClick: () => void }) => {
   const ranking = university?.koreanData?.koreanRanking || university?.ranking;
+  const topTier = university?.top_tier || university?.koreanData?.topTier || '';
   const address = university?.koreanData?.address || university?.region || 'Hàn Quốc';
   const koreanName = university?.koreanData?.koreanName || university?.koreanName || '';
-  const logo = university?.koreanData?.logo || university?.logo;
-  const bannerImage = university?.koreanData?.bannerImage || university?.bannerImage || 'https://images.unsplash.com/photo-1562774053-701939374585?w=1200&q=80';
+  // Use heroImage for background, thumbnail for logo circle
+  const logo = university?.thumbnail || university?.koreanData?.logo || university?.logo;
+  const bannerImage = university?.heroImage || university?.koreanData?.bannerImage || 'https://images.unsplash.com/photo-1562774053-701939374585?w=1200&q=80';
+
+  // TOP VISA badge colors based on tier
+  const getTopVisaBadge = (tier: string) => {
+    switch(tier) {
+      case 'Top1': return { bg: '#4CAF50', label: '01' };
+      case 'Top2': return { bg: '#FF9800', label: '02' };
+      case 'Top3': return { bg: '#F44336', label: '03' };
+      default: return { bg: '#9E9E9E', label: '-' };
+    }
+  };
+
+  const topVisaBadge = getTopVisaBadge(topTier);
   
   return (
     <div style={{
@@ -258,20 +272,35 @@ const HeroSection = ({ university, availableCount, onContactClick }: { universit
             gap: 16,
             flexWrap: 'wrap'
           }}>
-            {ranking && (
+            {/* TOP VISA Badge */}
+            <div style={{
+              background: topVisaBadge.bg,
+              color: '#fff',
+              borderRadius: '8px',
+              padding: '6px 12px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minWidth: '60px',
+            }}>
               <span style={{
-                fontSize: 14,
+                fontSize: '10px',
                 fontWeight: 600,
-                color: '#fff',
-                background: 'rgba(255,255,255,0.2)',
-                padding: '8px 16px',
-                borderRadius: 20,
-                backdropFilter: 'blur(10px)',
-                border: '1px solid rgba(255,255,255,0.3)'
+                letterSpacing: '0.5px',
+                lineHeight: 1,
               }}>
-                Top {ranking}
+                TOP VISA
               </span>
-            )}
+              <span style={{
+                fontSize: '24px',
+                fontWeight: 700,
+                lineHeight: 1,
+                marginTop: '2px',
+              }}>
+                {topVisaBadge.label}
+              </span>
+            </div>
             
             <span style={{
               fontSize: 14,
@@ -311,17 +340,17 @@ const HeroSection = ({ university, availableCount, onContactClick }: { universit
           justifyContent: 'center',
           boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
           border: '4px solid rgba(255,255,255,0.5)',
-          flexShrink: 0
+          flexShrink: 0,
+          overflow: 'hidden',
         }}>
           {logo ? (
             <img 
               src={logo} 
               alt={university?.name}
               style={{
-                width: 140,
-                height: 140,
-                objectFit: 'contain',
-                borderRadius: '50%'
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
               }}
             />
           ) : (
@@ -1106,6 +1135,10 @@ const GeneralInfoCards = ({ university, visaSystems }: { university: any; visaSy
         ? koreanData.majors.slice(0, 4).join(', ')
         : koreanData?.majors || university?.majors || 'Đang cập nhật');
   
+  // Image fields
+  const heroImage = university?.heroImage;
+  const thumbnail = university?.thumbnail || university?.koreanData?.logo;
+  
   return (
     <div style={{
       background: '#fff',
@@ -1114,28 +1147,54 @@ const GeneralInfoCards = ({ university, visaSystems }: { university: any; visaSy
       border: '1px solid #E8E8E8',
       boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
     }}>
-      {/* Header with University Info */}
+      {/* Header with hero image background */}
       <div style={{
-        background: 'linear-gradient(135deg, #003AB7 0%, #1B3F8B 100%)',
+        background: heroImage 
+          ? `linear-gradient(135deg, rgba(0,58,183,0.85) 0%, rgba(27,63,139,0.9) 100%), url(${heroImage})`
+          : 'linear-gradient(135deg, #003AB7 0%, #1B3F8B 100%)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
         padding: '20px 24px',
-        color: '#fff'
+        color: '#fff',
+        position: 'relative',
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
-            <h2 style={{
-              fontSize: 20,
-              fontWeight: 700,
-              margin: '0 0 4px 0'
-            }}>
-              {university?.name || 'Thông tin trường'}
-            </h2>
-            <p style={{
-              fontSize: 14,
-              opacity: 0.9,
-              margin: 0
-            }}>
-              {koreanData?.koreanName || university?.koreanName || ''}
-            </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            {/* Thumbnail/Logo */}
+            {thumbnail && (
+              <div style={{
+                width: 64,
+                height: 64,
+                borderRadius: '50%',
+                overflow: 'hidden',
+                border: '3px solid rgba(255,255,255,0.3)',
+                flexShrink: 0,
+                background: '#fff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                <img 
+                  src={thumbnail} 
+                  alt={university?.name}
+                  style={{ 
+                    width: 56, 
+                    height: 56, 
+                    objectFit: 'cover',
+                    borderRadius: '50%'
+                  }}
+                  onError={(e) => (e.currentTarget.style.display = 'none')}
+                />
+              </div>
+            )}
+            <div>
+              <h2 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 4px 0' }}>
+                {university?.name || 'Thông tin trường'}
+              </h2>
+              <p style={{ fontSize: 14, opacity: 0.9, margin: 0 }}>
+                {koreanData?.koreanName || university?.koreanName || ''}
+              </p>
+            </div>
           </div>
           {university?.ranking && (
             <div style={{
@@ -1786,7 +1845,8 @@ export default function UniversityDetailRedesigned() {
               setTopikLevel={setTopikLevel}
               ktxRoom={ktxRoom}
               setKtxRoom={setKtxRoom}
-              soTietKiem={setSoTietKiem}
+              soTietKiem={soTietKiem}
+              setSoTietKiem={setSoTietKiem}
               ktxVN={ktxVN}
               setKtxVN={setKtxVN}
               flight={flight}

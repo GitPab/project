@@ -4,25 +4,50 @@ import { useAuth } from './context/AuthContext';
 import Layout from './components/Layout';
 import Register from './pages/Register';
 import Login from './pages/Login';
-import AdminDashboard from './pages/AdminDashboard';
 import UniversityInfo from './pages/UniversityInfo';
-import AdminRegistrations from './pages/AdminRegistrations';
-import StudentMonitoring from './pages/StudentMonitoring';
-import StudentHome from './pages/StudentHome';
-import UniversityDetail from './pages/UniversityDetail';
 import UniversityDetailRedesigned from './pages/UniversityDetailRedesigned';
-import UniversityDetailAdmin from './pages/UniversityDetailAdmin';
-import MyCosts from './pages/MyCosts';
-import ProgressTracker from './pages/ProgressTracker';
-import StudentOnboarding from './pages/StudentOnboarding';
 import PublicOnboarding from './pages/PublicOnboarding';
-import StudentTracking from './pages/StudentTracking';
-import StudentLookup from './pages/StudentLookup';
-import UniversitiesListEnhancedRedesigned from './components/UniversitiesListEnhancedRedesigned';
+import StudentHome from './pages/StudentHome';
 import StudentUniversityList from './components/StudentUniversityList';
 import RouteError from './components/RouteError';
 
-// Protected route wrapper for admin
+// Lazy load admin pages for code splitting
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const AdminAuditTrail = lazy(() => import('./pages/AdminAuditTrail'));
+const AdminEmailTemplates = lazy(() => import('./pages/AdminEmailTemplates'));
+const AdminWorkflow = lazy(() => import('./pages/AdminWorkflow'));
+const AdminSettings = lazy(() => import('./pages/AdminSettings'));
+const AdminBulkOperations = lazy(() => import('./pages/AdminBulkOperations'));
+const AdminScholarships = lazy(() => import('./pages/AdminScholarships'));
+const AdminVisaTracking = lazy(() => import('./pages/AdminVisaTracking'));
+const AdminCalendar = lazy(() => import('./pages/AdminCalendar'));
+const AdminFeedback = lazy(() => import('./pages/AdminFeedback'));
+const AdminRoles = lazy(() => import('./pages/AdminRoles'));
+const AdminAnalyticsDashboard = lazy(() => import('./pages/AdminAnalyticsDashboard'));
+const AdminRegistrations = lazy(() => import('./pages/AdminRegistrations'));
+const StudentMonitoring = lazy(() => import('./pages/StudentMonitoring'));
+const UniversityDetailAdmin = lazy(() => import('./pages/UniversityDetailAdmin'));
+const MyCosts = lazy(() => import('./pages/MyCosts'));
+const ProgressTracker = lazy(() => import('./pages/ProgressTracker'));
+const StudentOnboarding = lazy(() => import('./pages/StudentOnboarding'));
+const StudentTracking = lazy(() => import('./pages/StudentTracking'));
+const StudentLookup = lazy(() => import('./pages/StudentLookup'));
+const StudentFeedback = lazy(() => import('./pages/StudentFeedback'));
+const UniversitiesListEnhancedRedesigned = lazy(() => import('./components/UniversitiesListEnhancedRedesigned'));
+
+// Loading fallback component
+const PageLoader = () => (
+  <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
+  </div>
+);
+
+// Wrap lazy components with Suspense
+const withSuspense = (Component: React.ComponentType) => () => (
+  <Suspense fallback={<PageLoader />}>
+    <Component />
+  </Suspense>
+);
 function AdminProtected() {
   const { isAuthenticated, isAdmin } = useAuth();
   if (!isAuthenticated) return <Navigate to="/login" replace />;
@@ -65,12 +90,12 @@ export const router = createHashRouter([
   },
   {
     path: '/student/lookup',
-    Component: StudentLookup,
+    Component: withSuspense(StudentLookup),
     errorElement: <RouteError />
   },
   {
     path: '/student/tracking/:code',
-    Component: StudentTracking,
+    Component: withSuspense(StudentTracking),
     errorElement: <RouteError />
   },
   {
@@ -88,23 +113,67 @@ export const router = createHashRouter([
           },
           {
             path: 'dashboard',
-            Component: AdminDashboard
+            Component: withSuspense(AdminDashboard)
           },
           {
             path: 'universities',
-            Component: UniversitiesListEnhancedRedesigned
+            Component: withSuspense(UniversitiesListEnhancedRedesigned)
           },
           {
             path: 'university/:id',
-            Component: UniversityDetailAdmin
+            Component: withSuspense(UniversityDetailAdmin)
           },
           {
             path: 'students',
-            Component: StudentMonitoring
+            Component: withSuspense(StudentMonitoring)
           },
           {
             path: 'registrations',
-            Component: AdminRegistrations
+            Component: withSuspense(AdminRegistrations)
+          },
+          {
+            path: 'audit',
+            Component: withSuspense(AdminAuditTrail)
+          },
+          {
+            path: 'templates',
+            Component: withSuspense(AdminEmailTemplates)
+          },
+          {
+            path: 'workflow',
+            Component: withSuspense(AdminWorkflow)
+          },
+          {
+            path: 'settings',
+            Component: withSuspense(AdminSettings)
+          },
+          {
+            path: 'bulk',
+            Component: withSuspense(AdminBulkOperations)
+          },
+          {
+            path: 'scholarships',
+            Component: withSuspense(AdminScholarships)
+          },
+          {
+            path: 'visa',
+            Component: withSuspense(AdminVisaTracking)
+          },
+          {
+            path: 'calendar',
+            Component: withSuspense(AdminCalendar)
+          },
+          {
+            path: 'feedback',
+            Component: withSuspense(AdminFeedback)
+          },
+          {
+            path: 'analytics',
+            Component: withSuspense(AdminAnalyticsDashboard)
+          },
+          {
+            path: 'roles',
+            Component: withSuspense(AdminRoles)
           }
         ]
       }
@@ -137,15 +206,19 @@ export const router = createHashRouter([
           },
           {
             path: 'my-costs',
-            Component: MyCosts
+            Component: withSuspense(MyCosts)
           },
           {
             path: 'my-progress',
-            Component: ProgressTracker
+            Component: withSuspense(ProgressTracker)
           },
           {
             path: 'onboarding',
-            Component: StudentOnboarding
+            Component: withSuspense(StudentOnboarding)
+          },
+          {
+            path: 'feedback',
+            Component: withSuspense(StudentFeedback)
           }
         ]
       }

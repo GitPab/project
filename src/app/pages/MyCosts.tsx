@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import { useApp } from '../context/AppContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -11,41 +11,71 @@ import {
   Plus,
   TrendingUp,
   AlertCircle,
+  FileText,
+  CheckCircle,
 } from 'lucide-react';
 import { getTrackingCode, searchTrackingCodesByEmail } from '../services/trackingCodeService';
 import type { TrackingCode } from '@/types/tracking';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Progress } from '../components/ui/progress';
+import { Badge } from '../components/ui/badge';
 
 export default function MyCosts() {
   const { registrations, universities, user, studentOnboardings } = useApp();
   const { formatFrom, convertAmount } = useCurrency();
   const { language } = useLanguage();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [expandedCards, setExpandedCards] = useState<string[]>([]);
   const [trackingInfo, setTrackingInfo] = useState<TrackingCode | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Get tracking code from URL query param or user context
+  const urlTrackingCode = searchParams.get('code');
 
   useEffect(() => {
     const loadTracking = async () => {
-      if (!user) return;
+      setIsLoading(true);
+      try {
+        // First check URL query param (from StudentLookup redirect)
+        if (urlTrackingCode) {
+          const data = await getTrackingCode(urlTrackingCode);
+          if (data) {
+            setTrackingInfo(data);
+            setIsLoading(false);
+            return;
+          }
+        }
 
-      if (user.trackingCode) {
-        const data = await getTrackingCode(user.trackingCode);
-        if (data) {
-          setTrackingInfo(data);
+        // Then check user context
+        if (!user) {
+          setIsLoading(false);
           return;
         }
-      }
 
-      if (user.email) {
-        const matches = await searchTrackingCodesByEmail(user.email);
-        if (matches.length > 0) setTrackingInfo(matches[0]);
+        if (user.trackingCode) {
+          const data = await getTrackingCode(user.trackingCode);
+          if (data) {
+            setTrackingInfo(data);
+            setIsLoading(false);
+            return;
+          }
+        }
+
+        if (user.email) {
+          const matches = await searchTrackingCodesByEmail(user.email);
+          if (matches.length > 0) setTrackingInfo(matches[0]);
+        }
+      } catch (error) {
+        console.error('Error loading tracking info:', error);
+      } finally {
+        setIsLoading(false);
       }
     };
 
     loadTracking();
-  }, [user]);
+  }, [user, urlTrackingCode]);
 
   const studentRegistrations = useMemo(() => {
     if (!user) return [];
@@ -64,7 +94,7 @@ export default function MyCosts() {
   const estimatedTotalVnd = useMemo(() => {
     if (trackingInfo?.initialTotalCostVnd) return trackingInfo.initialTotalCostVnd;
     if (latestOnboarding?.initialTotalCost) {
-      return convertAmount(latestOnboarding.initialTotalCost, 'VND', 'USD');
+      return convertAmount(latestOnboarding.initialTotalCost, 'VND', 'VND');
     }
     return 0;
   }, [trackingInfo, latestOnboarding, convertAmount]);
@@ -148,13 +178,48 @@ export default function MyCosts() {
     ];
   }, [studentRegistrations, universities, user?.trackingCode, trackingInfo, latestOnboarding, estimatedTotalVnd]);
 
-  const grandTotal = useMemo(
-    () => registeredUniversities.reduce((sum, reg) => sum + reg.costs.total, 0),
-    [registeredUniversities]
-  );
+  // Generate estimated costs for all universities when no tracking code exists
+  const estimatedUniversities = useMemo(() => {
+    // If we have registered universities from tracking, use those
+    if (registeredUniversities.length > 0) return [];
+    
+    // Otherwise, show estimates for all Korean universities
+    return universities
+      .filter(u => u.koreanData?.isKoreanUniversity)
+      .map(uni => {
+        const baseTotal =
+          (uni.generalTuition || 0) +
+          (uni.visaFee || 0) +
+          (uni.accommodationFee || 0) +
+          (uni.insuranceFee || 0) +
+          (uni.additionalFees || []).reduce((sum, fee) => sum + fee.amount, 0);
+
+        return {
+          registrationId: `estimate-${uni.id}`,
+          trackingCode: undefined as string | undefined,
+          university: uni,
+          selectedFees: {
+            visa: true,
+            accommodation: true,
+            insurance: true,
+            additional: (uni.additionalFees || []).map(() => true),
+          },
+          costs: {
+            tuition: uni.generalTuition || baseTotal * 0.6,
+            visa: uni.visaFee || baseTotal * 0.1,
+            accommodation: uni.accommodationFee || baseTotal * 0.15,
+            insuranceAndMisc: (uni.insuranceFee || 0) + (uni.additionalFees || []).reduce((sum, fee) => sum + fee.amount, 0) || baseTotal * 0.15,
+            total: baseTotal || 150000000,
+          },
+          isEstimated: true,
+        };
+      });
+  }, [registeredUniversities, universities]);
+
+  const displayUniversities = registeredUniversities.length > 0 ? registeredUniversities : estimatedUniversities;
+  const displayTotal = displayUniversities.reduce((sum, reg) => sum + reg.costs.total, 0);
 
   const budgetGoal = 500000000;
-  const progressPercentage = Math.min((grandTotal / budgetGoal) * 100, 100);
 
   const toggleCard = (id: string) => {
     setExpandedCards((prev) =>
@@ -162,7 +227,24 @@ export default function MyCosts() {
     );
   };
 
-  if (!user || user.role === 'admin') {
+  if (isLoading) {
+    return (
+      <div className="space-y-6 p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <span className="ml-2 text-slate-600">Đang tải...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Allow access for all users (logged-in students see personalized, others see estimates)
+  const isLoggedInStudent = user && user.role === 'student';
+  const hasValidTracking = !!trackingInfo;
+  const isGuestWithTracking = urlTrackingCode && hasValidTracking;
+
+  // Block only admins (students and guests can view)
+  if (user?.role === 'admin') {
     return (
       <div className="space-y-6 p-6">
         <Card className="border-amber-200 bg-amber-50">
@@ -195,50 +277,181 @@ export default function MyCosts() {
         </p>
       </div>
 
-      {registeredUniversities.length > 0 ? (
+      {displayUniversities.length > 0 ? (
         <Card className="border-primary/20 bg-gradient-to-br from-primary/10 to-blue-100">
           <CardHeader>
             <CardTitle className="text-base text-slate-600">
-              {language === 'vi' ? 'Tổng chi phí' : 'Total Costs'}
+              {language === 'vi' ? 'Tổng chi phí ước tính' : 'Estimated Total Costs'}
             </CardTitle>
             <div className="text-4xl font-bold text-primary">
-              {formatFrom(grandTotal, 'VND')}
+              {formatFrom(displayTotal, 'VND')}
             </div>
             {trackingInfo?.code && (
               <p className="text-xs text-slate-600">Tracking: {trackingInfo.code}</p>
             )}
+            {!trackingInfo && (
+              <p className="text-xs text-amber-600">
+                {language === 'vi' ? 'Chi phí ước tính - có thể thay đổi tùy theo lựa chọn' : 'Estimated costs - may vary based on selections'}
+              </p>
+            )}
           </CardHeader>
           <CardContent className="space-y-2">
             <div className="flex justify-between text-xs text-slate-600">
-              <span>{progressPercentage.toFixed(0)}% of budget</span>
+              <span>{Math.min((displayTotal / budgetGoal) * 100, 100).toFixed(0)}% of budget</span>
               <span>{formatFrom(budgetGoal, 'VND')} goal</span>
             </div>
-            <Progress value={progressPercentage} />
+            <Progress value={Math.min((displayTotal / budgetGoal) * 100, 100)} />
           </CardContent>
         </Card>
-      ) : (
+      ) : null}
+
+      {/* Hồ sơ / Application Status Section */}
+      {trackingInfo && (
+        <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-white">
+          <CardHeader>
+            <div className="flex items-center gap-2 mb-2">
+              <FileText className="w-5 h-5 text-blue-600" />
+              <CardTitle className="text-base text-slate-700">
+                {language === 'vi' ? 'Hồ sơ đăng ký' : 'Application Status'}
+              </CardTitle>
+            </div>
+            
+            {/* Tracking Code */}
+            <div className="flex items-center gap-2 mb-3">
+              <Badge variant="outline" className="font-mono text-sm">
+                {trackingInfo.code}
+              </Badge>
+              {trackingInfo.status && (
+                <Badge 
+                  className={
+                    trackingInfo.status === 'approved' ? 'bg-green-100 text-green-700' :
+                    trackingInfo.status === 'in-review' ? 'bg-blue-100 text-blue-700' :
+                    trackingInfo.status === 'contacted' ? 'bg-purple-100 text-purple-700' :
+                    'bg-amber-100 text-amber-700'
+                  }
+                >
+                  {trackingInfo.status === 'pending' && (language === 'vi' ? 'Đang chờ' : 'Pending')}
+                  {trackingInfo.status === 'in-review' && (language === 'vi' ? 'Đang xem xét' : 'In Review')}
+                  {trackingInfo.status === 'approved' && (language === 'vi' ? 'Đã duyệt' : 'Approved')}
+                  {trackingInfo.status === 'contacted' && (language === 'vi' ? 'Đã liên hệ' : 'Contacted')}
+                </Badge>
+              )}
+            </div>
+
+            {/* Total Cost */}
+            {trackingInfo.initialTotalCostVnd > 0 && (
+              <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-slate-600">
+                    {language === 'vi' ? 'Tổng chi phí:' : 'Total Cost:'}
+                  </span>
+                  <span className="text-lg font-bold text-primary">
+                    {formatFrom(trackingInfo.initialTotalCostVnd, 'VND')}
+                  </span>
+                </div>
+                <div className="text-xs text-slate-500 mt-1">
+                  {language === 'vi' ? 'Bao gồm: Học phí, phí visa, chỗ ở, bảo hiểm' : 'Includes: Tuition, visa, accommodation, insurance'}
+                </div>
+              </div>
+            )}
+
+            {/* Student Info */}
+            <div className="space-y-2 text-sm">
+              {trackingInfo.studentName && (
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-500">{language === 'vi' ? 'Họ tên:' : 'Name:'}</span>
+                  <span className="font-medium text-slate-800">{trackingInfo.studentName}</span>
+                </div>
+              )}
+              {trackingInfo.studentPhone && (
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-500">{language === 'vi' ? 'SĐT:' : 'Phone:'}</span>
+                  <span className="font-medium text-slate-800">{trackingInfo.studentPhone}</span>
+                </div>
+              )}
+              {trackingInfo.studentEmail && (
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-500">Email:</span>
+                  <span className="font-medium text-slate-800">{trackingInfo.studentEmail}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Visa & University Info */}
+            <div className="mt-4 pt-4 border-t border-blue-200 space-y-2">
+              {trackingInfo.desiredUniversityName && (
+                <div className="flex items-center gap-2">
+                  <GraduationCap className="w-4 h-4 text-slate-400" />
+                  <span className="text-slate-500">{language === 'vi' ? 'Trường:' : 'University:'}</span>
+                  <span className="font-medium text-slate-800">{trackingInfo.desiredUniversityName}</span>
+                </div>
+              )}
+              {trackingInfo.visaSystem && (
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-500">{language === 'vi' ? 'Hệ visa:' : 'Visa System:'}</span>
+                  <Badge variant="secondary">{trackingInfo.visaSystem}</Badge>
+                </div>
+              )}
+              {(trackingInfo.topikLevel || trackingInfo.ieltsScore) && (
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-500">{language === 'vi' ? 'Chứng chỉ:' : 'Certificates:'}</span>
+                  {trackingInfo.topikLevel && (
+                    <Badge variant="outline" className="text-green-600 border-green-200">
+                      TOPIK {trackingInfo.topikLevel}
+                    </Badge>
+                  )}
+                  {trackingInfo.ieltsScore && (
+                    <Badge variant="outline" className="text-blue-600 border-blue-200">
+                      IELTS {trackingInfo.ieltsScore}
+                    </Badge>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Notes */}
+            {trackingInfo.notes && (
+              <div className="mt-3 pt-3 border-t border-blue-200">
+                <p className="text-xs text-slate-500">{language === 'vi' ? 'Ghi chú:' : 'Notes:'}</p>
+                <p className="text-sm text-slate-700 mt-1">{trackingInfo.notes}</p>
+              </div>
+            )}
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2 text-sm text-slate-600">
+              <CheckCircle className="w-4 h-4 text-green-500" />
+              <span>{language === 'vi' 
+                ? `Đăng ký thành công: ${new Date(trackingInfo.createdAt || Date.now()).toLocaleDateString('vi-VN')}`
+                : `Registered: ${new Date(trackingInfo.createdAt || Date.now()).toLocaleDateString()}`
+              }</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {!registeredUniversities.length && !trackingInfo && (
         <Card className="border-blue-200 bg-blue-50">
           <CardHeader>
             <CardTitle className="text-base">
-              {language === 'vi' ? 'Chưa có đơn đăng ký' : 'No registrations yet'}
+              {language === 'vi' ? 'Chi phí ước tính' : 'Estimated Costs'}
             </CardTitle>
             <CardDescription>
               {language === 'vi'
-                ? 'Hoàn thành đơn tư vấn để xem chi phí ước tính.'
-                : 'Complete an application to see estimated costs.'}
+                ? 'Dưới đây là chi phí ước tính cho các trường. Hoàn thành đơn tư vấn để nhận báo giá chính xác.'
+                : 'Below are estimated costs for universities. Complete consultation for accurate pricing.'}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={() => navigate('/')}>
+            <Button onClick={() => navigate('/student/onboarding')}>
               <Plus />
-              {language === 'vi' ? 'Bắt đầu tư vấn' : 'Start Application'}
+              {language === 'vi' ? 'Đăng ký tư vấn ngay' : 'Register for Consultation'}
             </Button>
           </CardContent>
         </Card>
       )}
 
       <div className="space-y-4">
-        {registeredUniversities.map((item) => {
+        {displayUniversities.map((item) => {
           const isExpanded = expandedCards.includes(item.registrationId);
 
           return (
@@ -334,15 +547,15 @@ export default function MyCosts() {
         })}
       </div>
 
-      {registeredUniversities.length === 0 && (
+      {displayUniversities.length === 0 && (
         <Card className="border-dashed border-slate-300 bg-slate-50">
           <CardHeader className="items-center text-center">
             <AlertCircle className="w-10 h-10 text-slate-400" />
             <CardTitle>{language === 'vi' ? 'Không có chi phí' : 'No costs'}</CardTitle>
             <CardDescription>
               {language === 'vi'
-                ? 'Hoàn thành quá trình tư vấn để xem chi phí.'
-                : 'Complete an application to view costs.'}
+                ? 'Không tìm thấy thông tin chi phí cho các trường.'
+                : 'No cost information found for universities.'}
             </CardDescription>
           </CardHeader>
         </Card>

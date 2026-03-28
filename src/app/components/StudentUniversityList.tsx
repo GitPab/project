@@ -4,6 +4,7 @@ import { useApp } from '../context/AppContext';
 import { Search, MapPin, Home, Briefcase, Award } from 'lucide-react';
 import { getMaxScholarship } from '../../utils/universityPerks';
 import type { University } from '../context/AppContext';
+import { getAllUniversities } from '../services/universityService';
 
 interface StudentUniversityListProps {
   onUniversitySelect?: (university: University) => void;
@@ -18,7 +19,7 @@ const COLUMN_WIDTHS = {
 };
 
 export default function StudentUniversityList({ onUniversitySelect }: StudentUniversityListProps) {
-  const { universities, user } = useApp();
+  const { universities, setUniversities, user } = useApp();
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
@@ -26,9 +27,29 @@ export default function StudentUniversityList({ onUniversitySelect }: StudentUni
   const [activeTier, setActiveTier] = useState<string>('all');
   const [activeFilter, setActiveFilter] = useState<string>('all');
 
+  // Reload universities from SQLite on mount to get latest updates from admin
   useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 400);
-    return () => clearTimeout(timer);
+    const reloadUniversities = async () => {
+      try {
+        const dbUniversities = await getAllUniversities();
+        if (dbUniversities.length > 0) {
+          // Parse the universities to match the expected format
+          const parsedUniversities = dbUniversities.map((u: any) => ({
+            ...u,
+            koreanData: typeof u.korean_data === 'string' 
+              ? JSON.parse(u.korean_data) 
+              : u.koreanData || u.korean_data || {}
+          }));
+          setUniversities(() => parsedUniversities);
+        }
+      } catch (error) {
+        console.error('Failed to reload universities:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    reloadUniversities();
   }, []);
 
   const filteredUniversities = useMemo(() => {
@@ -251,14 +272,27 @@ export default function StudentUniversityList({ onUniversitySelect }: StudentUni
                             width: 48,
                             height: 48,
                             borderRadius: 8,
-                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                            background: (uni as any).koreanData?.listLogo || (uni as any).thumbnail 
+                              ? 'transparent' 
+                              : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             fontSize: 20,
                             flexShrink: 0,
+                            overflow: 'hidden',
                           }}>
-                            🏫
+                            {(uni as any).koreanData?.listLogo || (uni as any).thumbnail ? (
+                              <img 
+                                src={(uni as any).koreanData?.listLogo || (uni as any).thumbnail} 
+                                alt={uni.name}
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                onError={(e) => {
+                                  (e.currentTarget as HTMLImageElement).style.display = 'none';
+                                  (e.currentTarget.parentElement as HTMLElement).textContent = '🏫';
+                                }}
+                              />
+                            ) : '🏫'}
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>

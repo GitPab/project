@@ -51,9 +51,149 @@ const DEFAULT_USERS: Array<AuthUser & { password: string }> = [
   }
 ];
 
+// Seed complete test profile for student
+async function seedTestProfile() {
+  try {
+    const { saveTrackingCodeToDb, saveStudentProgress, savePayment, saveRegistration } = await import('../services/sqliteDatabase');
+    
+    // Check if tracking code already exists
+    const { getTrackingCodeFromDb } = await import('../services/sqliteDatabase');
+    const existingCode = await getTrackingCodeFromDb('SACMA-20250328-TEST01');
+    if (existingCode) {
+      console.log('[AuthContext] Test profile already exists');
+      return;
+    }
+    
+    console.log('[AuthContext] Seeding test profile for student@example.com...');
+    
+    // 1. Create tracking code
+    const trackingCode = {
+      id: 'test-tracking-001',
+      code: 'SACMA-20250328-TEST01',
+      studentEmail: 'student@example.com',
+      studentName: 'Nguyễn Văn A',
+      studentPhone: '+84-987-654-321',
+      desiredUniversityId: 'konkuk-university',
+      desiredUniversityName: 'Konkuk University',
+      visaSystem: 'D4-1',
+      topikLevel: '3',
+      ieltsScore: '6.5',
+      initialTotalCostVnd: 150000000,
+      status: 'approved',
+      notes: 'Hồ sơ mẫu cho demo',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    await saveTrackingCodeToDb(trackingCode);
+    console.log('[AuthContext] Created tracking code:', trackingCode.code);
+    
+    // 2. Create progress stages (8-stage pipeline)
+    const progressStages = [
+      { id: 1, status: 'completed', completedDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString() },
+      { id: 2, status: 'completed', completedDate: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000).toISOString() },
+      { id: 3, status: 'completed', completedDate: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString() },
+      { id: 4, status: 'completed', completedDate: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString() },
+      { id: 5, status: 'completed', completedDate: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString() },
+      { id: 6, status: 'in-progress', startDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString() },
+      { id: 7, status: 'pending' },
+      { id: 8, status: 'pending' }
+    ];
+    
+    for (const stage of progressStages) {
+      await saveStudentProgress({
+        id: `student@example.com_konkuk-university_${stage.id}`,
+        studentEmail: 'student@example.com',
+        universityId: 'konkuk-university',
+        stageId: stage.id,
+        stageName: `Stage ${stage.id}`,
+        status: stage.status as 'pending' | 'in-progress' | 'completed',
+        startDate: stage.startDate,
+        completedDate: stage.completedDate,
+        notes: stage.status === 'in-progress' ? 'Đang xử lý hồ sơ' : undefined
+      });
+    }
+    console.log('[AuthContext] Created progress stages');
+    
+    // 3. Create payment records
+    const payments = [
+      {
+        id: 'payment-001',
+        studentEmail: 'student@example.com',
+        universityId: 'konkuk-university',
+        paymentType: 'Phí tư vấn',
+        amountVnd: 5000000,
+        status: 'completed' as const,
+        paymentDate: new Date(Date.now() - 28 * 24 * 60 * 60 * 1000).toISOString()
+      },
+      {
+        id: 'payment-002',
+        studentEmail: 'student@example.com',
+        universityId: 'konkuk-university',
+        paymentType: 'Phí hồ sơ',
+        amountVnd: 15000000,
+        status: 'completed' as const,
+        paymentDate: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString()
+      },
+      {
+        id: 'payment-003',
+        studentEmail: 'student@example.com',
+        universityId: 'konkuk-university',
+        paymentType: 'Học phí kỳ 1',
+        amountVnd: 50000000,
+        status: 'completed' as const,
+        paymentDate: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString()
+      },
+      {
+        id: 'payment-004',
+        studentEmail: 'student@example.com',
+        universityId: 'konkuk-university',
+        paymentType: 'Phí visa',
+        amountVnd: 20000000,
+        status: 'pending' as const,
+        dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+      },
+      {
+        id: 'payment-005',
+        studentEmail: 'student@example.com',
+        universityId: 'konkuk-university',
+        paymentType: 'Phí chỗ ở',
+        amountVnd: 30000000,
+        status: 'pending' as const,
+        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+      }
+    ];
+    
+    for (const payment of payments) {
+      await savePayment(payment);
+    }
+    console.log('[AuthContext] Created payment records');
+    
+    // 4. Create registration
+    await saveRegistration({
+      id: 'reg-001',
+      studentId: 'student@example.com',
+      universityId: 'konkuk-university',
+      selectedFees: { visa: true, accommodation: true, insurance: true, additional: [true, true] },
+      totalCostVND: 150000000
+    });
+    console.log('[AuthContext] Created registration');
+    
+    console.log('[AuthContext] Test profile seeding complete!');
+  } catch (error) {
+    console.error('[AuthContext] Failed to seed test profile:', error);
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [token, setToken] = useState<string | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(() => {
+    // Restore user from localStorage on init
+    const stored = localStorage.getItem('auth_user');
+    return stored ? JSON.parse(stored) : null;
+  });
+  const [token, setToken] = useState<string | null>(() => {
+    // Restore token from localStorage on init
+    return localStorage.getItem('auth_token');
+  });
   const [dbInitialized, setDbInitialized] = useState(false);
   const dbInitRef = useRef(false);
 
@@ -66,6 +206,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Seed default users if none exist
         const existingUsers = getAllUsers();
         if (existingUsers.length === 0) {
+          console.log('[AuthContext] No users found, seeding defaults...');
           DEFAULT_USERS.forEach(u => {
             saveUser({
               id: u.id,
@@ -76,6 +217,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               phone: u.phone
             });
           });
+          
+          // Seed complete test profile for student account
+          await seedTestProfile();
+        } else {
+          console.log('[AuthContext] Users already exist:', existingUsers.length);
+          // Still check if test profile needs seeding
+          await seedTestProfile();
         }
         
         dbInitRef.current = true;
@@ -123,11 +271,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     const mockToken = `mock_token_${dbUser.id}_${Date.now()}`;
     
+    // Persist to localStorage
+    localStorage.setItem('auth_user', JSON.stringify(authUser));
+    localStorage.setItem('auth_token', mockToken);
+    
     setUser(authUser);
     setToken(mockToken);
   }, []);
 
   const logout = useCallback(() => {
+    // Clear localStorage
+    localStorage.removeItem('auth_user');
+    localStorage.removeItem('auth_token');
+    
     setUser(null);
     setToken(null);
     window.location.href = '/';
@@ -167,6 +323,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     
     const mockToken = `mock_token_${newId}_${Date.now()}`;
+    
+    // Persist to localStorage
+    localStorage.setItem('auth_user', JSON.stringify(authUser));
+    localStorage.setItem('auth_token', mockToken);
     
     setUser(authUser);
     setToken(mockToken);

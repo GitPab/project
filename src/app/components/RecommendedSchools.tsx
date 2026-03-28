@@ -1,8 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Search, ChevronDown } from 'lucide-react';
 import { useApp, University } from '../context/AppContext';
 import { useLanguage } from '../context/LanguageContext';
 import SchoolCard from './SchoolCard';
+import { getAllUniversities } from '../services/universityService';
 
 type TopTier = 'Top1' | 'Top2' | 'Top3';
 
@@ -11,8 +12,30 @@ interface RecommendedSchoolsProps {
 }
 
 export default function RecommendedSchools({ onUniversitySelect }: RecommendedSchoolsProps) {
-  const { universities } = useApp();
+  const { universities, setUniversities } = useApp();
   const { language } = useLanguage();
+
+  // Reload universities from SQLite on mount
+  useEffect(() => {
+    const reloadUniversities = async () => {
+      try {
+        const dbUniversities = await getAllUniversities();
+        if (dbUniversities.length > 0) {
+          const parsedUniversities = dbUniversities.map((u: any) => ({
+            ...u,
+            koreanData: typeof u.korean_data === 'string' 
+              ? JSON.parse(u.korean_data) 
+              : u.koreanData || u.korean_data || {}
+          }));
+          setUniversities(() => parsedUniversities);
+        }
+      } catch (error) {
+        console.error('Failed to reload universities:', error);
+      }
+    };
+
+    reloadUniversities();
+  }, []);
 
   // State
   const [activeTier, setActiveTier] = useState<TopTier>('Top1');

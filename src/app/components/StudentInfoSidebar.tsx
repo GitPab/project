@@ -48,7 +48,7 @@ export default function StudentInfoSidebar({ className = '', student, onStudentU
   };
 
   const handleViewDetails = () => {
-    window.location.href = '/student/monitoring';
+    window.location.href = '/#/student/my-costs';
   };
 
   const handleEditClick = () => {

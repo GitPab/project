@@ -257,6 +257,19 @@ const DEFAULT_SO_TIET_KIEM_FALLBACK = [
 // Admin General Info Cards - Same design as student page
 const AdminGeneralInfoCards = ({ university, visaSystems }: { university: any; visaSystems: any }) => {
   const koreanData = university?.koreanData;
+  const topTier = university?.top_tier || university?.koreanData?.topTier || '';
+
+  // TOP VISA badge colors based on tier
+  const getTopVisaBadge = (tier: string) => {
+    switch(tier) {
+      case 'Top1': return { bg: '#4CAF50', label: '01' };
+      case 'Top2': return { bg: '#FF9800', label: '02' };
+      case 'Top3': return { bg: '#F44336', label: '03' };
+      default: return { bg: '#9E9E9E', label: '-' };
+    }
+  };
+
+  const topVisaBadge = getTopVisaBadge(topTier);
   
   // Get all visa systems that have data
   const allSystems = ALL_VISA_SYSTEMS
@@ -303,6 +316,10 @@ const AdminGeneralInfoCards = ({ university, visaSystems }: { university: any; v
         ? koreanData.majors.slice(0, 4).join(', ')
         : koreanData?.majors || university?.majors || 'Đang cập nhật');
   
+  // Image fields
+  const heroImage = university?.heroImage;
+  const thumbnail = university?.thumbnail || university?.koreanData?.logo;
+  
   return (
     <div style={{
       background: '#fff',
@@ -311,32 +328,83 @@ const AdminGeneralInfoCards = ({ university, visaSystems }: { university: any; v
       border: '1px solid #E8E8E8',
       boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
     }}>
-      {/* Header */}
+      {/* Header with hero image background */}
       <div style={{
-        background: 'linear-gradient(135deg, #003AB7 0%, #1B3F8B 100%)',
+        background: heroImage 
+          ? `linear-gradient(135deg, rgba(0,58,183,0.85) 0%, rgba(27,63,139,0.9) 100%), url(${heroImage})`
+          : 'linear-gradient(135deg, #003AB7 0%, #1B3F8B 100%)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
         padding: '20px 24px',
-        color: '#fff'
+        color: '#fff',
+        position: 'relative',
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
-            <h2 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 4px 0' }}>
-              {university?.name || 'Thông tin trường'}
-            </h2>
-            <p style={{ fontSize: 14, opacity: 0.9, margin: 0 }}>
-              {koreanData?.koreanName || university?.koreanName || ''}
-            </p>
-          </div>
-          {university?.ranking && (
-            <div style={{
-              background: 'rgba(255,255,255,0.2)',
-              borderRadius: 8,
-              padding: '6px 12px',
-              fontSize: 13,
-              fontWeight: 600
-            }}>
-              Top {university.ranking}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            {/* Thumbnail/Logo */}
+            {thumbnail && (
+              <div style={{
+                width: 64,
+                height: 64,
+                borderRadius: '50%',
+                overflow: 'hidden',
+                border: '3px solid rgba(255,255,255,0.3)',
+                flexShrink: 0,
+                background: '#fff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                <img 
+                  src={thumbnail} 
+                  alt={university?.name}
+                  style={{ 
+                    width: '100%', 
+                    height: '100%', 
+                    objectFit: 'cover',
+                  }}
+                  onError={(e) => (e.currentTarget.style.display = 'none')}
+                />
+              </div>
+            )}
+            <div>
+              <h2 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 4px 0' }}>
+                {university?.name || 'Thông tin trường'}
+              </h2>
+              <p style={{ fontSize: 14, opacity: 0.9, margin: 0 }}>
+                {koreanData?.koreanName || university?.koreanName || ''}
+              </p>
             </div>
-          )}
+          </div>
+          {/* TOP VISA Badge */}
+          <div style={{
+            background: topVisaBadge.bg,
+            color: '#fff',
+            borderRadius: '8px',
+            padding: '6px 12px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minWidth: '60px',
+          }}>
+            <span style={{
+              fontSize: '10px',
+              fontWeight: 600,
+              letterSpacing: '0.5px',
+              lineHeight: 1,
+            }}>
+              TOP VISA
+            </span>
+            <span style={{
+              fontSize: '24px',
+              fontWeight: 700,
+              lineHeight: 1,
+              marginTop: '2px',
+            }}>
+              {topVisaBadge.label}
+            </span>
+          </div>
         </div>
         
         {/* Quick Stats */}
@@ -602,7 +670,9 @@ const VisaSelector = React.memo(({
 
 // Admin Cost Summary Component - Memoized
 const AdminCostSummary = React.memo(({ university }: { university: any }) => {
-  const visaSystems = university.koreanData?.visaSystemsDetail || {};
+  // Convert from snake_case (database format) to check availability
+  const rawVisaSystems = university.koreanData?.visaSystemsDetail || {};
+  const visaSystems = convertVisaSystemsToCamelCase(rawVisaSystems);
   const availableCount = ALL_VISA_SYSTEMS.filter(v => visaSystems[v.key]?.available).length;
   
   return (
@@ -1060,9 +1130,12 @@ const AdminHeroBanner = React.memo(({ university }: { university: any }) => {
   const ranking = university.koreanData?.ranking || university.ranking || 'Top 100';
   const location = university.koreanData?.address || university.location || '';
   const koreanName = university?.koreanData?.koreanName || university?.koreanName || '';
-  const logo = university?.koreanData?.logo || university?.logo;
-  const bannerImage = university?.koreanData?.bannerImage || university?.bannerImage || 'https://images.unsplash.com/photo-1562774053-701939374585?w=1200&q=80';
-  const visaSystems = university.koreanData?.visaSystemsDetail || {};
+  // Use new image fields
+  const logo = university?.thumbnail || university?.koreanData?.logo || university?.logo;
+  const bannerImage = university?.heroImage || university?.koreanData?.bannerImage || university?.bannerImage || 'https://images.unsplash.com/photo-1562774053-701939374585?w=1200&q=80';
+  // Convert from snake_case (database format) to check availability
+  const rawVisaSystems = university.koreanData?.visaSystemsDetail || {};
+  const visaSystems = convertVisaSystemsToCamelCase(rawVisaSystems);
   const availableCount = ALL_VISA_SYSTEMS.filter(v => visaSystems[v.key]?.available).length;
   
   return (
@@ -1239,17 +1312,17 @@ const AdminHeroBanner = React.memo(({ university }: { university: any }) => {
           justifyContent: 'center',
           boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
           border: '4px solid rgba(255,255,255,0.5)',
-          flexShrink: 0
+          flexShrink: 0,
+          overflow: 'hidden',
         }}>
           {logo ? (
             <img 
               src={logo} 
               alt={university?.name}
               style={{
-                width: 140,
-                height: 140,
-                objectFit: 'contain',
-                borderRadius: '50%'
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
               }}
             />
           ) : (
@@ -1395,24 +1468,6 @@ export default function UniversityDetailAdmin() {
   // eslint-disable-next-line react-hooks/exhaustive-deps  
   }, [id]);
 
-  // Redirect non-admin users
-  if (!university) {
-    return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f8f9fa' }}>
-        <div style={{ textAlign: 'center' }}>
-          <h2 style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16 }}>Không tìm thấy trường đại học</h2>
-          <Button onClick={() => navigate(-1)}>Quay lại</Button>
-        </div>
-      </div>
-    );
-  }
-
-  // Redirect non-admin users to student view
-  if (!isAdmin) {
-    navigate(`/university/${id}`);
-    return null;
-  }
-
   // Memoize availableCount to prevent recalculation on every render
   const availableCount = useMemo(() => 
     ALL_VISA_SYSTEMS.filter(v => visaSystems[v.key]?.available).length,
@@ -1434,6 +1489,24 @@ export default function UniversityDetailAdmin() {
       toast.success('Cập nhật thông tin trường thành công!');
     }
   }, [university, id]);
+
+  // Redirect non-admin users
+  if (!university) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f8f9fa' }}>
+        <div style={{ textAlign: 'center' }}>
+          <h2 style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16 }}>Không tìm thấy trường đại học</h2>
+          <Button onClick={() => navigate(-1)}>Quay lại</Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Redirect non-admin users to student view
+  if (!isAdmin) {
+    navigate(`/university/${id}`);
+    return null;
+  }
 
   return (
     <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
@@ -1562,23 +1635,36 @@ export default function UniversityDetailAdmin() {
                 visa_systems: convertVisaSystemsToSnakeCase(university.koreanData?.visaSystemsDetail)
               }}
               onSave={async (data) => {
-                const convertedVisaSystems = convertVisaSystemsToCamelCase(data.visa_systems);
-                const convertedCommonFees = convertCommonFeesToArray(data.common_fees_vnd);
-                
-                const updatedUniversity = {
-                  ...university,
-                  koreanData: {
-                    ...university.koreanData,
-                    isKoreanUniversity: true,
-                    commonFeesVND: convertedCommonFees,
-                    visaSystemsDetail: convertedVisaSystems
+                try {
+                  console.log('[Cost Save] Started');
+                  
+                  const convertedVisaSystems = convertVisaSystemsToCamelCase(data.visa_systems);
+                  console.log('[Cost Save] Converted systems:', Object.keys(convertedVisaSystems));
+                  
+                  const convertedCommonFees = convertCommonFeesToArray(data.common_fees_vnd);
+                  
+                  const updatedUniversity = {
+                    ...university,
+                    koreanData: {
+                      ...university.koreanData,
+                      isKoreanUniversity: true,
+                      commonFeesVND: convertedCommonFees,
+                      visaSystemsDetail: convertedVisaSystems
+                    }
+                  };
+                  
+                  await updateUniversity(university.id, updatedUniversity);
+                  
+                  toast.success('Cấu hình chi phí đã được lưu!');
+                  setShowCostConfigModal(false);
+                  
+                  if (id) {
+                    await fetchUniversity(id);
                   }
-                };
-                
-                await updateUniversity(university.id, updatedUniversity);
-                toast.success('Cấu hình chi phí đã được lưu!');
-                setShowCostConfigModal(false);
-                if (id) fetchUniversity(id);
+                } catch (error) {
+                  console.error('[Cost Save] ERROR:', error);
+                  toast.error('Lỗi khi lưu cấu hình chi phí');
+                }
               }}
               onCancel={handleCloseCostModal}
             />

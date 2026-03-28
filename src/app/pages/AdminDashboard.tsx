@@ -1,4 +1,4 @@
-﻿import React, { useMemo } from 'react';
+﻿import React, { useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { useApp } from '../context/AppContext';
 import StatCard from '../components/StatCard';
@@ -7,27 +7,98 @@ import TierMini from '../components/TierMini';
 import ImportUniversitiesModal from '../components/ImportUniversitiesModal';
 import DatabaseExportPanel from '../components/DatabaseExportPanel';
 import { toast } from 'sonner';
+import { getAllUniversities } from '../services/universityService';
+import { getAllUsers, getAuditLogs } from '../services/sqliteDatabase';
 
 const fetchDashboardStats = (universities: any[]) => {
-  const top1Count = universities.filter(u => u.koreanData?.topTier === 'Top1').length;
-  const top2Count = universities.filter(u => u.koreanData?.topTier === 'Top2').length;
-  const top3Count = universities.filter(u => u.koreanData?.topTier === 'Top3').length;
-  const configuredCount = universities.filter(u =>
-    u.visa_systems && Object.values(u.visa_systems).some((s: any) => s?.available === true && (s?.invoice_krw ?? 0) > 0)
+  const top1Count = universities.filter(u => u.koreanData?.topTier === 'Top1' || u.top_tier === 'Top1').length;
+  const top2Count = universities.filter(u => u.koreanData?.topTier === 'Top2' || u.top_tier === 'Top2').length;
+  const top3Count = universities.filter(u => u.koreanData?.topTier === 'Top3' || u.top_tier === 'Top3').length;
+  
+  // Check if university has visa systems configured (in korean_data)
+  const configuredCount = universities.filter(u => {
+    const visaSystems = u.koreanData?.visaSystemsDetail || u.visa_systems || {};
+    return Object.values(visaSystems).some((s: any) => s?.available === true);
+  }).length;
+  
+  const pendingConfig = universities.length - configuredCount;
+  
+  // Count universities that need updates (no koreanData or missing key fields)
+  const pendingUpdates = universities.filter(u => 
+    !u.koreanData || 
+    !u.koreanData.visaSystemsDetail ||
+    Object.keys(u.koreanData.visaSystemsDetail || {}).length === 0
   ).length;
-  const pendingConfig = universities.filter(u =>
-    !u.visa_systems || !Object.values(u.visa_systems).some((s: any) => s?.available === true)
-  ).length;
-  return { totalUniversities: universities.length, top1Count, top2Count, top3Count, activeStudents: 0, configuredCount, pendingConfig, pendingUpdates: 0, recentActivity: [] };
+  
+  return { 
+    totalUniversities: universities.length, 
+    top1Count, 
+    top2Count, 
+    top3Count, 
+    activeStudents: 0, // Will be overridden by actual count
+    configuredCount, 
+    pendingConfig, 
+    pendingUpdates, 
+    recentActivity: [] 
+  };
 };
 
 export default function AdminDashboard() {
-  const { universities, addUniversities } = useApp();
+  const { universities, setUniversities, addUniversities } = useApp();
   const navigate = useNavigate();
   const [showImportModal, setShowImportModal] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(true);
-  const stats = useMemo(() => fetchDashboardStats(universities), [universities]);
-  React.useEffect(() => { setIsLoading(false); }, [universities]);
+  const [activeStudents, setActiveStudents] = React.useState(0);
+  const [recentActivity, setRecentActivity] = React.useState<any[]>([]);
+  
+  const stats = useMemo(() => {
+    const baseStats = fetchDashboardStats(universities);
+    return { ...baseStats, activeStudents };
+  }, [universities, activeStudents]);
+
+  // Reload universities from SQLite on mount
+  useEffect(() => {
+    const reloadUniversities = async () => {
+      try {
+        const [dbUniversities, users] = await Promise.all([
+          getAllUniversities(),
+          getAllUsers()
+        ]);
+        
+        if (dbUniversities.length > 0) {
+          const parsedUniversities = dbUniversities.map((u: any) => ({
+            ...u,
+            koreanData: typeof u.korean_data === 'string' 
+              ? JSON.parse(u.korean_data) 
+              : u.koreanData || u.korean_data || {}
+          }));
+          setUniversities(() => parsedUniversities);
+        }
+        
+        // Count students
+        const students = users.filter((u: any) => u.role === 'student');
+        setActiveStudents(students.length);
+        
+        // Load recent activity from audit logs
+        const logs = await getAuditLogs(undefined, undefined, undefined, 10);
+        const formattedLogs = logs.map((log: any) => ({
+          id: log.id,
+          action: log.action,
+          entityType: log.entity_type,
+          entityName: log.new_values ? JSON.parse(log.new_values || '{}').name || log.entity_id : log.entity_id,
+          performedBy: log.performed_by_email || log.performed_by || 'System',
+          timestamp: new Date(log.created_at).toLocaleString('vi-VN')
+        }));
+        setRecentActivity(formattedLogs);
+      } catch (error) {
+        console.error('Failed to reload data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    reloadUniversities();
+  }, []);
 
   const palette = {
     pageBg: '#FBF7F2',
@@ -113,9 +184,44 @@ export default function AdminDashboard() {
 
         <div style={cardStyle}>
           <span style={{ fontWeight: 600, color: palette.text }}>Hoạt động gần đây</span>
-          <div style={{ textAlign: 'center', padding: '32px 0', color: palette.textMuted, fontSize: 13 }}>
-            Chưa có hoạt động nào
-          </div>
+          {recentActivity.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '32px 0', color: palette.textMuted, fontSize: 13 }}>
+              Chưa có hoạt động nào
+            </div>
+          ) : (
+            <div style={{ marginTop: 12, maxHeight: 200, overflowY: 'auto' }}>
+              {recentActivity.map((activity, idx) => (
+                <div key={idx} style={{ 
+                  padding: '8px 0', 
+                  borderBottom: idx < recentActivity.length - 1 ? `1px solid ${palette.border}` : 'none',
+                  fontSize: 12 
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ 
+                      width: 8, 
+                      height: 8, 
+                      borderRadius: '50%', 
+                      background: activity.action.includes('CREATE') ? '#10B981' : 
+                                  activity.action.includes('UPDATE') ? '#3B82F6' : 
+                                  activity.action.includes('DELETE') ? '#EF4444' : '#6B7280'
+                    }} />
+                    <span style={{ fontWeight: 500, color: palette.text }}>
+                      {activity.action}
+                    </span>
+                    <span style={{ color: palette.textMuted, marginLeft: 'auto' }}>
+                      {activity.timestamp}
+                    </span>
+                  </div>
+                  <div style={{ marginLeft: 16, marginTop: 2, color: palette.textMuted }}>
+                    {activity.entityType}: {activity.entityName}
+                  </div>
+                  <div style={{ marginLeft: 16, fontSize: 11, color: palette.textMuted }}>
+                    bởi {activity.performedBy}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

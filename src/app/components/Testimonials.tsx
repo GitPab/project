@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Star, Quote } from 'lucide-react';
+import { getServiceFeedback } from '../services/sqliteDatabase';
 
 interface TestimonialProps {
   name: string;
@@ -55,25 +56,57 @@ interface TestimonialsProps {
 }
 
 export default function Testimonials({ className = '' }: TestimonialsProps) {
-  const testimonials = [
+  const [testimonials, setTestimonials] = useState<any[]>([]);
+
+  useEffect(() => {
+    const loadTestimonials = async () => {
+      try {
+        const feedback = await getServiceFeedback();
+        // Filter approved feedback with ratings >= 4
+        const approved = feedback
+          .filter((f: any) => f.rating >= 4 && f.is_approved)
+          .slice(0, 6)
+          .map((f: any) => ({
+            name: f.student_email?.split('@')[0]?.replace(/\./g, ' ') || 'Học viên',
+            university: 'Du học Hàn Quốc',
+            story: f.feedback_text,
+            rating: f.rating,
+            avatar: f.student_email?.charAt(0).toUpperCase() || 'H'
+          }));
+        
+        // Fallback to static if no approved feedback
+        if (approved.length === 0) {
+          setTestimonials(staticTestimonials);
+        } else {
+          setTestimonials(approved);
+        }
+      } catch (error) {
+        console.log('Using static testimonials (database not ready)');
+        setTestimonials(staticTestimonials);
+      }
+    };
+    loadTestimonials();
+  }, []);
+
+  const staticTestimonials = [
     {
       name: "Nguyễn Thị An",
       university: "Konkuk University - Du học D4-1",
-      story: "SACMA đã giúp tôi hoàn thành ước mơ du học Hàn Quốc. Quy trình tư vấn chuyên nghiệp, hỗ trợ tận tình từ lúc đăng ký đến khi đến Seoul.",
+      story: "TBT đã giúp tôi hoàn thành ước mơ du học Hàn Quốc. Quy trình tư vấn chuyên nghiệp, hỗ trợ tận tình từ lúc đăng ký đến khi đến Seoul.",
       rating: 5,
       avatar: "NTA"
     },
     {
       name: "Trần Minh Hoàng",
       university: "Korea University - Học bổng TOPIK 5",
-      story: "Nhờ sự hướng dẫn của SACMA, tôi đã nhận được học bổng 50% học phí. Các thủ tục visa được hỗ trợ rất nhanh chóng.",
+      story: "Nhờ sự hướng dẫn của TBT, tôi đã nhận được học bổng 50% học phí. Các thủ tục visa được hỗ trợ rất nhanh chóng.",
       rating: 5,
       avatar: "TMH"
     },
     {
       name: "Lê Thuỳ Trang",
       university: "Yonsei University - Thạc sĩ",
-      story: "Tôi rất hài lòng với dịch vụ của SACMA. Từ việc chọn trường, chuẩn bị hồ sơ đến tìm nhà ở, mọi thứ đều được hỗ trợ.",
+      story: "Tôi rất hài lòng với dịch vụ của TBT. Từ việc chọn trường, chuẩn bị hồ sơ đến tìm nhà ở, mọi thứ đều được hỗ trợ.",
       rating: 4,
       avatar: "LTT"
     }

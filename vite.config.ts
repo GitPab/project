@@ -24,33 +24,57 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: (id) => {
-          // Vendor libraries - optimized chunking
+          // Vendor libraries - optimized chunking with smaller splits
           if (id.includes('node_modules')) {
-            if (id.includes('@radix-ui') || id.includes('cmdk')) {
+            if (id.includes('@radix-ui') || id.includes('cmdk') || id.includes('@headlessui')) {
               return 'vendor-ui';
             }
-            if (id.includes('recharts') || id.includes('react-day-picker')) {
+            if (id.includes('recharts') || id.includes('react-day-picker') || id.includes('chart')) {
               return 'vendor-charts';
             }
-            if (id.includes('react-dnd') || id.includes('react-dropzone')) {
+            if (id.includes('react-dnd') || id.includes('react-dropzone') || id.includes('@dnd-kit')) {
               return 'vendor-interactive';
             }
-            if (id.includes('html2canvas') || id.includes('jspdf') || id.includes('xlsx')) {
+            if (id.includes('html2canvas') || id.includes('jspdf') || id.includes('xlsx') || id.includes('file-saver')) {
               return 'vendor-export';
             }
             if (id.includes('lucide-react')) {
               return 'vendor-icons';
             }
-            // All other vendor libs go to vendor-other to avoid circular dependencies
-            return 'vendor-other';
+            if (id.includes('react-router') || id.includes('react-router-dom')) {
+              return 'vendor-router';
+            }
+            if (id.includes('react') && !id.includes('react-router')) {
+              return 'vendor-react';
+            }
+            if (id.includes('zustand') || id.includes('jotai') || id.includes('valtio')) {
+              return 'vendor-state';
+            }
+            // Split vendor-other by first letter to avoid huge chunks
+            const firstLetter = id.charCodeAt(id.lastIndexOf('/') + 1) || 0;
+            return `vendor-${String.fromCharCode(97 + (firstLetter % 4))}`;
           }
           
-          // Pages - split each route into separate chunk
-          if (id.includes('pages/')) {
-            const match = id.match(/pages\/(\w+)/);
-            if (match) {
-              return `page-${match[1].toLowerCase()}`;
+          // Admin pages - group related pages together
+          if (id.includes('pages/Admin')) {
+            if (id.includes('AdminDashboard') || id.includes('AdminAudit') || id.includes('AdminRegistrations')) {
+              return 'admin-core';
             }
+            if (id.includes('AdminEmail') || id.includes('AdminWorkflow') || id.includes('AdminSettings')) {
+              return 'admin-config';
+            }
+            if (id.includes('AdminBulk') || id.includes('AdminScholarship') || id.includes('AdminVisa') || id.includes('AdminCalendar')) {
+              return 'admin-operations';
+            }
+            if (id.includes('AdminFeedback') || id.includes('AdminRoles')) {
+              return 'admin-management';
+            }
+            return 'admin-other';
+          }
+          
+          // Student pages - group by feature
+          if (id.includes('pages/Student') || id.includes('Student')) {
+            return 'student-pages';
           }
           
           // Context - separate chunk
@@ -64,6 +88,11 @@ export default defineConfig({
               return 'components-ui';
             }
             return 'components';
+          }
+          
+          // Services
+          if (id.includes('services/')) {
+            return 'services';
           }
         },
       },

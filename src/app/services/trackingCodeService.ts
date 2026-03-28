@@ -1,9 +1,17 @@
 /**
  * Tracking Code Service
  * Handles generation, storage, and retrieval of tracking codes
+ * Now uses SQLite database for persistence
  */
 
-import { supabase } from '@/config/supabase';
+import {
+  saveTrackingCodeToDb,
+  getTrackingCodeFromDb,
+  getAllTrackingCodesFromDb,
+  searchTrackingCodesByEmailFromDb,
+  updateTrackingCodeStatusInDb,
+  deleteTrackingCodeFromDb,
+} from './sqliteDatabase';
 import type { TrackingCode, TrackingCodePayload } from '@/types/tracking';
 
 const ERROR_CHECKING_UNIQUENESS = 'Error checking code uniqueness';
@@ -14,48 +22,25 @@ const ERROR_RETRIEVING_ALL_CODES = 'Error retrieving all tracking codes';
 const ERROR_SEARCHING_CODES = 'Error searching tracking codes';
 
 /**
- * Convert snake_case storage format to camelCase TrackingCode interface
+ * Convert database format (snake_case) to TrackingCode interface (camelCase)
  */
-const convertToTrackingCode = (data: Record<string, any>): TrackingCode => {
+const convertFromDbFormat = (data: Record<string, any>): TrackingCode => {
   return {
     id: data.id,
     code: data.code,
-    studentEmail: data.student_email || data.studentEmail,
-    studentName: data.student_name || data.studentName,
-    studentPhone: data.student_phone || data.studentPhone,
-    desiredUniversityId: data.desired_university_id || data.desiredUniversityId,
-    desiredUniversityName: data.desired_university_name || data.desiredUniversityName,
-    visaSystem: data.visa_system || data.visaSystem,
-    topikLevel: data.topik_level || data.topikLevel,
-    ieltsScore: data.ielts_score || data.ieltsScore,
-    initialTotalCostVnd: data.initial_total_cost_vnd || data.initialTotalCostVnd,
-    status: data.status as any,
+    studentEmail: data.student_email,
+    studentName: data.student_name,
+    studentPhone: data.student_phone,
+    desiredUniversityId: data.desired_university_id,
+    desiredUniversityName: data.desired_university_name,
+    visaSystem: data.visa_system,
+    topikLevel: data.topik_level,
+    ieltsScore: data.ielts_score,
+    initialTotalCostVnd: data.initial_total_cost_vnd,
+    status: data.status,
     notes: data.notes,
-    createdAt: data.created_at || data.createdAt,
-    updatedAt: data.updated_at || data.updatedAt,
-  };
-};
-
-/**
- * Convert camelCase TrackingCode to snake_case for storage
- */
-const convertToStorageFormat = (code: TrackingCode): Record<string, any> => {
-  return {
-    id: code.id,
-    code: code.code,
-    student_email: code.studentEmail,
-    student_name: code.studentName,
-    student_phone: code.studentPhone,
-    desired_university_id: code.desiredUniversityId,
-    desired_university_name: code.desiredUniversityName,
-    visa_system: code.visaSystem,
-    topik_level: code.topikLevel,
-    ielts_score: code.ieltsScore,
-    initial_total_cost_vnd: code.initialTotalCostVnd,
-    status: code.status,
-    notes: code.notes,
-    created_at: code.createdAt,
-    updated_at: code.updatedAt,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
   };
 };
 
@@ -83,11 +68,8 @@ export const generateTrackingCode = (): string => {
  */
 export const isCodeUnique = async (code: string): Promise<boolean> => {
   try {
-    const existing = supabase.getFromStorage(code);
-    if (existing) {
-      return false;
-    }
-    return true;
+    const existing = await getTrackingCodeFromDb(code);
+    return !existing;
   } catch (error) {
     if (process.env.NODE_ENV === 'development') {
       console.error(ERROR_CHECKING_UNIQUENESS, error);
@@ -139,8 +121,21 @@ export const saveTrackingCode = async (payload: TrackingCodePayload): Promise<Tr
       updatedAt: new Date().toISOString(),
     };
 
-    const storageFormat = convertToStorageFormat(trackingCode);
-    supabase.saveToStorage(storageFormat as any);
+    saveTrackingCodeToDb({
+      id: trackingCode.id,
+      code: trackingCode.code,
+      studentEmail: trackingCode.studentEmail,
+      studentName: trackingCode.studentName,
+      studentPhone: trackingCode.studentPhone,
+      desiredUniversityId: trackingCode.desiredUniversityId,
+      desiredUniversityName: trackingCode.desiredUniversityName,
+      visaSystem: trackingCode.visaSystem,
+      topikLevel: trackingCode.topikLevel,
+      ieltsScore: trackingCode.ieltsScore,
+      initialTotalCostVnd: trackingCode.initialTotalCostVnd,
+      status: trackingCode.status,
+      notes: trackingCode.notes,
+    });
 
     return trackingCode;
   } catch (error) {
@@ -156,9 +151,9 @@ export const saveTrackingCode = async (payload: TrackingCodePayload): Promise<Tr
  */
 export const getTrackingCode = async (code: string): Promise<TrackingCode | null> => {
   try {
-    const stored = supabase.getFromStorage(code);
+    const stored = await getTrackingCodeFromDb(code);
     if (stored) {
-      return convertToTrackingCode(stored);
+      return convertFromDbFormat(stored);
     }
     return null;
   } catch (error) {
@@ -177,19 +172,16 @@ export const updateTrackingCodeStatus = async (
   status: 'pending' | 'in-review' | 'approved' | 'contacted'
 ): Promise<TrackingCode | null> => {
   try {
-    const existing = supabase.getFromStorage(code);
+    const existing = await getTrackingCodeFromDb(code);
     if (!existing) {
       return null;
     }
 
-    const updated = {
-      ...existing,
-      status,
-      updated_at: new Date().toISOString(),
-    };
-
-    supabase.saveToStorage(updated);
-    return convertToTrackingCode(updated);
+    updateTrackingCodeStatusInDb(code, status);
+    
+    // Return updated tracking code
+    const updated = await getTrackingCodeFromDb(code);
+    return updated ? convertFromDbFormat(updated) : null;
   } catch (error) {
     if (process.env.NODE_ENV === 'development') {
       console.error(ERROR_UPDATING_CODE, error);
@@ -203,8 +195,8 @@ export const updateTrackingCodeStatus = async (
  */
 export const getAllTrackingCodes = async (): Promise<TrackingCode[]> => {
   try {
-    const codes = supabase.getAllCodesInStorage();
-    return codes.map(convertToTrackingCode);
+    const codes = await getAllTrackingCodesFromDb();
+    return codes.map(convertFromDbFormat);
   } catch (error) {
     if (process.env.NODE_ENV === 'development') {
       console.error(ERROR_RETRIEVING_ALL_CODES, error);
@@ -218,15 +210,32 @@ export const getAllTrackingCodes = async (): Promise<TrackingCode[]> => {
  */
 export const searchTrackingCodesByEmail = async (email: string): Promise<TrackingCode[]> => {
   try {
-    const codes = supabase.getAllCodesInStorage();
-    return codes
-      .filter((code) => code.student_email.toLowerCase().includes(email.toLowerCase()))
-      .map(convertToTrackingCode);
+    const codes = await searchTrackingCodesByEmailFromDb(email);
+    return codes.map(convertFromDbFormat);
   } catch (error) {
     if (process.env.NODE_ENV === 'development') {
       console.error(ERROR_SEARCHING_CODES, error);
     }
     return [];
+  }
+};
+
+/**
+ * Delete tracking code by ID (admin only)
+ */
+export const deleteTrackingCode = async (code: string): Promise<boolean> => {
+  try {
+    const existing = await getTrackingCodeFromDb(code);
+    if (!existing) {
+      return false;
+    }
+    deleteTrackingCodeFromDb(code);
+    return true;
+  } catch (error) {
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Error deleting tracking code:', error);
+    }
+    return false;
   }
 };
 

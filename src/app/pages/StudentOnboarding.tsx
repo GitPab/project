@@ -11,6 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Textarea } from '../components/ui/textarea';
 import { toast } from 'sonner';
 import { UserPlus, GraduationCap, Phone, Mail, BookOpen, Globe } from 'lucide-react';
+import { createTrackingCode } from '../services/trackingCodeSqliteService';
+import { generateUniqueTrackingCode } from '../services/trackingCodeService';
 
 export default function StudentOnboarding() {
   const { universities, addStudentOnboarding, user } = useApp();
@@ -49,8 +51,8 @@ export default function StudentOnboarding() {
     // Fixed costs
     if (selectedUniversity.fixedCosts) {
       selectedUniversity.fixedCosts.forEach(cost => {
-        const amountInUSD = convertAmount(cost.amount, 'USD', cost.currency || 'USD');
-        total += amountInUSD;
+        const amountInVND = convertAmount(cost.amount, 'VND', (cost.currency || 'VND') as 'VND');
+        total += amountInVND;
       });
     }
 
@@ -63,25 +65,25 @@ export default function StudentOnboarding() {
       if (visaSystem) {
         // Application fee
         if (visaSystem.applicationFee) {
-          total += convertAmount(visaSystem.applicationFee, 'VND', 'KRW');
+          total += convertAmount(visaSystem.applicationFee, 'VND', 'VND');
         }
         
         // Tuition (estimate per term or range average)
         if (visaSystem.tuitionPerTerm) {
-          total += convertAmount(visaSystem.tuitionPerTerm, 'VND', 'KRW');
+          total += convertAmount(visaSystem.tuitionPerTerm, 'VND', 'VND');
         } else if (visaSystem.tuitionRange) {
           const avgTuition = (visaSystem.tuitionRange.min + visaSystem.tuitionRange.max) / 2;
-          total += convertAmount(avgTuition, 'VND', 'KRW');
+          total += convertAmount(avgTuition, 'VND', 'VND');
         }
         
         // Base yearly fee
         if (visaSystem.baseYearlyFee) {
-          total += convertAmount(visaSystem.baseYearlyFee, 'VND', 'KRW');
+          total += convertAmount(visaSystem.baseYearlyFee, 'VND', 'VND');
         }
 
         // Enrollment fee
         if (visaSystem.enrollmentFee) {
-          total += convertAmount(visaSystem.enrollmentFee, 'VND', 'KRW');
+          total += convertAmount(visaSystem.enrollmentFee, 'VND', 'VND');
         }
       }
     }
@@ -89,7 +91,7 @@ export default function StudentOnboarding() {
     return total;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validation
@@ -112,7 +114,40 @@ export default function StudentOnboarding() {
     }
 
     const initialCost = calculateInitialCost();
+    const selectedUni = universities.find(u => u.id === formData.desiredUniversity);
 
+    // Generate unique tracking code
+    let trackingCode = '';
+    try {
+      trackingCode = await generateUniqueTrackingCode();
+    } catch (err) {
+      console.error('Failed to generate tracking code:', err);
+      toast.error(language === 'vi' ? 'Lỗi tạo mã theo dõi' : 'Failed to generate tracking code');
+      return;
+    }
+
+    // Save to SQLite database (persisted)
+    const savedCode = await createTrackingCode({
+      code: trackingCode,
+      student_email: formData.email,
+      student_name: formData.name,
+      student_phone: formData.phone,
+      desired_university_id: formData.desiredUniversity,
+      desired_university_name: selectedUni?.name || '',
+      visa_system: formData.visaSystem,
+      topik_level: formData.topikLevel || '',
+      ielts_score: formData.ieltsScore || '',
+      initial_total_cost_vnd: Math.round(initialCost),
+      status: 'pending',
+      notes: formData.notes || `TOPIK Level: ${formData.topikLevel}, System: ${formData.visaSystem}`
+    });
+
+    if (!savedCode) {
+      toast.error(language === 'vi' ? 'Lỗi lưu dữ liệu' : 'Failed to save data');
+      return;
+    }
+
+    // Also save to React state (for immediate UI updates)
     addStudentOnboarding({
       name: formData.name,
       phone: formData.phone,
@@ -129,8 +164,8 @@ export default function StudentOnboarding() {
                   language === 'ko' ? '정보가 성공적으로 제출되었습니다!' :
                   'Information submitted successfully!');
 
-    // Navigate to universities list
-    navigate('/student/universities');
+    // Navigate to tracking page with the generated code
+    navigate(`/student/tracking/${trackingCode}`);
   };
 
   const initialCost = calculateInitialCost();

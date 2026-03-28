@@ -1,0 +1,123 @@
+[
+  {
+    "name": "ĐẠI HỌC AJOU",
+    "name_korean": "아주대학교",
+    "country": "South Korea",
+    "address": "206 Woldeukeom-ro, Woncheon-dong, Yeongtong-gu, Suwon, Gyeonggi-do, Hàn Quốc",
+    "area": "Gyeonggi (Suwon)",
+    "ranking": 20,
+    "top_tier": "1",
+    "majors": [
+      "Kỹ thuật",
+      "IT",
+      "Truyền thông",
+      "Khoa học tự nhiên",
+      "QTKD"
+    ],
+    "visa_systems": {
+      "D4-1": {
+        "available": true,
+        "invoice_krw": 1500000,
+        "invoice_krw_max": null
+      },
+      "D2-1": {
+        "available": false,
+        "invoice_krw": null
+      },
+      "D2-2": {
+        "available": true,
+        "invoice_krw": 3928000,
+        "invoice_krw_max": 5323000
+      },
+      "D2-3M": {
+        "available": true,
+        "invoice_krw": 5490000,
+        "invoice_krw_max": 8513000
+      },
+      "D2-3P": {
+        "available": false,
+        "invoice_krw": null
+      },
+      "D2-6": {
+        "available": false,
+        "invoice_krw": null
+      },
+      "exchange": {
+        "available": false,
+        "invoice_krw": null
+      },
+      "short": {
+        "available": false,
+        "invoice_krw": null
+      }
+    },
+    "admission": {
+      "D4-1": {
+        "gpa_min": 7.0,
+        "gap_year_limit": 2
+      },
+      "D2": {
+        "gpa_min": 6.5,
+        "gap_year_limit": null
+      }
+    },
+    "scholarships": {
+      "D4-1": [],
+      "D2-2": [
+        {
+          "condition": "TOPIK 3",
+          "topik_level": 3,
+          "discount_pct": 30
+        },
+        {
+          "condition": "TOPIK 4",
+          "topik_level": 4,
+          "discount_pct": 50
+        },
+        {
+          "condition": "TOPIK 5",
+          "topik_level": 5,
+          "discount_pct": 70
+        },
+        {
+          "condition": "TOPIK 6",
+          "topik_level": 6,
+          "discount_pct": 100
+        }
+      ],
+      "D2-3M": [
+        {
+          "condition": "TOPIK 5",
+          "topik_level": 5,
+          "discount_pct": 40
+        },
+        {
+          "condition": "IELTS 5.5",
+          "topik_level": null,
+          "discount_pct": 40
+        }
+      ]
+    },
+    "ktx_options": [
+      {
+        "name": "Phòng 4 người",
+        "price_krw": 747000
+      },
+      {
+        "name": "Phòng 2 người",
+        "price_krw": 1102000
+      },
+      {
+        "name": "Phòng 2 người (Quốc tế)",
+        "price_krw": 1440000
+      }
+    ],
+    "dormitory_info": "KTX trong khuôn viên trường. Đăng ký online đầu kỳ.",
+    "part_time_info": "Nhà hàng, cửa hàng tiện lợi, dọn dẹp tại khu trung tâm cách trường 10 phút buýt.",
+    "support_policies": [
+      "Đón sân bay",
+      "Hỗ trợ CCCD nước ngoài",
+      "Chuyển đổi visa"
+    ]
+  }
+]

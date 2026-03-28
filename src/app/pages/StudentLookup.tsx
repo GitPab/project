@@ -1,20 +1,25 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Search, CheckCircle2, AlertCircle, Loader, Info } from 'lucide-react';
+import { Search, Loader, Info, QrCode } from 'lucide-react';
 import { toast } from 'sonner';
 import { getTrackingCode } from '../services/trackingCodeService';
 import { useLanguage } from '../context/LanguageContext';
+import { QRScannerModal } from '../components/QRScannerModal';
+import { useAuth } from '../context/AuthContext';
 
 /**
  * Student Lookup / Tra cứu Page
  * Public page where students can enter their tracking code to view their application status
  * URL: /student/lookup
+ * Redirects to MyCosts page after successful lookup
  */
 export default function StudentLookup() {
   const navigate = useNavigate();
   const { language } = useLanguage();
+  const { user } = useAuth();
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
 
   const handleLookup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,7 +37,23 @@ export default function StudentLookup() {
     try {
       const data = await getTrackingCode(code.trim());
       if (data) {
-        navigate(`/student/tracking/${code.trim()}`);
+        // If user is logged in and tracking code matches their email, save to localStorage
+        if (user && data.studentEmail === user.email) {
+          const updatedUser = { 
+            ...user, 
+            name: data.studentName || user.name,
+            phone: data.studentPhone || user.phone,
+            trackingCode: code.trim()
+          };
+          localStorage.setItem('auth_user', JSON.stringify(updatedUser));
+          toast.success(
+            language === 'vi' ? 'Đã liên kết mã theo dõi!' :
+            'Tracking code linked!'
+          );
+        }
+        
+        // Redirect to Tracking page (shows progress pipeline)
+        navigate(`/student/tracking/${encodeURIComponent(code.trim())}`);
       } else {
         toast.error(
           language === 'vi' ? 'Mã theo dõi không tồn tại' :
@@ -75,7 +96,7 @@ export default function StudentLookup() {
 
         {/* Form */}
         <form onSubmit={handleLookup} className="bg-white rounded-2xl shadow-xl border border-slate-200 p-8 space-y-6">
-          {/* Code Input */}
+          {/* Code Input with QR Button */}
           <div>
             <label className="block mb-2 text-sm font-semibold text-slate-700">
               {language === 'vi' ? 'Mã Theo Dõi' :
@@ -83,14 +104,24 @@ export default function StudentLookup() {
                'Tracking Code'}
               <span className="text-red-500">*</span>
             </label>
-            <input
-              type="text"
-              value={code}
-              onChange={(e) => setCode(e.target.value.toUpperCase())}
-              placeholder="SACMA-20260313-ABC123"
-              className="w-full px-4 py-3 bg-slate-50 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all font-mono text-center"
-              disabled={loading}
-            />
+            <div className="relative">
+              <input
+                type="text"
+                value={code}
+                onChange={(e) => setCode(e.target.value.toUpperCase())}
+                placeholder="SACMA-20260313-ABC123"
+                className="w-full px-4 py-3 pr-12 bg-slate-50 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all font-mono text-center"
+                disabled={loading}
+              />
+              <button
+                type="button"
+                onClick={() => setShowScanner(true)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                title="Quét mã QR"
+              >
+                <QrCode className="w-5 h-5" />
+              </button>
+            </div>
             <p className="text-xs text-slate-500 mt-1">
               {language === 'vi' ? 'Mã có dạng: SACMA-YYYYMMDD-XXXXXX' :
                language === 'ko' ? '형식: SACMA-YYYYMMDD-XXXXXX' :
@@ -158,6 +189,19 @@ export default function StudentLookup() {
              '← Back to home'}
           </button>
         </div>
+        {/* QR Scanner Modal */}
+        <QRScannerModal
+          isOpen={showScanner}
+          onClose={() => setShowScanner(false)}
+          onScan={(scannedCode) => {
+            setCode(scannedCode);
+            toast.success(
+              language === 'vi' ? 'Đã quét mã thành công!' :
+              language === 'ko' ? '코드 스캔 성공!' :
+              'Code scanned successfully!'
+            );
+          }}
+        />
       </div>
     </div>
   );

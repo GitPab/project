@@ -22,6 +22,27 @@ export default function RegistrationModal({
   university 
 }: RegistrationModalProps) {
   const { formatFrom } = useCurrency();
+  
+  // Get fees from new visaSystemsDetail (preferred) or legacy fields
+  const visaSystems = university.koreanData?.visaSystemsDetail || {};
+  const firstVisaSystem = Object.values(visaSystems)[0] as any;
+  
+  // Extract fees from new system or fallback to legacy
+  const tuitionFee = firstVisaSystem?.invoiceKRWPerYear || university.generalTuition || 0;
+  const applyFee = firstVisaSystem?.applyFeeKRW || university.visaFee || 0;
+  const enrollmentFee = firstVisaSystem?.enrollmentFeeKRW || 0;
+  const ktxOptions = firstVisaSystem?.ktxOptions || [];
+  const cheapestKTX = ktxOptions.length > 0 
+    ? Math.min(...ktxOptions.map((k: any) => k.priceKRWPerKy || 0))
+    : university.accommodationFee || 0;
+  const insuranceFee = university.insuranceFee || 0;
+  
+  // Calculate common VND fees from new system
+  const commonFees = university.koreanData?.commonFeesVND || [];
+  const hocTieng = commonFees.find((f: any) => f.id === 'hoc_tieng')?.amount || 13000000;
+  const phiTuVan = commonFees.find((f: any) => f.id === 'phi_tu_van')?.amount || 39000000;
+  const phiTrungTam = commonFees.find((f: any) => f.id === 'phi_trung_tam')?.amount || 11000000;
+  
   const [selectedFees, setSelectedFees] = useState({
     visa: true,
     accommodation: true,
@@ -32,11 +53,11 @@ export default function RegistrationModal({
   if (!isOpen) return null;
 
   const calculateTotal = () => {
-    let total = university.generalTuition || 0; // Always included
+    let total = tuitionFee; // Always included
     
-    if (selectedFees.visa) total += university.visaFee || 0;
-    if (selectedFees.accommodation) total += university.accommodationFee || 0;
-    if (selectedFees.insurance) total += university.insuranceFee || 0;
+    if (selectedFees.visa) total += applyFee;
+    if (selectedFees.accommodation) total += cheapestKTX;
+    if (selectedFees.insurance) total += insuranceFee;
     
     selectedFees.additional.forEach((selected, index) => {
       if (selected) {
@@ -94,13 +115,13 @@ export default function RegistrationModal({
                   <Building className="w-5 h-5 text-blue-600" />
                 </div>
                 <div>
-                  <p className="font-semibold text-slate-900">Học phí (General Tuition)</p>
+                  <p className="font-semibold text-slate-900">Học phí (Tuition)</p>
                   <p className="text-sm text-slate-600">Bắt buộc - Không thể bỏ chọn</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
                 <p className="text-lg font-bold text-blue-600">
-                  {formatFrom(university.generalTuition || 0, 'VND')}
+                  {formatFrom(tuitionFee, 'VND')}
                 </p>
                 <input
                   type="checkbox"
@@ -126,15 +147,15 @@ export default function RegistrationModal({
                   }`} />
                 </div>
                 <div>
-                  <p className="font-semibold text-slate-900">Phí visa</p>
-                  <span className="text-xs text-gray-500">(~ {((calculateTotal() / 23000)).toFixed(0)} USD)</span>
+                  <p className="font-semibold text-slate-900">Phí apply</p>
+                  <span className="text-xs text-gray-500">Application fee</span>
                 </div>
               </div>
               <div className="flex items-center gap-3">
                 <p className={`text-lg font-bold ${
                   selectedFees.visa ? 'text-green-600' : 'text-slate-900'
                 }`}>
-                  {formatFrom(university.visaFee || 0, 'VND')}
+                  {formatFrom(applyFee, 'VND')}
                 </p>
                 <input
                   type="checkbox"
@@ -163,15 +184,15 @@ export default function RegistrationModal({
                   }`} />
                 </div>
                 <div>
-                  <p className="font-semibold text-slate-900">Chi phí lưu trú</p>
-                  <p className="text-sm text-slate-600">Accommodation fees</p>
+                  <p className="font-semibold text-slate-900">KTX / Lưu trú</p>
+                  <p className="text-sm text-slate-600">Accommodation ( cheapest option )</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
                 <p className={`text-lg font-bold ${
                   selectedFees.accommodation ? 'text-green-600' : 'text-slate-900'
                 }`}>
-                  {formatFrom(university.accommodationFee || 0, 'VND')}
+                  {formatFrom(cheapestKTX, 'VND')}
                 </p>
                 <input
                   type="checkbox"
@@ -200,15 +221,15 @@ export default function RegistrationModal({
                   }`} />
                 </div>
                 <div>
-                  <p className="font-semibold text-slate-900">Bảo hiểm</p>
-                  <p className="text-sm text-slate-600">Insurance fees</p>
+                  <p className="font-semibold text-slate-900">Phí nhập học</p>
+                  <p className="text-sm text-slate-600">Enrollment fee</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
                 <p className={`text-lg font-bold ${
                   selectedFees.insurance ? 'text-green-600' : 'text-slate-900'
                 }`}>
-                  {formatFrom(university.insuranceFee || 0, 'VND')}
+                  {formatFrom(enrollmentFee, 'VND')}
                 </p>
                 <input
                   type="checkbox"

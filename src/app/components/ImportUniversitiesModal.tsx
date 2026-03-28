@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import ExcelJS from 'exceljs';
-import { X, Upload, FileSpreadsheet, CheckCircle, ChevronRight, ChevronLeft } from 'lucide-react';
+import { X, Upload, FileSpreadsheet, CheckCircle, ChevronRight, ChevronLeft, Loader } from 'lucide-react';
 import type { University } from '../context/AppContext';
 import { useApp } from '../context/AppContext';
 
@@ -17,68 +17,135 @@ type Step = 1 | 2 | 3 | 4;
 type MappingConfidence = 'auto' | 'check' | 'manual';
 type MappingEntry = { field: string; confidence: MappingConfidence; manual?: boolean };
 
-type ParsedUniversity = {
+type ParsedRow = {
   name: string;
   name_korean: string;
+  country: string;
   address: string;
   area: string;
   ranking: number | null;
+  top_tier: string;
   majors: string[];
-  admission: Record<string, { gpa_min: number | null; gap_year_limit: number | null }>;
   visa_systems: Record<string, any>;
-  scholarship_text: { raw: string };
+  admission: Record<string, { gpa_min: number | null; gap_year_limit: number | null }>;
+  scholarships: Record<string, any[]>;
+  ktx_options: Array<{ name: string; price_krw: number }>;
   dormitory_info: string;
-  ktx_options: Array<{ name: string; price_krw: number; price_krw_max?: number }>;
   part_time_info: string;
+  support_policies: string[];
+  notes: string;
   _warnings: string[];
   _status: 'ok' | 'check' | 'error';
 };
 
+// Auto-detect CSV column names to field keys
 const AUTO_MAPPINGS: Record<string, string> = {
+  // Basic info - exact matches from CSV header
+  'name': 'name',
+  'name_korean': 'name_korean',
+  'country': 'country',
+  'address': 'address',
+  'area': 'area',
+  'ranking': 'ranking',
+  'top_tier': 'top_tier',
+  'majors': 'majors',
+  
+  // Fees - exact matches
+  'fee_d4_1_krw': 'fee_d4_1_krw',
+  'fee_d2_1_krw': 'fee_d2_1_krw',
+  'fee_d2_2_min_krw': 'fee_d2_2_min_krw',
+  'fee_d2_2_max_krw': 'fee_d2_2_max_krw',
+  'fee_d2_3m_min_krw': 'fee_d2_3m_min_krw',
+  'fee_d2_3m_max_krw': 'fee_d2_3m_max_krw',
+  'fee_d2_3p_min_krw': 'fee_d2_3p_min_krw',
+  'fee_d2_3p_max_krw': 'fee_d2_3p_max_krw',
+  'fee_d2_6_krw': 'fee_d2_6_krw',
+  'fee_exchange_krw': 'fee_exchange_krw',
+  'fee_short_krw': 'fee_short_krw',
+  
+  // Admission
+  'admission_d4_gpa_min': 'admission_d4_gpa_min',
+  'admission_d4_gap_year': 'admission_d4_gap_year',
+  'admission_d2_gpa_min': 'admission_d2_gpa_min',
+  'admission_d2_gap_year': 'admission_d2_gap_year',
+  
+  // Scholarships
+  'scholarship_d4_1': 'scholarship_d4_1',
+  'scholarship_d2_2': 'scholarship_d2_2',
+  'scholarship_d2_3': 'scholarship_d2_3',
+  
+  // KTX
+  'ktx_room_types': 'ktx_room_types',
+  'ktx_prices_krw': 'ktx_prices_krw',
+  'dormitory_info': 'dormitory_info',
+  
+  // Other
+  'part_time_info': 'part_time_info',
+  'support_policies': 'support_policies',
+  'notes': 'notes',
+  
+  // Vietnamese variations
   'tên trường': 'name',
   'ten truong': 'name',
   'tên tiếng hàn': 'name_korean',
   'ten tieng han': 'name_korean',
+  'quốc gia': 'country',
   'địa chỉ': 'address',
   'dia chi': 'address',
   'khu vực': 'area',
   'khu vuc': 'area',
-  'địa chỉ & khu vực': 'address',
   'xếp hạng': 'ranking',
-  'ranking': 'ranking',
   'chuyên ngành': 'majors',
-  'chuyên ngành tiêu biểu': 'majors',
-  'dieu kien tuyen sinh': 'admission_raw',
-  'điều kiện tuyển sinh': 'admission_raw',
-  'học phí hệ tiếng': 'fee_d4_1_raw',
-  'học phí d4-1': 'fee_d4_1_raw',
-  'học phí hệ d2-2': 'fee_d2_2_raw',
-  'học phí d2-2': 'fee_d2_2_raw',
-  'học phí hệ d2-3': 'fee_d2_3_raw',
-  'học phí d2-3': 'fee_d2_3_raw',
-  'chính sách học bổng': 'scholarship_raw',
-  'thông tin ký túc xá': 'ktx_raw',
-  'ký túc xá': 'ktx_raw',
-  'ktx': 'ktx_raw',
-  'cơ hội việc làm': 'part_time_info',
-  'cơ hội việc làm thêm': 'part_time_info',
-  'việc làm thêm': 'part_time_info'
+  'chính sách hỗ trợ': 'support_policies',
+  'chính sách ho tro': 'support_policies'
 };
 
+// Field definitions for the new CSV format
 const FIELD_DEFS = [
-  { key: 'name', label: 'Tên trường', required: true },
+  // Basic info
+  { key: 'name', label: 'Tên trường (Việt)', required: true },
   { key: 'name_korean', label: 'Tên tiếng Hàn', required: false },
+  { key: 'country', label: 'Quốc gia', required: false },
   { key: 'address', label: 'Địa chỉ', required: false },
-  { key: 'area', label: 'Khu vực', required: false },
+  { key: 'area', label: 'Khu vực/Thành phố', required: false },
   { key: 'ranking', label: 'Xếp hạng', required: false },
+  { key: 'top_tier', label: 'Top Tier (1-3)', required: false },
   { key: 'majors', label: 'Chuyên ngành', required: false },
-  { key: 'admission_raw', label: 'Điều kiện tuyển sinh', required: false },
-  { key: 'fee_d4_1_raw', label: 'Học phí D4-1', required: false },
-  { key: 'fee_d2_2_raw', label: 'Học phí D2-2', required: false },
-  { key: 'fee_d2_3_raw', label: 'Học phí D2-3', required: false },
-  { key: 'scholarship_raw', label: 'Chính sách học bổng', required: false },
-  { key: 'ktx_raw', label: 'Thông tin KTX', required: false },
+  
+  // Visa system fees
+  { key: 'fee_d4_1_krw', label: 'Học phí D4-1 (Tiếng Hàn)', required: false },
+  { key: 'fee_d2_1_krw', label: 'Học phí D2-1', required: false },
+  { key: 'fee_d2_2_min_krw', label: 'Học phí D2-2 (Đại học) min', required: false },
+  { key: 'fee_d2_2_max_krw', label: 'Học phí D2-2 (Đại học) max', required: false },
+  { key: 'fee_d2_3m_min_krw', label: 'Học phí D2-3 Thạc sĩ min', required: false },
+  { key: 'fee_d2_3m_max_krw', label: 'Học phí D2-3 Thạc sĩ max', required: false },
+  { key: 'fee_d2_3p_min_krw', label: 'Học phí D2-3 Tiến sĩ min', required: false },
+  { key: 'fee_d2_3p_max_krw', label: 'Học phí D2-3 Tiến sĩ max', required: false },
+  { key: 'fee_d2_6_krw', label: 'Học phí D2-6', required: false },
+  { key: 'fee_exchange_krw', label: 'Học phí Trao đổi', required: false },
+  { key: 'fee_short_krw', label: 'Học phí Ngắn hạn', required: false },
+  
+  // Admission requirements
+  { key: 'admission_d4_gpa_min', label: 'GPA min D4-1', required: false },
+  { key: 'admission_d4_gap_year', label: 'Năm trống D4-1', required: false },
+  { key: 'admission_d2_gpa_min', label: 'GPA min D2', required: false },
+  { key: 'admission_d2_gap_year', label: 'Năm trống D2', required: false },
+  
+  // Scholarships
+  { key: 'scholarship_d4_1', label: 'Học bổng D4-1', required: false },
+  { key: 'scholarship_d2_2', label: 'Học bổng D2-2', required: false },
+  { key: 'scholarship_d2_3', label: 'Học bổng D2-3', required: false },
+  
+  // KTX/Dormitory
+  { key: 'ktx_room_types', label: 'Loại phòng KTX', required: false },
+  { key: 'ktx_prices_krw', label: 'Giá KTX', required: false },
+  { key: 'dormitory_info', label: 'Thông tin KTX chi tiết', required: false },
+  
+  // Other
   { key: 'part_time_info', label: 'Việc làm thêm', required: false },
+  { key: 'support_policies', label: 'Chính sách hỗ trợ', required: false },
+  { key: 'notes', label: 'Ghi chú', required: false },
+  
   { key: 'ignore', label: 'Bỏ qua', required: false }
 ];
 
@@ -180,6 +247,53 @@ const parseXlsx = async (file: File): Promise<{ headers: string[]; rows: Record<
   return { headers, rows: mapped };
 };
 
+// Parse number from string, handling various formats
+const parseNumber = (str: string | undefined): number | null => {
+  if (!str || str === '' || str === 'null' || str === 'undefined') return null;
+  const clean = str.replace(/[.,](?=.*[.,])/g, '').replace(',', '.');
+  const num = parseFloat(clean);
+  return isNaN(num) ? null : num;
+};
+
+// Parse integer from string
+const parseIntValue = (str: string | undefined): number | null => {
+  if (!str || str === '') return null;
+  const clean = str.replace(/\./g, '').replace(/,/g, '');
+  const num = parseInt(clean, 10);
+  return isNaN(num) ? null : num;
+};
+
+// Parse scholarship string format: "TOPIK3:30|TOPIK4:50|TOPIK5:70|TOPIK6:100"
+const parseScholarships = (str: string | undefined): Array<{ condition: string; topik_level: number | null; discount_pct: number }> => {
+  if (!str || str === '' || str === 'none') return [];
+  
+  const results: Array<{ condition: string; topik_level: number | null; discount_pct: number }> = [];
+  const parts = str.split('|');
+  
+  for (const part of parts) {
+    const match = part.match(/^(TOPIK|IELTS)?\s*(\d+(?:\.\d+)?)\s*:\s*(\d+)$/i);
+    if (match) {
+      const type = match[1]?.toUpperCase() || 'TOPIK';
+      const level = parseFloat(match[2]);
+      const discount = parseInt(match[3], 10);
+      
+      results.push({
+        condition: `${type} ${level}`,
+        topik_level: type === 'TOPIK' ? level : null,
+        discount_pct: discount
+      });
+    }
+  }
+  
+  return results;
+};
+
+// Parse pipe-separated values
+const parsePipeList = (str: string | undefined): string[] => {
+  if (!str || str === '') return [];
+  return str.split('|').map(s => s.trim()).filter(Boolean);
+};
+
 const parseFee = (str: string) => {
   if (!str) return { min: 0, max: 0 };
   const clean = str.replace(/\./g, '').replace(/[^\d~\-]/g, ' ').trim();
@@ -190,137 +304,179 @@ const parseFee = (str: string) => {
   return { min: parts[0] ?? 0, max: parts[1] ?? parts[0] ?? 0 };
 };
 
-const parseUniversityRow = (row: Record<string, string>, mappings: Record<string, string>): ParsedUniversity => {
-  const result: ParsedUniversity = {
+const parseUniversityRow = (row: Record<string, string>, mappings: Record<string, string>): ParsedRow => {
+  const result: ParsedRow = {
     name: '',
     name_korean: '',
+    country: 'South Korea',
     address: '',
     area: '',
     ranking: null,
+    top_tier: '',
     majors: [],
-    admission: {},
     visa_systems: {},
-    scholarship_text: { raw: '' },
-    dormitory_info: '',
+    admission: {},
+    scholarships: {},
     ktx_options: [],
+    dormitory_info: '',
     part_time_info: '',
+    support_policies: [],
+    notes: '',
     _warnings: [],
     _status: 'ok'
   };
 
-  const getField = (key: string) => {
+  const getField = (key: string): string => {
     const header = mappings[key];
     if (!header) return '';
     return row[header] ?? '';
   };
 
-  // 1. Basic fields
-  result.name = String(getField('name') || '').trim();
-  result.name_korean = String(getField('name_korean') || '').trim();
+  // Basic fields
+  result.name = getField('name').trim();
+  result.name_korean = getField('name_korean').trim();
+  result.country = getField('country') || 'South Korea';
+  result.address = getField('address').trim();
+  result.area = getField('area').trim();
+  result.ranking = parseIntValue(getField('ranking'));
+  result.top_tier = getField('top_tier').trim();
+  result.majors = parsePipeList(getField('majors'));
 
-  // 2. Address + area
-  const addr = String(getField('address') || '').trim();
-  const areaRaw = String(getField('area') || '').trim();
-  result.address = addr;
-  if (areaRaw) {
-    result.area = areaRaw;
-  } else if (addr) {
-    const areaMatch = addr.match(/([^,]+),\s*Hàn Quốc/i);
-    result.area = areaMatch ? areaMatch[1].trim() : addr.split(',').slice(-2, -1)[0]?.trim() || '';
-  }
+  // Parse visa system fees
+  const feeD4_1 = parseIntValue(getField('fee_d4_1_krw'));
+  const feeD2_1 = parseIntValue(getField('fee_d2_1_krw'));
+  const feeD2_2_min = parseIntValue(getField('fee_d2_2_min_krw'));
+  const feeD2_2_max = parseIntValue(getField('fee_d2_2_max_krw'));
+  const feeD2_3m_min = parseIntValue(getField('fee_d2_3m_min_krw'));
+  const feeD2_3m_max = parseIntValue(getField('fee_d2_3m_max_krw'));
+  const feeD2_3p_min = parseIntValue(getField('fee_d2_3p_min_krw'));
+  const feeD2_3p_max = parseIntValue(getField('fee_d2_3p_max_krw'));
+  const feeD2_6 = parseIntValue(getField('fee_d2_6_krw'));
+  const feeExchange = parseIntValue(getField('fee_exchange_krw'));
+  const feeShort = parseIntValue(getField('fee_short_krw'));
 
-  // 3. Ranking
-  const rankRaw = String(getField('ranking') || '').trim();
-  result.ranking = parseInt(rankRaw.split('/')[0], 10) || null;
-
-  // 4. Majors
-  const majorsRaw = String(getField('majors') || '');
-  result.majors = majorsRaw.split(',').map(m => m.trim()).filter(Boolean);
-
-  // 5. Admission
-  const admissionRaw = String(getField('admission_raw') || '');
-  const d41Match = admissionRaw.match(/D4-1[^;]*GPA\s*>=?\s*([\d.]+)/i);
-  const d41Gap = admissionRaw.match(/D4-1[^;]*tr[oô]ng\s*<\s*(\d+)/i);
-  const d2Match = admissionRaw.match(/D2[^;]*GPA\s*>=?\s*([\d.]+)/i);
-  result.admission = {
+  // Build visa systems
+  result.visa_systems = {
     'D4-1': {
-      gpa_min: d41Match ? parseFloat(d41Match[1]) : null,
-      gap_year_limit: d41Gap ? parseInt(d41Gap[1], 10) : null,
+      available: !!feeD4_1,
+      invoice_krw: feeD4_1 || 0,
+      invoice_krw_max: null,
+      apply_fee_krw: 100000,
+      enrollment_fee_krw: 0
     },
-    'D2': {
-      gpa_min: d2Match ? parseFloat(d2Match[1]) : null,
-      gap_year_limit: null,
+    'D2-1': {
+      available: !!feeD2_1,
+      invoice_krw: feeD2_1 || 0,
+      invoice_krw_max: null,
+      apply_fee_krw: 150000,
+      enrollment_fee_krw: 0
+    },
+    'D2-2': {
+      available: !!feeD2_2_min,
+      invoice_krw: feeD2_2_min || 0,
+      invoice_krw_max: feeD2_2_max || null,
+      apply_fee_krw: 150000,
+      enrollment_fee_krw: 0
+    },
+    'D2-3M': {
+      available: !!feeD2_3m_min,
+      invoice_krw: feeD2_3m_min || 0,
+      invoice_krw_max: feeD2_3m_max || null,
+      apply_fee_krw: 100000,
+      enrollment_fee_krw: 900000
+    },
+    'D2-3P': {
+      available: !!feeD2_3p_min,
+      invoice_krw: feeD2_3p_min || 0,
+      invoice_krw_max: feeD2_3p_max || null,
+      apply_fee_krw: 100000,
+      enrollment_fee_krw: 900000
+    },
+    'D2-6': {
+      available: !!feeD2_6,
+      invoice_krw: feeD2_6 || 0,
+      invoice_krw_max: null,
+      apply_fee_krw: 150000,
+      enrollment_fee_krw: 0
+    },
+    'exchange': {
+      available: !!feeExchange,
+      invoice_krw: feeExchange || 0,
+      invoice_krw_max: null,
+      apply_fee_krw: 100000,
+      enrollment_fee_krw: 0
+    },
+    'short': {
+      available: !!feeShort,
+      invoice_krw: feeShort || 0,
+      invoice_krw_max: null,
+      apply_fee_krw: 100000,
+      enrollment_fee_krw: 0
     }
   };
 
-  // 6. Fees
-  const d41Fee = parseFee(String(getField('fee_d4_1_raw') || ''));
-  const d22Fee = parseFee(String(getField('fee_d2_2_raw') || ''));
-  const d23Fee = parseFee(String(getField('fee_d2_3_raw') || ''));
-
-  result.visa_systems = {
-    'D4-1': { available: d41Fee.min > 0, invoice_krw: d41Fee.min, invoice_krw_max: d41Fee.max, apply_fee_krw: 100000, enrollment_fee_krw: 0, scholarships: [], ktx_options: [] },
-    'D2-1': { available: false, invoice_krw: 0, scholarships: [], ktx_options: [] },
-    'D2-2': { available: d22Fee.min > 0, invoice_krw: d22Fee.min, invoice_krw_max: d22Fee.max, apply_fee_krw: 150000, enrollment_fee_krw: 0, scholarships: [], ktx_options: [] },
-    'D2-3M': { available: d23Fee.min > 0, invoice_krw: d23Fee.min, invoice_krw_max: d23Fee.max, apply_fee_krw: 100000, enrollment_fee_krw: 900000, scholarships: [], ktx_options: [] },
-    'D2-3P': { available: false, invoice_krw: 0, scholarships: [], ktx_options: [] },
-    'D2-6': { available: false, invoice_krw: 0, scholarships: [], ktx_options: [] },
-    'D2-6E': { available: false, invoice_krw: 0, scholarships: [], ktx_options: [] },
-    'D2-8': { available: false, invoice_krw: 0, scholarships: [], ktx_options: [] },
+  // Parse admission requirements
+  const d4GapYearRaw = getField('admission_d4_gap_year').toLowerCase();
+  const d2GapYearRaw = getField('admission_d2_gap_year').toLowerCase();
+  
+  result.admission = {
+    'D4-1': {
+      gpa_min: parseNumber(getField('admission_d4_gpa_min')),
+      gap_year_limit: d4GapYearRaw === 'unlimited' ? null : parseIntValue(getField('admission_d4_gap_year'))
+    },
+    'D2': {
+      gpa_min: parseNumber(getField('admission_d2_gpa_min')),
+      gap_year_limit: d2GapYearRaw === 'unlimited' ? null : parseIntValue(getField('admission_d2_gap_year'))
+    }
   };
 
-  // 7. Scholarships
-  const scholarshipRaw = String(getField('scholarship_raw') || '');
-  result.scholarship_text = { raw: scholarshipRaw };
-  const topikLines = scholarshipRaw.match(/TOPIK\s*(\d)[^\n]*?(\d+)%/gi) ?? [];
-  const d22Scholarships = topikLines.map(line => {
-    const level = parseInt(line.match(/TOPIK\s*(\d)/i)?.[1] || '', 10);
-    const pct = parseInt(line.match(/(\d+)%/)?.[1] || '', 10);
-    return level && pct ? { condition: `TOPIK ${level}`, topik_level: level, discount_pct: pct } : null;
-  }).filter(Boolean) as any[];
-  if (d22Scholarships.length > 0) {
-    result.visa_systems['D2-2'].scholarships = d22Scholarships;
-  }
+  // Parse scholarships
+  result.scholarships = {
+    'D4-1': parseScholarships(getField('scholarship_d4_1')),
+    'D2-2': parseScholarships(getField('scholarship_d2_2')),
+    'D2-3M': parseScholarships(getField('scholarship_d2_3'))
+  };
 
-  // 8. KTX
-  const ktxRaw = String(getField('ktx_raw') || '');
-  result.dormitory_info = ktxRaw;
-  const ktxParts = ktxRaw.split(';').map(p => p.trim()).filter(Boolean);
-  result.ktx_options = ktxParts.map(part => {
-    const nameMatch = part.match(/^([^:]+):/);
-    const priceMatch = part.match(/([\d.]+)\s*(?:~~|~|-)?\s*([\d.]+)?\s*KRW/i);
-    if (!nameMatch || !priceMatch) return null;
-    const minPrice = parseInt(priceMatch[1].replace(/\./g, ''), 10);
-    const maxPrice = priceMatch[2] ? parseInt(priceMatch[2].replace(/\./g, ''), 10) : minPrice;
-    return { name: nameMatch[1].trim(), price_krw: minPrice, price_krw_max: maxPrice };
-  }).filter(Boolean) as any[];
+  // Parse KTX options
+  const roomTypes = parsePipeList(getField('ktx_room_types'));
+  const roomPrices = parsePipeList(getField('ktx_prices_krw')).map(p => parseIntValue(p) || 0);
+  
+  result.ktx_options = roomTypes.map((name, idx) => ({
+    name,
+    price_krw: roomPrices[idx] || 0
+  })).filter(opt => opt.price_krw > 0);
 
-  if (result.ktx_options.length > 0) {
-    ['D4-1', 'D2-2', 'D2-3M'].forEach(key => {
-      if (result.visa_systems[key]?.available) {
-        result.visa_systems[key].ktx_options = result.ktx_options;
-      }
-    });
-  }
-
-  // 9. Part time info
-  result.part_time_info = String(getField('part_time_info') || '').trim();
+  result.dormitory_info = getField('dormitory_info').trim();
+  result.part_time_info = getField('part_time_info').trim();
+  result.support_policies = parsePipeList(getField('support_policies'));
+  result.notes = getField('notes').trim();
 
   // Warnings & status
-  if (scholarshipRaw && d22Scholarships.length === 0) result._warnings.push('Không parse được học bổng');
-  if (ktxRaw && result.ktx_options.length === 0) result._warnings.push('Không parse được KTX');
-  const feeOk = d41Fee.min > 0 || d22Fee.min > 0 || d23Fee.min > 0;
-  if (!result.name) result._status = 'error';
-  else if (!feeOk) result._status = 'error';
-  else if (result._warnings.length > 0) result._status = 'check';
-  else result._status = 'ok';
+  if (!result.name) {
+    result._status = 'error';
+    result._warnings.push('Thiếu tên trường');
+  } else if (!Object.values(result.visa_systems).some((s: any) => s.available)) {
+    result._warnings.push('Chưa có học phí cho hệ nào');
+    result._status = 'check';
+  } else if (result._warnings.length > 0) {
+    result._status = 'check';
+  }
 
   return result;
 };
 
-const formatKRW = (value: number) => value.toLocaleString('vi-VN');
+const formatKRW = (value: number | null | undefined): string => {
+  if (!value) return '—';
+  return value.toLocaleString('vi-VN');
+};
 
-const getTierFromRanking = (ranking: number | null): { label: string; tier: 'Top1' | 'Top2' | 'Top3' } => {
+const getTierFromRanking = (ranking: number | null, topTier: string): { label: string; tier: 'Top1' | 'Top2' | 'Top3' } => {
+  // Use explicit top_tier if provided
+  if (topTier === '1') return { label: 'Top 1', tier: 'Top1' };
+  if (topTier === '2') return { label: 'Top 2', tier: 'Top2' };
+  if (topTier === '3') return { label: 'Top 3', tier: 'Top3' };
+  
+  // Fallback to ranking-based calculation
   if (!ranking) return { label: 'Top 2', tier: 'Top2' };
   if (ranking <= 30) return { label: 'Top 1', tier: 'Top1' };
   if (ranking <= 80) return { label: 'Top 2', tier: 'Top2' };
@@ -334,10 +490,11 @@ export default function ImportUniversitiesModal({ isOpen, onClose, onImport }: I
   const [headers, setHeaders] = useState<string[]>([]);
   const [rawRows, setRawRows] = useState<Record<string, string>[]>([]);
   const [mappings, setMappings] = useState<Record<string, MappingEntry>>({});
-  const [parsedRows, setParsedRows] = useState<ParsedUniversity[]>([]);
+  const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
   const [overwrite, setOverwrite] = useState(true);
   const [results, setResults] = useState<Array<{ name: string; status: 'created' | 'updated' | 'skipped' | 'error'; warnings?: string[]; reason?: string }>>([]);
   const [error, setError] = useState<string | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
 
   const previews = useMemo(() => rawRows.slice(0, 3), [rawRows]);
 
@@ -441,43 +598,50 @@ export default function ImportUniversitiesModal({ isOpen, onClose, onImport }: I
     return { ok, check, error: errorCount };
   }, [parsedRows]);
 
-  const buildUniversity = (row: ParsedUniversity, index: number) => {
-    const tierInfo = getTierFromRanking(row.ranking);
+  const buildUniversity = (row: ParsedRow, index: number) => {
+    const tierInfo = getTierFromRanking(row.ranking, row.top_tier);
     const id = `import-${Date.now()}-${index}`;
 
+    // Build visaSystemsDetail in camelCase format for the app
     const visaSystemsDetail: Record<string, any> = {};
-    Object.entries(row.visa_systems).forEach(([key, sys]) => {
-      if (!sys) return;
+    Object.entries(row.visa_systems).forEach(([key, sys]: [string, any]) => {
+      if (!sys || !sys.available) return;
       visaSystemsDetail[key] = {
-        available: !!sys.available,
+        available: true,
         invoiceKRWPerYear: sys.invoice_krw ?? 0,
+        invoiceKRWPerYearMax: sys.invoice_krw_max || null,
         applyFeeKRW: sys.apply_fee_krw ?? 0,
         enrollmentFeeKRW: sys.enrollment_fee_krw ?? 0,
-        scholarships: (sys.scholarships || []).map((s: any) => ({
-          condition: s.condition ?? `TOPIK ${s.topik_level}`,
+        scholarships: (row.scholarships[key] || []).map((s: any) => ({
+          condition: s.condition,
           discountPct: s.discount_pct,
           topikLevel: s.topik_level
         })),
-        ktxOptions: (sys.ktx_options || []).map((k: any) => ({
+        ktxOptions: row.ktx_options.map((k: any) => ({
           name: k.name,
           priceKRWPerKy: k.price_krw
         })),
-        financialRequirement: { soTietKiemOptions: [], luiNThang: 0 }
+        financialRequirement: { soTietKiemOptions: [], luiNThang: 0 },
+        admission: {
+          gpaMin: row.admission[key === 'D4-1' ? 'D4-1' : 'D2']?.gpa_min ?? 0,
+          gapYearLimit: row.admission[key === 'D4-1' ? 'D4-1' : 'D2']?.gap_year_limit ?? null,
+          regions: []
+        }
       };
     });
 
-    const university: any = {
+    const university: University = {
       id,
       name: row.name,
       koreanName: row.name_korean || undefined,
-      country: 'South Korea',
+      country: row.country,
+      countryCode: '🇰🇷',
       region: row.area || undefined,
+      top_tier: tierInfo.tier,
       ranking: row.ranking ? `${row.ranking}/200` : undefined,
-      systems: [],
+      description: undefined,
+      systems: [] as any[],
       majors: row.majors,
-      admission: row.admission,
-      visa_systems: row.visa_systems,
-      top_tier: tierInfo.tier.replace('Top', ''),
       koreanData: {
         isKoreanUniversity: true,
         address: row.address,
@@ -485,50 +649,145 @@ export default function ImportUniversitiesModal({ isOpen, onClose, onImport }: I
         koreanRanking: row.ranking ? `${row.ranking}/200` : undefined,
         majors: row.majors,
         admission: {
-          'D4-1': { gpaMin: row.admission['D4-1']?.gpa_min ?? 0, gapYearLimit: row.admission['D4-1']?.gap_year_limit ?? null, regions: [] },
-          'D2': { gpaMin: row.admission['D2']?.gpa_min ?? 0, gapYearLimit: null, regions: [] },
+          'D4-1': {
+            gpaMin: row.admission['D4-1']?.gpa_min ?? 0,
+            gapYearLimit: row.admission['D4-1']?.gap_year_limit ?? null,
+            regions: []
+          },
+          'D2': {
+            gpaMin: row.admission['D2']?.gpa_min ?? 0,
+            gapYearLimit: row.admission['D2']?.gap_year_limit ?? null,
+            regions: []
+          }
         },
         visaSystemsDetail,
         jobOpportunities: row.part_time_info || undefined,
         workOpportunity: row.part_time_info || undefined,
         dormOptions: row.ktx_options.map(k => ({ type: k.name, priceKRW: k.price_krw })),
+        supportPolicies: row.support_policies,
+        dormitoryInfo: row.dormitory_info || undefined,
+        notes: row.notes || undefined
       }
     };
 
-    return university as University;
+    return university;
+  };
+
+  // Deep merge helper - keeps existing data, only updates with non-empty new values
+  const deepMerge = (target: any, source: any): any => {
+    if (source === null || source === undefined) return target;
+    if (target === null || target === undefined) return source;
+    
+    // Handle arrays - replace if source has items, keep target if empty
+    if (Array.isArray(source)) {
+      return source.length > 0 ? source : target;
+    }
+    
+    // Handle objects
+    if (typeof source === 'object' && typeof target === 'object') {
+      const result = { ...target };
+      for (const key of Object.keys(source)) {
+        const sourceVal = source[key];
+        const targetVal = target[key];
+        
+        // Skip empty values from source
+        if (sourceVal === '' || sourceVal === null || sourceVal === undefined) {
+          result[key] = targetVal;
+        } else if (typeof sourceVal === 'object' && !Array.isArray(sourceVal)) {
+          // Recursively merge nested objects
+          result[key] = deepMerge(targetVal, sourceVal);
+        } else {
+          // Use source value
+          result[key] = sourceVal;
+        }
+      }
+      return result;
+    }
+    
+    return source !== '' ? source : target;
   };
 
   const handleImport = async () => {
+    setIsImporting(true);
+    setError(null);
+    
     const finalResults: Array<{ name: string; status: 'created' | 'updated' | 'skipped' | 'error'; warnings?: string[]; reason?: string }> = [];
     const parsed = parsedRows.filter(r => r._status !== 'error');
     const byName = (value: string) => value.trim().toLowerCase();
     const nextList = [...universities];
 
-    parsed.forEach((row, idx) => {
-      try {
-        const existingIndex = nextList.findIndex(u => byName(u.name) === byName(row.name));
-        const incoming = buildUniversity(row, idx);
+    try {
+      // Import service for database save
+      const { saveUniversity } = await import('../services/universityService');
 
-        if (existingIndex >= 0) {
-          if (overwrite) {
-            nextList[existingIndex] = { ...nextList[existingIndex], ...incoming, id: nextList[existingIndex].id };
-            finalResults.push({ name: row.name, status: 'updated', warnings: row._warnings });
+      for (let idx = 0; idx < parsed.length; idx++) {
+        const row = parsed[idx];
+        try {
+          const existingIndex = nextList.findIndex(u => byName(u.name) === byName(row.name));
+          const incoming = buildUniversity(row, idx);
+
+          // Prepare database data
+          const dbData = {
+            id: incoming.id,
+            name: incoming.name,
+            name_korean: incoming.koreanName,
+            region: incoming.region,
+            top_tier: incoming.top_tier,
+            ranking: incoming.ranking,
+            country: incoming.country,
+            country_code: incoming.countryCode,
+            address: incoming.koreanData?.address,
+            korean_data: JSON.stringify(incoming.koreanData)
+          };
+
+          if (existingIndex >= 0) {
+            const existing = nextList[existingIndex];
+            
+            if (overwrite) {
+              // Smart merge: keep existing data, only update with non-empty CSV values
+              const merged = deepMerge(existing, incoming);
+              // Always preserve the original ID
+              merged.id = existing.id;
+              
+              // Save merged data to database
+              await saveUniversity({
+                ...dbData,
+                id: existing.id
+              });
+              
+              nextList[existingIndex] = merged;
+              finalResults.push({ 
+                name: row.name, 
+                status: 'updated', 
+                warnings: row._warnings,
+                reason: 'Đã cập nhật dữ liệu mới, giữ nguyên dữ liệu cũ'
+              });
+            } else {
+              finalResults.push({ name: row.name, status: 'skipped', reason: 'Đã tồn tại, không ghi đè' });
+            }
           } else {
-            finalResults.push({ name: row.name, status: 'skipped', reason: 'Đã tồn tại, không ghi đè' });
+            // Save new university to database
+            await saveUniversity(dbData);
+            
+            nextList.push(incoming);
+            finalResults.push({ name: row.name, status: 'created', warnings: row._warnings });
           }
-        } else {
-          nextList.push(incoming);
-          finalResults.push({ name: row.name, status: 'created', warnings: row._warnings });
+        } catch (err: any) {
+          console.error(`Error importing ${row.name}:`, err);
+          finalResults.push({ name: row.name, status: 'error', reason: err?.message || 'Lỗi không xác định' });
         }
-      } catch (err: any) {
-        finalResults.push({ name: row.name, status: 'error', reason: err?.message || 'Lỗi không xác định' });
       }
-    });
 
-    updateUniversitiesList(() => nextList);
-    onImport?.(nextList);
-    setResults(finalResults);
-    setStep(4);
+      updateUniversitiesList(() => nextList);
+      onImport?.(nextList);
+      setResults(finalResults);
+      setStep(4);
+    } catch (err: any) {
+      console.error('Import error:', err);
+      setError(err?.message || 'Lỗi trong quá trình import');
+    } finally {
+      setIsImporting(false);
+    }
   };
 
   const downloadWarnings = () => {
@@ -614,35 +873,39 @@ export default function ImportUniversitiesModal({ isOpen, onClose, onImport }: I
 
               <div className="rounded-lg border border-slate-200 overflow-hidden">
                 <div className="bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700">
-                  Cấu trúc CSV được hỗ trợ
+                  Cấu trúc CSV được hỗ trợ (31 cột)
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead className="bg-white border-b border-slate-200">
                       <tr>
+                        <th className="px-4 py-2 text-left">Nhóm</th>
                         <th className="px-4 py-2 text-left">Cột trong CSV</th>
-                        <th className="px-4 py-2 text-left">Map vào field</th>
-                        <th className="px-4 py-2 text-left">Dùng ở đâu</th>
+                        <th className="px-4 py-2 text-left">Mô tả</th>
                       </tr>
                     </thead>
                     <tbody>
                       {[
-                        ['Tên trường', 'name', 'Danh sách + chi tiết'],
-                        ['Tên tiếng Hàn', 'name_korean', 'Danh sách'],
-                        ['Địa chỉ & Khu vực', 'address, area', 'Danh sách'],
-                        ['Xếp hạng', 'ranking', 'Danh sách'],
-                        ['Chuyên ngành tiêu biểu', 'majors[]', 'Chi tiết'],
-                        ['Điều kiện tuyển sinh', 'admission', 'Chi tiết + danh sách'],
-                        ['Học phí D4-1', 'visa_systems.D4-1.invoice_krw', 'Danh sách'],
-                        ['Học phí D2-2', 'visa_systems.D2-2.invoice_krw', 'Danh sách'],
-                        ['Học phí D2-3', 'visa_systems.D2-3M.invoice_krw', 'Danh sách'],
-                        ['Chính sách học bổng', 'scholarships', 'Chi tiết + danh sách'],
-                        ['Thông tin KTX', 'ktx_options', 'Chi tiết + danh sách'],
-                        ['Cơ hội việc làm thêm', 'part_time_info', 'Chi tiết'],
+                        ['Thông tin cơ bản', 'name, name_korean, country', 'Tên trường (bắt buộc), tên tiếng Hàn, quốc gia'],
+                        ['Địa điểm', 'address, area', 'Địa chỉ đầy đủ, thành phố/tỉnh'],
+                        ['Xếp hạng', 'ranking, top_tier', 'Xếp hạng (số), Top tier (1-3)'],
+                        ['Ngành học', 'majors', 'Chuyên ngành, phân cách bằng |'],
+                        ['Học phí D4-1', 'fee_d4_1_krw', 'Học phí tiếng Hàn (KRW/kỳ)'],
+                        ['Học phí D2-1', 'fee_d2_1_krw', 'Học phí hệ D2-1'],
+                        ['Học phí D2-2', 'fee_d2_2_min_krw, fee_d2_2_max_krw', 'Học phí Đại học (min-max)'],
+                        ['Học phí D2-3 Thạc sĩ', 'fee_d2_3m_min_krw, fee_d2_3m_max_krw', 'Học phí Thạc sĩ (min-max)'],
+                        ['Học phí D2-3 Tiến sĩ', 'fee_d2_3p_min_krw, fee_d2_3p_max_krw', 'Học phí Tiến sĩ (min-max)'],
+                        ['Học phí D2-6', 'fee_d2_6_krw', 'Học phí hệ D2-6'],
+                        ['Học phí khác', 'fee_exchange_krw, fee_short_krw', 'Trao đổi & Ngắn hạn'],
+                        ['Điều kiện D4-1', 'admission_d4_gpa_min, admission_d4_gap_year', 'GPA min, năm trống tối đa'],
+                        ['Điều kiện D2', 'admission_d2_gpa_min, admission_d2_gap_year', 'GPA min, năm trống (unlimited)'],
+                        ['Học bổng', 'scholarship_d4_1, scholarship_d2_2, scholarship_d2_3', 'Format: TOPIK3:30|TOPIK4:50'],
+                        ['KTX', 'ktx_room_types, ktx_prices_krw, dormitory_info', 'Loại phòng | Giá | Mô tả chi tiết'],
+                        ['Khác', 'part_time_info, support_policies, notes', 'Việc làm thêm, hỗ trợ, ghi chú'],
                       ].map((row) => (
                         <tr key={row[0]} className="border-b border-slate-100">
-                          <td className="px-4 py-2">{row[0]}</td>
-                          <td className="px-4 py-2 text-slate-600">{row[1]}</td>
+                          <td className="px-4 py-2 font-medium">{row[0]}</td>
+                          <td className="px-4 py-2 text-slate-600 font-mono text-xs">{row[1]}</td>
                           <td className="px-4 py-2 text-slate-500">{row[2]}</td>
                         </tr>
                       ))}
@@ -781,8 +1044,8 @@ export default function ImportUniversitiesModal({ isOpen, onClose, onImport }: I
                         const maxScholar = scholarships.length ? Math.max(...scholarships.map((s: any) => s.discount_pct || 0)) : 0;
                         const topik = scholarships.find((s: any) => s.discount_pct === maxScholar)?.topik_level;
                         const ktxMin = row.ktx_options.length ? Math.min(...row.ktx_options.map(k => k.price_krw)) : null;
-                        const ktxMax = row.ktx_options.length ? Math.max(...row.ktx_options.map(k => k.price_krw_max || k.price_krw)) : null;
-                        const tierInfo = getTierFromRanking(row.ranking);
+                        const ktxMax = row.ktx_options.length ? Math.max(...row.ktx_options.map(k => k.price_krw)) : null;
+                        const tierInfo = getTierFromRanking(row.ranking, row.top_tier);
                         const statusClass =
                           row._status === 'ok'
                             ? 'bg-green-100 text-green-700'
@@ -914,10 +1177,20 @@ export default function ImportUniversitiesModal({ isOpen, onClose, onImport }: I
             {step === 3 && (
               <button
                 onClick={handleImport}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center gap-2"
+                disabled={isImporting}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Xác nhận import
-                <CheckCircle className="w-4 h-4" />
+                {isImporting ? (
+                  <>
+                    <Loader className="w-4 h-4 animate-spin" />
+                    Đang import...
+                  </>
+                ) : (
+                  <>
+                    Xác nhận import
+                    <CheckCircle className="w-4 h-4" />
+                  </>
+                )}
               </button>
             )}
 

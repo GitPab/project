@@ -18,6 +18,6 @@
     }
   },
   "include": ["src", "vite.config.ts"],
-  "exclude": ["src/app/pages/UniversityDetailKorean.tsx"]
+  "exclude": ["src/app/pages/UniversityDetailKorean.tsx", "src/hooks/__tests__/*.ts", "src/**/*.test.ts", "src/**/*.test.tsx", "**/*.test.{ts,tsx}"]
 }
 

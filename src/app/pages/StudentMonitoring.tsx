@@ -22,15 +22,22 @@ import {
   Filter,
   X,
   Code,
+  ChevronRight,
+  ChevronDown,
+  CheckCircle,
+  Circle,
+  RotateCcw,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import ExcelJS from 'exceljs';
 import jsPDF from 'jspdf';
-import { getAllTrackingCodes, updateTrackingCodeStatus, searchTrackingCodesByEmail } from '../services/trackingCodeService';
+import { getAllTrackingCodes, updateTrackingCodeStatus, searchTrackingCodesByEmail, deleteTrackingCode } from '../services/trackingCodeService';
+import { DEFAULT_FEES_VND, DEFAULT_SO_TIET_KIEM_KRW, EXCHANGE_RATES } from '../../constants/feeDefaults';
 import type { TrackingCode } from '@/types/tracking';
+import type { ProgressStage } from '@/types/university';
 
 export default function StudentMonitoring() {
-  const { universities } = useApp();
+  const { universities, studentProgress, updateProgress } = useApp();
   const { t, language } = useLanguage();
   const { formatFrom, currency } = useCurrency();
   const [students, setStudents] = useState<TrackingCode[]>([]);
@@ -39,6 +46,42 @@ export default function StudentMonitoring() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedStudent, setSelectedStudent] = useState<TrackingCode | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showProgressModal, setShowProgressModal] = useState(false);
+  const [selectedStudentProgress, setSelectedStudentProgress] = useState<ProgressStage[] | null>(null);
+
+  // Progress stage definitions
+  const progressStages = [
+    { id: 1, name: language === 'vi' ? 'Đăng ký tư vấn' : 'Consultation Registration', description: language === 'vi' ? 'Hoàn thành đơn đăng ký tư vấn' : 'Complete consultation form' },
+    { id: 2, name: language === 'vi' ? 'Tư vấn & đánh giá' : 'Consultation & Assessment', description: language === 'vi' ? 'Tư vấn và đánh giá hồ sơ' : 'Consultation and profile assessment' },
+    { id: 3, name: language === 'vi' ? 'Chuẩn bị hồ sơ' : 'Document Preparation', description: language === 'vi' ? 'Chuẩn bị giấy tờ cần thiết' : 'Prepare required documents' },
+    { id: 4, name: language === 'vi' ? 'Nộp hồ sơ trường' : 'Submit to University', description: language === 'vi' ? 'Nộp hồ sơ vào trường' : 'Submit application to university' },
+    { id: 5, name: language === 'vi' ? 'Nhận thư mời (COE)' : 'Receive COE', description: language === 'vi' ? 'Nhận chứng nhận nhập học' : 'Receive Certificate of Eligibility' },
+    { id: 6, name: language === 'vi' ? 'Xin visa' : 'Apply for Visa', description: language === 'vi' ? 'Nộp hồ sơ xin visa' : 'Submit visa application' },
+    { id: 7, name: language === 'vi' ? 'Nhận visa' : 'Receive Visa', description: language === 'vi' ? 'Nhận visa du học' : 'Receive study visa' },
+    { id: 8, name: language === 'vi' ? 'Chuẩn bị lên đường' : 'Departure Preparation', description: language === 'vi' ? 'Chuẩn bị bay sang Hàn Quốc' : 'Prepare to depart for Korea' },
+  ];
+
+  // Get or build default progress for a student
+  const getStudentProgress = (studentEmail: string, universityId: string): ProgressStage[] => {
+    const existing = studentProgress.find(
+      sp => sp.studentEmail === studentEmail && sp.universityId === universityId
+    );
+    if (existing) return existing.stages;
+    
+    // Build default stages
+    return progressStages.map((stage, index) => ({
+      id: stage.id,
+      status: index === 0 ? 'completed' : index === 1 ? 'in-progress' : 'pending' as 'completed' | 'in-progress' | 'pending',
+      startDate: index === 0 ? new Date().toISOString() : undefined,
+      completedDate: index === 0 ? new Date().toISOString() : undefined,
+    }));
+  };
+
+  // Calculate overall progress percentage
+  const calculateProgress = (stages: ProgressStage[]): number => {
+    const completed = stages.filter(s => s.status === 'completed').length;
+    return Math.round((completed / stages.length) * 100);
+  };
 
   // Load all students from tracking codes on mount
   useEffect(() => {
@@ -123,10 +166,10 @@ export default function StudentMonitoring() {
   // Export to Excel
   const exportToExcel = async () => {
     const data = filteredStudents.map((student) => {
-      // Calculate fixed cost breakdown (Ajou-style)
-      const fixedCostVND = 39000000 + 11000000 + 13000000; // Consulting + Agency + Language
-      const fixedCostKRW = 100000 + 5800000 + 10000000;    // Apply + Invoice + Savings
-      const fixedCostKRW_inVND = fixedCostKRW * 17.77;
+      // Calculate fixed cost breakdown using constants
+      const fixedCostVND = DEFAULT_FEES_VND.phiTuVan + DEFAULT_FEES_VND.phiTrungTam + DEFAULT_FEES_VND.hocTieng;
+      const fixedCostKRW = 100000 + 5800000 + DEFAULT_SO_TIET_KIEM_KRW.gyeonggi; // Apply + Invoice + Savings
+      const fixedCostKRW_inVND = fixedCostKRW * EXCHANGE_RATES.krwToUsd * (EXCHANGE_RATES.vndToUsd / EXCHANGE_RATES.krwToUsd);
       const totalFixedVND = fixedCostVND + fixedCostKRW_inVND;
 
       return {
@@ -138,12 +181,12 @@ export default function StudentMonitoring() {
         'TOPIK': student.topikLevel || 'N/A',
         'IELTS': student.ieltsScore || 'N/A',
         // Cost breakdown categories (in VND)
-        [language === 'vi' ? 'Phí tư vấn (VND)' : 'Consulting Fee (VND)']: 39000000,
-        [language === 'vi' ? 'Phí môi giới (VND)' : 'Agency Fee (VND)']: 11000000,
-        [language === 'vi' ? 'Học tiếng Hàn (VND)' : 'Korean Language (VND)']: 13000000,
+        [language === 'vi' ? 'Phí tư vấn (VND)' : 'Consulting Fee (VND)']: DEFAULT_FEES_VND.phiTuVan,
+        [language === 'vi' ? 'Phí môi giới (VND)' : 'Agency Fee (VND)']: DEFAULT_FEES_VND.phiTrungTam,
+        [language === 'vi' ? 'Học tiếng Hàn (VND)' : 'Korean Language (VND)']: DEFAULT_FEES_VND.hocTieng,
         [language === 'vi' ? 'Phí apply (KRW)' : 'Application Fee (KRW)']: 100000,
         [language === 'vi' ? 'Phí hóa đơn (KRW)' : 'Invoice Fee (KRW)']: 5800000,
-        [language === 'vi' ? 'Tài khoản tiết kiệm (KRW)' : 'Savings Account (KRW)']: 10000000,
+        [language === 'vi' ? 'Tài khoản tiết kiệm (KRW)' : 'Savings Account (KRW)']: DEFAULT_SO_TIET_KIEM_KRW.gyeonggi,
         [language === 'vi' ? 'Tổng cố định (VND)' : 'Total Fixed (VND)']: Math.round(totalFixedVND),
         [language === 'vi' ? 'Tổng chi phí ước tính (VND)' : language === 'ko' ? '예상 비용 (VND)' : 'Estimated Cost (VND)']: student.initialTotalCostVnd,
         [language === 'vi' ? 'Trạng thái' : language === 'ko' ? '상태' : 'Status']: student.status,
@@ -224,13 +267,21 @@ export default function StudentMonitoring() {
     }
   };
 
-  // Handle delete - remove from storage (need to implement deleteTrackingCode)
+  // Handle delete - remove from storage
   const handleDelete = async (id: string) => {
     if (confirm(language === 'vi' ? 'Bạn có chắc muốn xóa học sinh này?' : language === 'ko' ? '이 학생을 삭제하시겠습니까?' : 'Are you sure you want to delete this student?')) {
-      // For now, just remove from local state
-      // Note: deleteTrackingCode function needs to be added to trackingCodeService
-      setStudents(prev => prev.filter(s => s.id !== id));
-      toast.success(language === 'vi' ? 'Xóa thành công!' : language === 'ko' ? '삭제 성공!' : 'Deleted successfully!');
+      try {
+        const success = await deleteTrackingCode(id);
+        if (success) {
+          setStudents(prev => prev.filter(s => s.id !== id));
+          toast.success(language === 'vi' ? 'Xóa thành công!' : language === 'ko' ? '삭제 성공!' : 'Deleted successfully!');
+        } else {
+          toast.error(language === 'vi' ? 'Không thể xóa học sinh' : 'Failed to delete');
+        }
+      } catch (error) {
+        console.error('Failed to delete tracking code:', error);
+        toast.error(language === 'vi' ? 'Lỗi khi xóa học sinh' : 'Error deleting student');
+      }
     }
   };
 
@@ -470,6 +521,18 @@ export default function StudentMonitoring() {
                       </td>
                       <td className="px-4 py-4">
                         <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => {
+                              setSelectedStudent(student);
+                              const progress = getStudentProgress(student.studentEmail, student.desiredUniversityId || '');
+                              setSelectedStudentProgress(progress);
+                              setShowProgressModal(true);
+                            }}
+                            className="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors"
+                            title={language === 'vi' ? 'Tiến độ hồ sơ' : 'Progress'}
+                          >
+                            <CheckCircle2 className="w-4 h-4" />
+                          </button>
                           <select
                             value={student.status}
                             onChange={(e) => handleStatusUpdate(student.code, e.target.value as TrackingCode['status'])}
@@ -717,6 +780,162 @@ export default function StudentMonitoring() {
                 className="w-full px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors"
               >
                 {language === 'vi' ? 'Đóng' : language === 'ko' ? '닫기' : 'Close'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Progress Modal */}
+      {showProgressModal && selectedStudent && selectedStudentProgress && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b border-slate-200 bg-gradient-to-r from-green-600 to-green-800 text-white">
+              <div>
+                <h2 className="text-2xl font-bold">
+                  {language === 'vi' ? 'Tiến độ hồ sơ' : 'Application Progress'}
+                </h2>
+                <p className="text-green-100 text-sm mt-1">{selectedStudent.studentName}</p>
+              </div>
+              <button
+                onClick={() => setShowProgressModal(false)}
+                className="text-white/80 hover:text-white transition-colors p-2"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-6">
+              {/* Overall Progress */}
+              <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-semibold text-green-900">
+                    {language === 'vi' ? 'Tổng tiến độ' : 'Overall Progress'}
+                  </span>
+                  <span className="text-2xl font-bold text-green-600">
+                    {calculateProgress(selectedStudentProgress)}%
+                  </span>
+                </div>
+                <div className="w-full bg-green-200 rounded-full h-3">
+                  <div
+                    className="bg-green-600 h-3 rounded-full transition-all"
+                    style={{ width: `${calculateProgress(selectedStudentProgress)}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Progress Stages */}
+              <div className="space-y-3">
+                {progressStages.map((stage, index) => {
+                  const progress = selectedStudentProgress.find(p => p.id === stage.id);
+                  const status = progress?.status || 'pending';
+                  
+                  return (
+                    <div
+                      key={stage.id}
+                      className={`p-4 rounded-lg border transition-all ${
+                        status === 'completed'
+                          ? 'bg-green-50 border-green-200'
+                          : status === 'in-progress'
+                          ? 'bg-blue-50 border-blue-200'
+                          : 'bg-slate-50 border-slate-200'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                              status === 'completed'
+                                ? 'bg-green-600 text-white'
+                                : status === 'in-progress'
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-slate-300 text-slate-600'
+                            }`}
+                          >
+                            {status === 'completed' ? (
+                              <CheckCircle className="w-5 h-5" />
+                            ) : (
+                              stage.id
+                            )}
+                          </div>
+                          <div>
+                            <p className={`font-semibold ${
+                              status === 'completed'
+                                ? 'text-green-900'
+                                : status === 'in-progress'
+                                ? 'text-blue-900'
+                                : 'text-slate-700'
+                            }`}>
+                              {stage.name}
+                            </p>
+                            <p className="text-xs text-slate-500">{stage.description}</p>
+                          </div>
+                        </div>
+
+                        {/* Status Controls */}
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={status}
+                            onChange={(e) => {
+                              const newStatus = e.target.value as 'pending' | 'in-progress' | 'completed';
+                              const updatedProgress = selectedStudentProgress.map(p =>
+                                p.id === stage.id
+                                  ? {
+                                      ...p,
+                                      status: newStatus,
+                                      startDate: newStatus !== 'pending' && !p.startDate ? new Date().toISOString() : p.startDate,
+                                      completedDate: newStatus === 'completed' ? new Date().toISOString() : undefined,
+                                    }
+                                  : p
+                              );
+                              setSelectedStudentProgress(updatedProgress);
+                              updateProgress(selectedStudent.studentEmail, selectedStudent.desiredUniversityId || '', updatedProgress);
+                              toast.success(language === 'vi' ? 'Cập nhật tiến độ thành công!' : 'Progress updated!');
+                            }}
+                            className="px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2"
+                          >
+                            <option value="pending">
+                              {language === 'vi' ? 'Chờ' : 'Pending'}
+                            </option>
+                            <option value="in-progress">
+                              {language === 'vi' ? 'Đang làm' : 'In Progress'}
+                            </option>
+                            <option value="completed">
+                              {language === 'vi' ? 'Hoàn thành' : 'Completed'}
+                            </option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Dates */}
+                      {(progress?.startDate || progress?.completedDate) && (
+                        <div className="mt-3 pl-11 flex gap-4 text-xs text-slate-500">
+                          {progress.startDate && (
+                            <span>
+                              {language === 'vi' ? 'Bắt đầu:' : 'Started:'} {' '}
+                              {new Date(progress.startDate).toLocaleDateString()}
+                            </span>
+                          )}
+                          {progress.completedDate && (
+                            <span className="text-green-600">
+                              {language === 'vi' ? 'Hoàn thành:' : 'Completed:'} {' '}
+                              {new Date(progress.completedDate).toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-slate-200 bg-slate-50 flex justify-end">
+              <button
+                onClick={() => setShowProgressModal(false)}
+                className="px-6 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors"
+              >
+                {language === 'vi' ? 'Đóng' : 'Close'}
               </button>
             </div>
           </div>
