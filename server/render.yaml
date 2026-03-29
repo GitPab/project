@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: sacma-backend
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: JWT_SECRET
+        generateValue: true
+      - key: R2_ENDPOINT
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET_NAME
+        value: sacma-images
+      - key: R2_PUBLIC_URL
+        sync: false
+      - key: DATABASE_PATH
+        value: ./sacma_database.db
+    disk:
+      name: sqlite-data
+      mountPath: /opt/render/project/src/server
+      sizeGB: 1

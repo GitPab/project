@@ -80,3 +80,30 @@ export const registrationApi = {
   create: (data: any) => api.post('/registrations', data),
   update: (id: string, data: any) => api.put(`/registrations/${id}`, data)
 };
+
+// Upload API - for images to Cloudflare R2
+export const uploadApi = {
+  uploadImage: async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append('image', file);
+    
+    const token = localStorage.getItem('auth_token');
+    const response = await fetch(`${API_BASE_URL}/upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : '',
+      },
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Upload failed');
+    }
+    
+    const data = await response.json();
+    return data.url;
+  },
+  
+  deleteImage: (url: string) => api.delete('/upload', { data: { url } })
+};
