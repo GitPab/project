@@ -89,7 +89,12 @@ import {
   getSavedFilters,
   deleteSavedFilter,
 } from '../services/sqliteDatabase';
-import { getAllUniversities, saveUniversity, bulkInsertUniversities, getUniversityById } from '../services/universityService';
+import { 
+  fetchUniversitiesFromAPI, 
+  fetchUniversityByIdFromAPI,
+  updateUniversityInAPI,
+  bulkCreateUniversitiesInAPI 
+} from '../services/universityApi';
 import {
   University,
   User,
@@ -426,22 +431,52 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
   const [dbInitialized, setDbInitialized] = useState(false);
 
-  // Initialize SQLite database and load universities
+  // PostgreSQL-first, SQLite-offline-fallback architecture
+  // PRIMARY: PostgreSQL (via API) - for all online reads and writes
+  // FALLBACK: SQLite (local) - for offline caching only
   useEffect(() => {
     const init = async () => {
       try {
+        // Initialize SQLite for offline fallback
         await initDatabase();
         
-        const { getDatabase } = await import('../services/sqliteDatabase');
-        const { bulkInsertUniversities, getAllUniversities } = await import('../services/universityService');
+        // PRIMARY: Try to fetch from PostgreSQL API
+        try {
+          console.log('[AppContext] Fetching universities from PostgreSQL...');
+          const apiUniversities = await fetchUniversitiesFromAPI();
+          if (apiUniversities.length > 0) {
+            setUniversities(apiUniversities.map(parseUniversity));
+            console.log('[AppContext] Loaded', apiUniversities.length, 'universities from PostgreSQL');
+            
+            // Cache to SQLite for offline fallback
+            const { bulkInsertUniversities } = await import('../services/universityService');
+            const dbData = apiUniversities.map(u => ({
+              id: u.id,
+              name: u.name,
+              name_korean: u.koreanName,
+              region: u.region,
+              top_tier: u.top_tier,
+              ranking: u.ranking,
+              country: u.country,
+              country_code: u.countryCode,
+              address: u.koreanData?.address,
+              korean_data: JSON.stringify(u.koreanData)
+            }));
+            await bulkInsertUniversities(dbData);
+            setDbInitialized(true);
+            return;
+          }
+        } catch (apiError) {
+          console.warn('[AppContext] PostgreSQL API failed, falling back to SQLite:', apiError);
+        }
         
-        // Check if universities exist - only seed if empty
+        // FALLBACK: Load from SQLite (offline mode)
+        const { getAllUniversities } = await import('../services/universityService');
         const existingUniversities = await getAllUniversities();
         
         if (existingUniversities.length === 0) {
-          console.log('[AppContext] No universities found, seeding...');
-          
-          // Seed with complete CSV data
+          console.log('[AppContext] No universities found, seeding with CSV data...');
+          const { bulkInsertUniversities } = await import('../services/universityService');
           const seedData = allUniversitiesData.map(u => ({
             id: u.id,
             name: u.name,
@@ -455,20 +490,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
             korean_data: JSON.stringify(u.koreanData)
           }));
           await bulkInsertUniversities(seedData);
-          console.log('[AppContext] Seeded', seedData.length, 'universities');
-          
-          // Load fresh data
-          const dbUniversities = await getAllUniversities();
-          setUniversities(dbUniversities.map(parseUniversity));
+          setUniversities(allUniversitiesData);
         } else {
-          console.log('[AppContext] Universities already exist:', existingUniversities.length);
+          console.log('[AppContext] Loaded', existingUniversities.length, 'universities from SQLite (offline fallback)');
           setUniversities(existingUniversities.map(parseUniversity));
         }
         
         setDbInitialized(true);
       } catch (error) {
-        console.error('Failed to initialize database:', error);
-        // Fallback to memory-only mode
+        console.error('Failed to initialize:', error);
+        // Final fallback to memory-only
         setUniversities(allUniversitiesData);
         setDbInitialized(true);
       }
@@ -500,17 +531,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const updateUniversity = async (id: string, updates: Partial<University>) => {
-    console.log('[AppContext] updateUniversity called:', id);
-    console.log('[AppContext] updates.koreanData:', updates.koreanData);
-    console.log('[AppContext] visaSystemsDetail keys:', Object.keys(updates.koreanData?.visaSystemsDetail || {}));
-    
+    // Update React state immediately (optimistic update)
     setUniversities(prev =>
       prev.map(uni => uni.id === id ? parseUniversity({ ...uni, ...updates }) : uni)
     );
     
-    // Save to SQLite
+    // PRIMARY: Save to PostgreSQL
+    try {
+      await updateUniversityInAPI(id, updates);
+    } catch (apiError) {
+      console.error('[AppContext] PostgreSQL update failed:', apiError);
+    }
+    
+    // FALLBACK: Save to SQLite for offline caching
     if (dbInitialized) {
       try {
+        const { saveUniversity } = await import('../services/universityService');
         const saveData = {
           id,
           name: updates.name || '',
@@ -523,57 +559,62 @@ export function AppProvider({ children }: { children: ReactNode }) {
           address: updates.koreanData?.address,
           korean_data: JSON.stringify(updates.koreanData)
         };
-        console.log('[AppContext] Saving to SQLite:', saveData);
         await saveUniversity(saveData);
-        console.log('[AppContext] SQLite save SUCCESS');
       } catch (error) {
-        console.error('[AppContext] Failed to save university to SQLite:', error);
+        console.error('[AppContext] SQLite cache update failed:', error);
       }
-    } else {
-      console.warn('[AppContext] Database not initialized, skipping SQLite save');
     }
   };
 
   const fetchUniversity = useCallback(async (id: string) => {
     try {
-      // Fetch fresh data from SQLite database
+      // PRIMARY: Fetch from PostgreSQL API
+      const apiUniversity = await fetchUniversityByIdFromAPI(id);
+      
+      if (apiUniversity) {
+        const parsed = parseUniversity(apiUniversity);
+        setUniversities(prev => prev.map(u => u.id === id ? parsed : u));
+        return parsed;
+      }
+    } catch (apiError) {
+      console.warn('[fetchUniversity] PostgreSQL failed, trying SQLite:', apiError);
+    }
+    
+    // FALLBACK: Fetch from SQLite
+    try {
+      const { getUniversityById } = await import('../services/universityService');
       const dbUniversity = await getUniversityById(id);
       
-      console.log('[fetchUniversity] Raw DB data:', dbUniversity);
-      console.log('[fetchUniversity] korean_data from DB:', dbUniversity?.korean_data);
-      
-      if (!dbUniversity) {
-        console.error('University not found in database:', id);
-        return null;
+      if (dbUniversity) {
+        const parsed = parseUniversity({
+          ...dbUniversity,
+          koreanData: dbUniversity.korean_data
+        });
+        setUniversities(prev => prev.map(u => u.id === id ? parsed : u));
+        return parsed;
       }
-
-      // Parse and update the university in state
-      const parsed = parseUniversity({
-        ...dbUniversity,
-        koreanData: dbUniversity.korean_data  // Map snake_case to camelCase
-      });
-      
-      console.log('[fetchUniversity] Parsed university:', parsed);
-      console.log('[fetchUniversity] parsed.koreanData:', parsed.koreanData);
-      
-      setUniversities(prev => 
-        prev.map(u => u.id === id ? parsed : u)
-      );
-      
-      return parsed;
     } catch (error) {
-      console.error('Failed to fetch university from database:', error);
-      return null;
+      console.error('[fetchUniversity] Both PostgreSQL and SQLite failed:', error);
     }
+    
+    return null;
   }, []);
 
   const addUniversities = async (newUniversities: University[]) => {
     const parsed = newUniversities.map(parseUniversity);
     setUniversities(prev => [...prev, ...parsed]);
     
-    // Save to SQLite
+    // PRIMARY: Save to PostgreSQL
+    try {
+      await bulkCreateUniversitiesInAPI(newUniversities);
+    } catch (apiError) {
+      console.error('[AppContext] PostgreSQL bulk insert failed:', apiError);
+    }
+    
+    // FALLBACK: Save to SQLite for offline caching
     if (dbInitialized) {
       try {
+        const { bulkInsertUniversities } = await import('../services/universityService');
         const dbData = parsed.map(u => ({
           id: u.id,
           name: u.name,
@@ -588,7 +629,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }));
         await bulkInsertUniversities(dbData);
       } catch (error) {
-        console.error('Failed to add universities to SQLite:', error);
+        console.error('[AppContext] SQLite cache update failed:', error);
       }
     }
   };

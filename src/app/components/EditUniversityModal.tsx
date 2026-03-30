@@ -249,8 +249,6 @@ export default function EditUniversityModal({
   }, [university?.id]);
 
   const handleSave = handleSubmit(async (values) => {
-    console.log('=== handleSave CALLED ===');
-    console.log('Form values:', values);
     try {
       const topVisaLabel = values.topTier === 'Top1' ? 'Top 1' : values.topTier === 'Top2' ? 'Top 2' : 'Top 3';
       const enabledVisaSystemsData = currentVisaSystems.filter(vs => enabledVisaSystems.has(vs.visaType));
@@ -298,9 +296,7 @@ export default function EditUniversityModal({
         payload.additionalFees = values.additionalFees || [];
       }
 
-      console.log('Calling onSave with payload:', payload);
       await onSave(payload);
-      console.log('onSave completed successfully');
       onClose();
       toast.success(isEditMode ? 'Đã cập nhật trường' : 'Đã thêm trường');
     } catch (error) {
@@ -309,9 +305,12 @@ export default function EditUniversityModal({
     }
   });
   
-  // Debug: log form errors
-  console.log('Form errors:', errors);
-  console.log('isSubmitting:', isSubmitting);
+        {/* Debug info */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
+            Debug: isKorean = {String(isKorean)}, showCostForm = {String(showCostForm)}
+          </div>
+        )}
 
   const allVisaLabels = VISA_SYSTEMS.reduce<Record<string, { label: string; name: string }>>(
     (acc, visa) => {
@@ -407,7 +406,7 @@ export default function EditUniversityModal({
 
         {/* Scrollable content */}
         <div style={{ padding: 24 }}>
-          <form onSubmit={(e) => { console.log('Form onSubmit triggered'); handleSave(e); }} className="space-y-6">
+          <form onSubmit={handleSave} className="space-y-6">
           {/* Basic Information */}
           <div className="space-y-4">
             <h3 className="text-sm font-semibold text-slate-900">Thông tin cơ bản</h3>
@@ -745,9 +744,7 @@ export default function EditUniversityModal({
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    console.log('Button clicked! Opening cost form for:', university?.name);
                     setShowCostForm(true);
-                    console.log('setShowCostForm called with true');
                   }}
                 >
                   <Plus className="w-4 h-4 mr-2" />
@@ -917,17 +914,12 @@ export default function EditUniversityModal({
             display: 'flex', 
             justifyContent: 'space-between'
           }}>
-            <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); console.log('Cancel clicked'); onClose(); }} disabled={isSubmitting}>
+            <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); onClose(); }} disabled={isSubmitting}>
               Hủy
             </Button>
             <Button 
               type="submit" 
-              disabled={isSubmitting} 
-              onClick={(e) => {
-                console.log('Save button clicked');
-                console.log('isSubmitting:', isSubmitting);
-                console.log('Form errors:', errors);
-              }}
+              disabled={isSubmitting}
             >
               {isEditMode ? 'Lưu thay đổi' : 'Thêm trường'}
             </Button>

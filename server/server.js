@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import rateLimit from 'express-rate-limit';
 import multer from 'multer';
 import { createClient } from '@supabase/supabase-js';
 import pkg from 'pg';
@@ -15,7 +16,27 @@ const { Pool } = pkg;
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors());
+// Rate limiting - 100 requests per 15 minutes per IP
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: { error: 'Too many requests, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Stricter rate limit for auth endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10, // 10 login/register attempts per 15 minutes
+  message: { error: 'Too many auth attempts, please try again later' },
+});
+
+app.use(limiter); // Apply to all routes
+app.use(cors({
+  origin: process.env.FRONTEND_URL || '*',
+  credentials: true
+}));
 app.use(express.json({ limit: '10mb' }));
 
 // Supabase client
@@ -34,7 +55,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 *
 const authenticateToken = (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) return res.status(401).json({ error: 'Access token required' });
-  jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key', (err, user) => {
+  jwt.verify(token, process.env.JWT_SECRET, (err, user) => { // Removed fallback
     if (err) return res.status(403).json({ error: 'Invalid token' });
     req.user = user;
     next();
@@ -78,32 +99,39 @@ async function initializeDatabase() {
 
 initializeDatabase();
 
-// Auth routes
-app.post('/api/auth/register', async (req, res) => {
-  const { name, email, password, role } = req.body;
+// Auth routes - SECURE VERSION
+app.post('/api/auth/register', authLimiter, async (req, res) => {
+  const { name, email, password } = req.body;
   if (!name || !email || !password) return res.status(400).json({ error: 'Name, email, password required' });
+  if (password.length < 6) return res.status(400).json({ error: 'Password must be 6+ characters' });
+  
   try {
-    const hash = await bcrypt.hash(password, 10);
+    // Check if any users exist - first user becomes admin
+    const { rows: existingUsers } = await pool.query('SELECT COUNT(*) as count FROM users');
+    const isFirstUser = existingUsers[0].count === '0';
+    const role = isFirstUser ? 'admin' : 'student';
+    
+    const hash = await bcrypt.hash(password, 12); // Increased from 10 to 12
     const id = uuidv4();
     const { rows } = await pool.query(
       'INSERT INTO users (id, name, email, password, role) VALUES ($1, $2, $3, $4, $5) RETURNING id, name, email, role',
-      [id, name, email, hash, role || 'student']
+      [id, name, email, hash, role]
     );
-    const token = jwt.sign(rows[0], process.env.JWT_SECRET || 'your-secret-key', { expiresIn: '24h' });
+    const token = jwt.sign(rows[0], process.env.JWT_SECRET, { expiresIn: '24h' }); // Removed fallback
     res.status(201).json({ user: rows[0], token });
   } catch (e) {
     res.status(409).json({ error: 'Email exists' });
   }
 });
 
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', authLimiter, async (req, res) => {
   const { email, password } = req.body;
   const { rows } = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
   if (!rows[0] || !await bcrypt.compare(password, rows[0].password)) {
     return res.status(401).json({ error: 'Invalid credentials' });
   }
   const user = { id: rows[0].id, name: rows[0].name, email: rows[0].email, role: rows[0].role };
-  const token = jwt.sign(user, process.env.JWT_SECRET || 'your-secret-key', { expiresIn: '24h' });
+  const token = jwt.sign(user, process.env.JWT_SECRET, { expiresIn: '24h' }); // Removed fallback
   res.json({ user, token });
 });
 

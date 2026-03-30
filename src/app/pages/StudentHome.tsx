@@ -71,44 +71,27 @@ export default function StudentHome() {
   // Sync with tracking code data on mount
   useEffect(() => {
     const syncWithTrackingData = async () => {
-      if (!user?.email) {
-        console.log('[StudentHome] No user email, skipping sync');
-        return;
-      }
-      
-      console.log('[StudentHome] Syncing tracking data for:', user.email);
+      if (!user?.email) return;
       
       try {
-        // Use getTrackingCodesByEmail to find user's tracking code
         const userCodes = await searchTrackingCodesByEmail(user.email);
-        console.log('[StudentHome] Found tracking codes:', userCodes.length);
+        const userCode = userCodes[0];
         
-        const userCode = userCodes[0]; // Get most recent
-        console.log('[StudentHome] User code:', userCode);
-        
-        if (!userCode) {
-          console.log('[StudentHome] No tracking code found for user');
-          return;
-        }
+        if (!userCode) return;
         
         // Fetch real student progress from database
         let realProgress = 0;
         let realGPA = 'N/A';
         if (userCode?.desiredUniversityId) {
-          console.log('[StudentHome] Fetching progress for university:', userCode.desiredUniversityId);
           const progressData = await getStudentProgress(user.email, userCode.desiredUniversityId);
-          console.log('[StudentHome] Progress data:', progressData);
           if (progressData && progressData.length > 0) {
             const completedStages = progressData.filter((p: any) => p.status === 'completed').length;
             realProgress = Math.round((completedStages / progressData.length) * 100);
-            console.log('[StudentHome] Calculated progress:', realProgress);
           }
         }
         
         // Fetch real payments from database
-        console.log('[StudentHome] Fetching payments...');
         const payments = await getPayments(user.email, userCode?.desiredUniversityId);
-        console.log('[StudentHome] Payments:', payments);
         const totalPaid = payments
           .filter((p: any) => p.status === 'completed')
           .reduce((sum: number, p: any) => sum + (p.amount_vnd || 0), 0);
@@ -141,7 +124,6 @@ export default function StudentHome() {
           progress: realProgress || 25
         };
         
-        console.log('[StudentHome] Setting student profile:', updatedProfile);
         setStudentProfile(updatedProfile);
       } catch (error) {
         console.error('[StudentHome] Failed to sync with tracking data:', error);
