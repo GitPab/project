@@ -1,0 +1,444 @@
+@startuml Activity_Login
+!theme plain
+title Login Process - Activity Diagram
+
+|User|
+start
+:Enter email and password;
+:Click Login button;
+
+|Frontend|
+:Validate input fields;
+if (Valid?) then (yes)
+    :Send POST /api/login;
+    
+    |Backend|
+    :Receive credentials;
+    :Query database for user;
+    
+    |Database|
+    :SELECT * FROM users
+    WHERE email = ?;
+    :Return user data;
+    
+    |Backend|
+    :Verify password hash;
+    if (Password match?) then (yes)
+        :Generate JWT token;
+        :Create response
+        {token, user};
+        :Return 200 OK;
+    else (no)
+        :Return 401 Unauthorized;
+        stop
+    endif
+    
+    |Frontend|
+    :Receive token;
+    :Store in localStorage;
+    :Decode user role;
+    :Update AuthContext;
+    :Redirect to dashboard;
+    
+    |User|
+    :See dashboard;
+    stop
+else (no)
+    |Frontend|
+    :Show validation error;
+    stop
+endif
+
+@enduml
+
+@startuml Activity_UniversityCRUD
+!theme plain
+title University Management - Activity Diagram
+
+|Admin|
+start
+:Navigate to Universities page;
+
+|Frontend|
+:Fetch universities list;
+
+|Backend|
+:Query database;
+
+|Database|
+:SELECT * FROM universities;
+:Return results;
+
+|Backend|
+:Return universities array;
+
+|Frontend|
+:Display university list;
+
+|Admin|
+:Click "Add University";
+
+|Frontend|
+:Open UniversityForm modal;
+
+|Admin|
+:Fill university details;
+:Upload images;
+:Click Submit;
+
+|Frontend|
+:Validate form data;
+if (Valid?) then (yes)
+    :POST /api/universities;
+    
+    |Backend|
+    :Check permissions
+    (university:create);
+    if (Has permission?) then (yes)
+        :Validate data;
+        
+        |Database|
+        :INSERT INTO universities;
+        :Return new ID;
+        
+        |Backend|
+        :Return 201 Created;
+        
+        |Frontend|
+        :Show success message;
+        :Refresh list;
+        :Close modal;
+        stop
+    else (no)
+        |Backend|
+        :Return 403 Forbidden;
+        
+        |Frontend|
+        :Show permission error;
+        stop
+    endif
+else (no)
+    |Frontend|
+    :Show validation errors;
+    stop
+endif
+
+@enduml
+
+@startuml Activity_AdminInvite
+!theme plain
+title Admin Invite Process - Activity Diagram
+
+|SuperAdmin|
+start
+:Go to Admin Roles page;
+
+|Frontend|
+:Load invited users list;
+
+|SuperAdmin|
+:Click "Invite Admin";
+
+|Frontend|
+:Open invite form;
+
+|SuperAdmin|
+:Enter email, name, role;
+:Click Send Invite;
+
+|Frontend|
+:Validate form;
+if (Valid?) then (yes)
+    :POST /api/admin/invite;
+    
+    |Backend|
+    :Check permissions
+    (manage:user);
+    if (Authorized?) then (yes)
+        :Check if email exists;
+        
+        |Database|
+        :SELECT * FROM users
+        WHERE email = ?;
+        
+        |Backend|
+        if (Email exists?) then (yes)
+            :Return 400 Error;
+            
+            |Frontend|
+            :Show error message;
+            stop
+        else (no)
+            :Generate setup token;
+            :Calculate expiry (24h);
+            
+            |Database|
+            :INSERT INTO invitations;
+            :INSERT INTO users
+            (pending state);
+            
+            |Backend|
+            :Send invitation email;
+            :Return success + setup URL;
+            
+            |Frontend|
+            :Show success message;
+            :Display invite link;
+            stop
+        endif
+    else (no)
+        |Backend|
+        :Return 403 Forbidden;
+        
+        |Frontend|
+        :Show permission error;
+        stop
+    endif
+else (no)
+    |Frontend|
+    :Show validation errors;
+    stop
+endif
+
+@enduml
+
+@startuml Activity_RegistrationApproval
+!theme plain
+title Registration Approval Workflow - Activity Diagram
+
+|Student|
+start
+:Fill registration form;
+:Upload required documents;
+:Submit application;
+
+|Frontend|
+:Validate form data;
+:POST /api/registrations;
+
+|Backend|
+:Verify authentication;
+:Validate data;
+
+|Database|
+:INSERT INTO registrations;
+
+|Backend|
+:Send confirmation email;
+:Return success;
+
+|Frontend|
+:Show confirmation;
+
+|Student|
+:Receive email confirmation;
+
+|Admin|
+:View pending registrations;
+
+|Frontend|
+:Display registration list;
+
+|Admin|
+:Open registration details;
+:Review documents;
+
+|Admin|
+if (Decision) then (approve)
+    :Click Approve;
+    
+    |Frontend|
+    :PUT /api/registrations/:id
+    {status: "approved"};
+    
+    |Backend|
+    :Update status;
+    
+    |Database|
+    :UPDATE registrations;
+    :INSERT INTO student_progress;
+    
+    |Backend|
+    :Send approval email;
+    
+    |Student|
+    :Receive approval email;
+    :Can now track progress;
+    stop
+else (reject)
+    :Click Reject;
+    :Enter rejection reason;
+    
+    |Frontend|
+    :PUT /api/registrations/:id
+    {status: "rejected", reason};
+    
+    |Backend|
+    :Update status;
+    
+    |Database|
+    :UPDATE registrations;
+    
+    |Backend|
+    :Send rejection email;
+    
+    |Student|
+    :Receive rejection email;
+    :Can reapply;
+    stop
+endif
+
+@enduml
+
+@startuml Activity_ImportCSV
+!theme plain
+title CSV Import Process - Activity Diagram
+
+|Admin|
+start
+:Click "Import CSV";
+
+|Frontend|
+:Open Import Modal;
+
+|Admin|
+:Select CSV file;
+
+|Frontend|
+:Parse CSV;
+:Validate format;
+
+if (Valid CSV?) then (yes)
+    :Show preview table;
+    :Display validation results;
+    
+    |Admin|
+    :Review data;
+    :Click Confirm Import;
+    
+    |Frontend|
+    :POST /api/universities/import;
+    
+    |Backend|
+    :Check permissions;
+    :Begin transaction;
+    
+    |Database|
+    while (For each row) is (more rows)
+        :Validate row data;
+        if (Valid?) then (yes)
+            :INSERT INTO universities;
+        else (no)
+            :Add to error list;
+        endif
+    endwhile (done)
+    
+    |Backend|
+    if (Errors?) then (yes)
+        :ROLLBACK;
+        :Return error list;
+        
+        |Frontend|
+        :Show import errors;
+        stop
+    else (no)
+        :COMMIT;
+        :Return success;
+        
+        |Frontend|
+        :Show success message;
+        :Refresh list;
+        stop
+    endif
+else (no)
+    |Frontend|
+    :Show CSV format error;
+    stop
+endif
+
+@enduml
+
+@startuml Activity_SetupPassword
+!theme plain
+title First-time Password Setup - Activity Diagram
+
+|NewAdmin|
+start
+:Click invite link in email;
+
+|Browser|
+:Navigate to /setup?token=xxx;
+
+|Frontend|
+:Extract token from URL;
+:GET /api/admin/verify-setup;
+
+|Backend|
+:Validate token;
+
+|Database|
+:SELECT * FROM users
+WHERE setup_token = ?;
+
+|Backend|
+if (Token valid?) then (yes)
+    :Check expiry;
+    if (Not expired?) then (yes)
+        :Return email;
+        
+        |Frontend|
+        :Show password form;
+        
+        |NewAdmin|
+        :Enter new password;
+        :Confirm password;
+        
+        |Frontend|
+        :Validate passwords match;
+        if (Match?) then (yes)
+            :POST /api/admin/setup-password;
+            
+            |Backend|
+            :Hash password;
+            
+            |Database|
+            :UPDATE users
+            SET password_hash = ?,
+            setup_token = NULL,
+            is_first_login = false;
+            :UPDATE invitations
+            SET used = true;
+            
+            |Backend|
+            :Return success;
+            
+            |Frontend|
+            :Redirect to login;
+            
+            |NewAdmin|
+            :Login with new password;
+            :Access dashboard;
+            stop
+        else (no)
+            |Frontend|
+            :Show "passwords don't match";
+            stop
+        endif
+    else (expired)
+        |Backend|
+        :Return "token expired";
+        
+        |Frontend|
+        :Show error;
+        stop
+    endif
+else (invalid)
+    |Backend|
+    :Return "invalid token";
+    
+    |Frontend|
+    :Show error;
+    stop
+endif
+
+@enduml

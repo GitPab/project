@@ -1,0 +1,587 @@
+@startuml DuHocCost_SystemArchitecture
+!theme plain
+skinparam componentStyle rectangle
+skinparam linetype ortho
+
+title Du Học Cost - System Architecture Overview
+
+package "Client Layer" {
+    [Web Browser] as Client
+}
+
+package "Frontend (Vercel)" {
+    [React + Vite App] as Frontend
+    [React Router] as Router
+    [AuthContext] as AuthCtx
+    [AppContext] as AppCtx
+    [RBAC Components] as RBAC
+    [UI Components] as UI
+}
+
+package "Backend (Render)" {
+    [Node.js + Express] as Backend
+    [Authentication Middleware] as AuthMiddleware
+    [RBAC Middleware] as RBACMiddleware
+    [API Routes] as Routes
+    [File Upload Handler] as Upload
+}
+
+package "Database Layer" {
+    database "PostgreSQL" as DB {
+        [Users Table] as UsersTbl
+        [Universities Table] as UnivTbl
+        [Registrations Table] as RegTbl
+        [Student Progress Table] as ProgTbl
+    }
+}
+
+package "External Services" {
+    [Imgur API] as Imgur
+    [JWT Token Service] as JWT
+}
+
+Client --> Frontend : HTTPS
+Frontend --> Backend : REST API
+Backend --> DB : SQL Queries
+Backend --> Imgur : Image Upload
+Backend --> JWT : Token Verify
+
+Frontend --> Router
+Frontend --> AuthCtx
+Frontend --> AppCtx
+Frontend --> RBAC
+Frontend --> UI
+
+Backend --> AuthMiddleware
+Backend --> RBACMiddleware
+Backend --> Routes
+Backend --> Upload
+
+DB --> UsersTbl
+DB --> UnivTbl
+DB --> RegTbl
+DB --> ProgTbl
+
+@enduml
+
+@startuml DuHocCost_FrontendComponents
+!theme plain
+skinparam componentStyle rectangle
+
+title Frontend Component Architecture
+
+package "App Entry" {
+    [main.tsx] as Main
+}
+
+package "Routing Layer" {
+    [routes.tsx] as Routes
+    [Public Routes] as PublicRoutes
+    [Protected Admin Routes] as AdminRoutes
+    [Protected Student Routes] as StudentRoutes
+}
+
+package "Context Layer" {
+    [AuthContext.tsx] as AuthContext
+    [AppContext.tsx] as AppContext
+}
+
+package "Layout Components" {
+    [Layout.tsx] as Layout
+    [Sidebar Navigation] as Sidebar
+    [Header] as Header
+    [Footer] as Footer
+}
+
+package "Admin Pages" {
+    [AdminDashboard.tsx] as AdminDashboard
+    [AdminRoles.tsx] as AdminRoles
+    [UniversitiesList] as UniversitiesList
+    [StudentManagement] as StudentManagement
+    [RegistrationManagement] as RegistrationManagement
+}
+
+package "RBAC Components" {
+    [PermissionGuard.tsx] as PermissionGuard
+    [PermissionRoute.tsx] as PermissionRoute
+    [rbac.ts Constants] as RBACConstants
+}
+
+package "Reusable Components" {
+    [UniversityForm.tsx] as UniversityForm
+    [EditUniversityModal.tsx] as EditUniversityModal
+    [ImportUniversitiesModal.tsx] as ImportModal
+    [AdminInvite.tsx] as AdminInvite
+}
+
+Main --> Routes
+Routes --> AuthContext
+Routes --> AppContext
+Routes --> Layout
+
+Layout --> AdminDashboard
+Layout --> AdminRoles
+Layout --> UniversitiesList
+Layout --> StudentManagement
+Layout --> RegistrationManagement
+
+AdminDashboard --> PermissionGuard
+AdminRoles --> PermissionGuard
+UniversitiesList --> PermissionGuard
+
+PermissionGuard --> RBACConstants
+PermissionRoute --> RBACConstants
+
+UniversitiesList --> UniversityForm
+UniversitiesList --> EditUniversityModal
+UniversitiesList --> ImportModal
+AdminRoles --> AdminInvite
+
+@enduml
+
+@startuml DuHocCost_BackendAPI
+!theme plain
+skinparam componentStyle rectangle
+
+title Backend API Architecture
+
+package "Express Server" {
+    [server.js] as Server
+}
+
+package "Middleware Stack" {
+    [CORS Middleware] as CORS
+    [JSON Parser] as JSONParser
+    [Authentication Middleware] as AuthMiddleware
+    [RBAC Middleware] as RBACMiddleware
+}
+
+package "Route Modules" {
+    [auth.js] as AuthRoutes
+    [universities.js] as UniversityRoutes
+    [registrations.js] as RegistrationRoutes
+    [students.js] as StudentRoutes
+    [adminInvite.js] as AdminInviteRoutes
+}
+
+package "Database Access" {
+    [pg Pool] as Pool
+    [SQL Queries] as Queries
+}
+
+Server --> CORS
+Server --> JSONParser
+CORS --> AuthMiddleware
+JSONParser --> AuthMiddleware
+AuthMiddleware --> RBACMiddleware
+
+RBACMiddleware --> AuthRoutes
+RBACMiddleware --> UniversityRoutes
+RBACMiddleware --> RegistrationRoutes
+RBACMiddleware --> StudentRoutes
+RBACMiddleware --> AdminInviteRoutes
+
+AuthRoutes --> Pool
+UniversityRoutes --> Pool
+RegistrationRoutes --> Pool
+StudentRoutes --> Pool
+AdminInviteRoutes --> Pool
+
+Pool --> Queries
+
+@enduml
+
+@startuml DuHocCost_DatabaseER
+!theme plain
+
+title Database Schema - ER Diagram
+
+entity "USERS" as Users {
+    * id : UUID <<PK>>
+    --
+    * email : String <<UK>>
+    * name : String
+    * password_hash : String
+    * role : Enum
+    phone : String
+    setup_token : String
+    setup_token_expiry : Timestamp
+    created_at : Timestamp
+    updated_at : Timestamp
+}
+
+entity "UNIVERSITIES" as Universities {
+    * id : UUID <<PK>>
+    --
+    * name : String
+    korean_name : String
+    region : String
+    hero_image : String
+    thumbnail : String
+    korean_data : JSONB
+    created_at : Timestamp
+    updated_at : Timestamp
+}
+
+entity "REGISTRATIONS" as Registrations {
+    * id : UUID <<PK>>
+    --
+    * student_id : UUID <<FK>>
+    * university_id : UUID <<FK>>
+    * status : Enum
+    form_data : JSONB
+    created_at : Timestamp
+    updated_at : Timestamp
+}
+
+entity "STUDENT_PROGRESS" as Progress {
+    * id : UUID <<PK>>
+    --
+    * student_id : UUID <<FK>>
+    * registration_id : UUID <<FK>>
+    * stage : Enum
+    progress_data : JSONB
+    created_at : Timestamp
+    updated_at : Timestamp
+}
+
+entity "INVITATIONS" as Invitations {
+    * id : UUID <<PK>>
+    --
+    * email : String <<UK>>
+    * name : String
+    * role : String
+    invited_by : UUID <<FK>>
+    setup_token : String
+    setup_token_expiry : Timestamp
+    created_at : Timestamp
+    used : Boolean
+}
+
+Users ||--o{ Registrations : "makes"
+Users ||--o{ Progress : "has"
+Users ||--o{ Invitations : "invited_by"
+Universities ||--o{ Registrations : "receives"
+Registrations ||--o{ Progress : "tracks"
+
+@enduml
+
+@startuml DuHocCost_RBACHierarchy
+!theme plain
+
+title RBAC Role Hierarchy & Permissions
+
+package "Roles" {
+    [super_admin] as SuperAdmin
+    [admin] as Admin
+    [admin_manager] as AdminManager
+    [content_editor] as ContentEditor
+    [finance_admin] as FinanceAdmin
+    [viewer] as Viewer
+}
+
+package "super_admin / admin\nPermissions" {
+    [* - All Permissions] as AllPerms
+}
+
+package "admin_manager\nPermissions" {
+    [university:view] as AM1
+    [student:view/edit/progress] as AM2
+    [application:view/manage] as AM3
+    [payment:view] as AM4
+    [analytics:view] as AM5
+}
+
+package "content_editor\nPermissions" {
+    [university:view/create/edit] as CE1
+    [student:view] as CE2
+    [application:view] as CE3
+}
+
+package "finance_admin\nPermissions" {
+    [university:view] as FA1
+    [student:view] as FA2
+    [application:view] as FA3
+    [payment:view/create/approve] as FA4
+    [analytics:view] as FA5
+}
+
+package "viewer\nPermissions" {
+    [university:view] as V1
+    [student:view] as V2
+    [application:view] as V3
+    [payment:view] as V4
+    [analytics:view] as V5
+}
+
+SuperAdmin --> AllPerms
+Admin --> AllPerms
+AdminManager --> AM1
+AdminManager --> AM2
+AdminManager --> AM3
+AdminManager --> AM4
+AdminManager --> AM5
+ContentEditor --> CE1
+ContentEditor --> CE2
+ContentEditor --> CE3
+FinanceAdmin --> FA1
+FinanceAdmin --> FA2
+FinanceAdmin --> FA3
+FinanceAdmin --> FA4
+FinanceAdmin --> FA5
+Viewer --> V1
+Viewer --> V2
+Viewer --> V3
+Viewer --> V4
+Viewer --> V5
+
+@enduml
+
+@startuml DuHocCost_AuthSequence
+!theme plain
+
+title Authentication Flow - Sequence Diagram
+
+actor User
+participant "Frontend" as Frontend
+participant "Backend API" as Backend
+participant "Database" as DB
+participant "JWT Service" as JWT
+
+User -> Frontend: Enter credentials
+Frontend -> Backend: POST /api/login
+Backend -> DB: SELECT user by email
+DB --> Backend: user data
+Backend -> Backend: Verify password
+Backend -> JWT: Generate token
+JWT --> Backend: token
+Backend --> Frontend: {token, user}
+Frontend -> Frontend: Store token (localStorage)
+Frontend -> Frontend: Decode role from token
+Frontend -> Frontend: Render UI based on role
+
+User -> Frontend: Access protected route
+Frontend -> Backend: Request with Authorization header
+Backend -> JWT: Verify token
+JWT --> Backend: decoded payload
+Backend -> Backend: Check permissions
+Backend -> DB: Execute query
+DB --> Backend: Results
+Backend --> Frontend: Response data
+Frontend --> User: Display data
+
+@enduml
+
+@startuml DuHocCost_AdminInviteSequence
+!theme plain
+
+title Admin Invite Flow - Sequence Diagram
+
+actor Admin
+participant "Frontend" as Frontend
+participant "Backend API" as Backend
+participant "Database" as DB
+participant "Email Service" as Email
+
+Admin -> Frontend: Fill invite form (email, name, role)
+Frontend -> Backend: POST /api/admin/invite
+Backend -> Backend: Check Admin permissions
+Backend -> Backend: Generate setup_token
+Backend -> DB: INSERT INTO invitations
+DB --> Backend: Success
+Backend -> DB: INSERT INTO users (pending)
+DB --> Backend: Success
+Backend --> Frontend: {success, setupUrl}
+Frontend --> Admin: Display invite link
+
+Admin -> Email: Share setup link (manual)
+Email -> Frontend: New user clicks link
+Frontend -> Backend: GET /api/admin/verify-setup?token=xxx
+Backend -> DB: Verify token
+DB --> Backend: Valid
+Backend --> Frontend: {valid, email}
+
+Frontend -> Backend: POST /api/admin/setup-password
+Backend -> Backend: Hash password
+Backend -> DB: UPDATE users SET password, clear token
+DB --> Backend: Success
+Backend --> Frontend: {success}
+Frontend --> Email: Redirect to login
+
+@enduml
+
+@startuml DuHocCost_ClassDiagram
+!theme plain
+
+title Component Class Diagram
+
+class AuthProvider {
+    +User user
+    +boolean isAdmin
+    +boolean isLoading
+    +login(email, password)
+    +logout()
+    +hasPermission(permission)
+}
+
+class AppProvider {
+    +Array universities
+    +Array students
+    +Array registrations
+    +addUniversity(data)
+    +updateUniversity(id, data)
+    +deleteUniversity(id)
+    +addUniversities(data)
+}
+
+class Layout {
+    +boolean sidebarCollapsed
+    +Array menuItems
+    +toggleSidebar()
+    +handleLogout()
+}
+
+class PermissionGuard {
+    +string permission
+    +ReactNode children
+    +ReactNode fallback
+    -checkPermission()
+    +render()
+}
+
+class PermissionRoute {
+    +string permission
+    +ReactNode children
+    +ReactNode fallback
+    +render()
+}
+
+class AdminInvite {
+    -Array invitedUsers
+    -boolean showInviteForm
+    -string copiedLink
+    +inviteUser(data)
+    +resendInvite(id)
+    +fetchInvitedUsers()
+}
+
+class UniversitiesList {
+    -Array universities
+    -string searchQuery
+    -boolean showAddModal
+    +handleSearch(query)
+    +handleAdd(university)
+    +handleEdit(id, data)
+    +handleDelete(id)
+    +handleQuickInfo(id)
+}
+
+class UniversityForm {
+    -object formData
+    -boolean loading
+    +handleSubmit(data)
+    +handleImageUpload(file)
+}
+
+class AdminDashboard {
+    -object stats
+    -Array recentActivity
+    +fetchDashboardData()
+    +handleImportCSV()
+}
+
+AuthProvider "1" --> "1" Layout : provides auth state
+AppProvider "1" --> "1" UniversitiesList : provides data
+AuthProvider "1" --> "1" PermissionGuard : provides permission check
+Layout "1" --> "1" AdminInvite : contains
+Layout "1" --> "1" UniversitiesList : contains
+Layout "1" --> "1" AdminDashboard : contains
+UniversitiesList "1" --> "1" UniversityForm : uses
+PermissionRoute ..> PermissionGuard : uses
+
+@enduml
+
+@startuml DuHocCost_Deployment
+!theme plain
+
+title Deployment Architecture
+
+package "Development" {
+    [localhost:5173] as DevFrontend
+    [localhost:3001] as DevBackend
+    [Local/Supabase DB] as DevDB
+}
+
+package "Production" {
+    [Vercel] as Vercel
+    [Render] as Render
+    [Supabase PostgreSQL] as ProdDB
+}
+
+package "CDN & DNS" {
+    [Cloudflare DNS] as Cloudflare
+    [Vercel Edge Network] as Edge
+}
+
+cloud "Git Repository" as Git
+
+DevFrontend --> Git : git push
+DevBackend --> Git : git push
+Git --> Vercel : auto deploy
+Git --> Render : auto deploy
+
+Vercel --> Edge
+Edge --> Cloudflare
+
+Vercel --> Render : API calls
+Render --> ProdDB : SQL queries
+
+Vercel -[#00C853]-> Edge : Deployed
+Render -[#00BFA5]-> ProdDB : Connected
+ProdDB -[#2979FF]-> Render : Data
+
+@enduml
+
+@startuml DuHocCost_APIEndpoints
+!theme plain
+
+title API Endpoints Summary
+
+package "Authentication" {
+    POST /api/login : "Public"
+    POST /api/logout : "Public"
+    GET /api/me : "Authenticated"
+}
+
+package "Universities" {
+    GET /api/universities : "university:view"
+    POST /api/universities : "university:create"
+    PUT /api/universities/:id : "university:edit"
+    DELETE /api/universities/:id : "university:delete"
+    POST /api/universities/import : "university:create"
+}
+
+package "Students" {
+    GET /api/students : "student:view"
+    POST /api/students : "student:create"
+    PUT /api/students/:id : "student:edit"
+    DELETE /api/students/:id : "student:delete"
+}
+
+package "Registrations" {
+    GET /api/registrations : "application:view"
+    POST /api/registrations : "application:create"
+    PUT /api/registrations/:id : "application:manage"
+    DELETE /api/registrations/:id : "application:manage"
+}
+
+package "Admin Invite" {
+    POST /api/admin/invite : "manage:user"
+    GET /api/admin/verify-setup : "Public"
+    POST /api/admin/setup-password : "Public"
+    GET /api/admin/invited-users : "manage:user"
+    POST /api/admin/resend-invite/:id : "manage:user"
+}
+
+@enduml
+

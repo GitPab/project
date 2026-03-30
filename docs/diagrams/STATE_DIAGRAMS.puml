@@ -1,0 +1,303 @@
+@startuml State_UserRegistration
+!theme plain
+title User Registration - State Diagram
+
+[*] --> Guest : Visit website
+
+Guest --> Authenticating : Click Login
+Guest --> Browsing : Browse as guest
+
+Browsing --> ViewingUniversities : View list
+Browsing --> ViewingDetails : View details
+
+state Authenticating {
+    [*] --> EnteringCredentials
+    EnteringCredentials --> Validating : Submit form
+    Validating --> Success : Valid credentials
+    Validating --> Failed : Invalid credentials
+    Failed --> EnteringCredentials : Retry
+    Success --> [*]
+}
+
+Authenticating --> LoggedIn : JWT token received
+
+state LoggedIn {
+    [*] --> CheckingRole
+    
+    CheckingRole --> AdminDashboard : role = admin
+    CheckingRole --> StudentDashboard : role = student
+    
+    state AdminDashboard {
+        [*] --> ViewingDashboard
+        ViewingDashboard --> ManagingUniversities : Click Universities
+        ViewingDashboard --> ManagingStudents : Click Students
+        ViewingDashboard --> ManagingRegistrations : Click Registrations
+        ViewingDashboard --> ViewingAnalytics : Click Analytics
+        ViewingDashboard --> ManagingRoles : Click Roles
+        
+        ManagingUniversities --> EditingUniversity : Edit
+        ManagingUniversities --> AddingUniversity : Add
+        ManagingUniversities --> DeletingUniversity : Delete
+        
+        AddingUniversity --> [*] : Save
+        EditingUniversity --> [*] : Save
+        DeletingUniversity --> [*] : Confirm
+        
+        ManagingRoles --> InvitingAdmin : Invite
+        InvitingAdmin --> [*] : Send
+    }
+    
+    state StudentDashboard {
+        [*] --> ViewingMyDashboard
+        ViewingMyDashboard --> BrowsingUniversities : Browse
+        ViewingMyDashboard --> ViewingMyRegistrations : My Applications
+        ViewingMyDashboard --> ViewingMyProgress : My Progress
+        ViewingMyDashboard --> SubmittingRegistration : Apply
+        
+        BrowsingUniversities --> ViewingUniversityDetail : Select
+        ViewingUniversityDetail --> SubmittingRegistration : Apply
+        
+        SubmittingRegistration --> Pending : Submit
+        Pending --> UnderReview : Admin reviews
+        UnderReview --> Approved : Approved
+        UnderReview --> Rejected : Rejected
+        Rejected --> SubmittingRegistration : Reapply
+        
+        Approved --> InProgress : Start tracking
+        InProgress --> DocumentStage : Upload docs
+        DocumentStage --> ApplicationStage : Submit
+        ApplicationStage --> InterviewStage : Interview
+        InterviewStage --> VisaStage : Visa process
+        VisaStage --> DepartureStage : Ready
+        DepartureStage --> Completed : Departed
+    }
+}
+
+LoggedIn --> LoggingOut : Click logout
+LoggingOut --> Guest : Token cleared
+
+Guest --> [*] : Close browser
+
+@enduml
+
+@startuml State_UniversityLifecycle
+!theme plain
+title University - Lifecycle State Diagram
+
+[*] --> Draft : Create new
+
+Draft --> Active : Publish
+Draft --> Archived : Archive draft
+
+state Active {
+    [*] --> Visible
+    
+    Visible --> BeingViewed : Student views
+    Visible --> InRegistration : Student applies
+    
+    InRegistration --> RegistrationPending : Submitted
+    RegistrationPending --> RegistrationApproved : Approved
+    RegistrationPending --> RegistrationRejected : Rejected
+    RegistrationRejected --> Visible : Student reapplies
+}
+
+Active --> UnderMaintenance : Update info
+UnderMaintenance --> Active : Publish updates
+
+Active --> Hidden : Temporarily hide
+Hidden --> Active : Unhide
+
+Active --> Deprecated : Mark obsolete
+Deprecated --> Archived : Archive
+
+Archived --> [*] : Delete permanently
+Deprecated --> [*] : Delete
+
+@enduml
+
+@startuml State_RegistrationWorkflow
+!theme plain
+title Registration Application - State Diagram
+
+[*] --> Started : Student starts application
+
+Started --> FillingForm : Enter details
+FillingForm --> UploadingDocuments : Attach files
+UploadingDocuments --> Reviewing : Review application
+
+Reviewing --> DraftSaved : Save draft
+DraftSaved --> FillingForm : Continue editing
+
+Reviewing --> Submitted : Submit
+Submitted --> Pending : System receives
+
+Pending --> UnderReview : Admin picks up
+UnderReview --> AdditionalInfoRequired : Need more info
+
+AdditionalInfoRequired --> InfoProvided : Student updates
+InfoProvided --> UnderReview : Resubmit
+
+UnderReview --> Approved : Admin approves
+UnderReview --> Rejected : Admin rejects
+
+Approved --> ContractStage : Generate contract
+ContractStage --> Signed : Student signs
+Signed --> PaymentStage : Make payment
+PaymentStage --> Paid : Payment confirmed
+
+Paid --> DocumentPreparation : Prepare docs
+DocumentPreparation --> VisaApplication : Apply for visa
+VisaApplication --> VisaApproved : Visa granted
+VisaApproved --> TravelArrangement : Book flight
+TravelArrangement --> Departed : Left country
+
+Departed --> [*] : Completed
+
+Rejected --> AppealSubmitted : Student appeals
+AppealSubmitted --> UnderReview : Review appeal
+
+Rejected --> [*] : Closed
+
+@enduml
+
+@startuml State_InvitationLifecycle
+!theme plain
+title Admin Invitation - State Diagram
+
+[*] --> Created : SuperAdmin creates
+
+Created --> Sent : Email sent
+Sent --> EmailDelivered : Delivered
+Sent --> EmailBounced : Bounced
+
+EmailBounced --> Resent : Retry
+Resent --> EmailDelivered
+
+EmailDelivered --> LinkClicked : User clicks
+LinkClicked --> TokenValidating : Verify token
+
+TokenValidating --> TokenValid : Valid
+TokenValidating --> TokenExpired : Expired
+TokenValidating --> TokenInvalid : Invalid
+
+TokenExpired --> Resent : Request new
+TokenInvalid --> [*] : Error
+
+TokenValid --> FormDisplayed : Show setup form
+FormDisplayed --> PasswordEntering : Enter password
+PasswordEntering --> PasswordValidating : Validate
+
+PasswordValidating --> PasswordMismatch : No match
+PasswordMismatch --> PasswordEntering : Retry
+
+PasswordValidating --> PasswordAccepted : Valid
+PasswordAccepted --> AccountActivated : Activate
+
+AccountActivated --> FirstLogin : Login
+FirstLogin --> ActiveUser : Authenticated
+
+ActiveUser --> [*] : Normal usage
+
+Created --> Cancelled : Revoked
+Sent --> Cancelled : Revoked
+EmailDelivered --> Cancelled : Revoked
+
+Cancelled --> [*] : Closed
+
+@enduml
+
+@startuml State_AuthenticationSession
+!theme plain
+title Authentication Session - State Diagram
+
+[*] --> Unauthenticated : Initial state
+
+Unauthenticated --> CredentialsEntered : Type login
+CredentialsEntered --> Validating : Submit
+
+Validating --> Authenticated : Success
+Validating --> InvalidCredentials : Wrong password
+Validating --> AccountLocked : Too many attempts
+InvalidCredentials --> CredentialsEntered : Retry
+AccountLocked --> [*] : Contact admin
+
+state Authenticated {
+    [*] --> TokenActive
+    
+    TokenActive --> CheckingPermission : Access resource
+    CheckingPermission --> AccessGranted : Has permission
+    CheckingPermission --> AccessDenied : No permission
+    
+    AccessDenied --> TokenActive : Try another
+    AccessGranted --> PerformingAction : Execute
+    PerformingAction --> TokenActive : Done
+    
+    TokenActive --> TokenRefreshing : Near expiry
+    TokenRefreshing --> TokenActive : New token
+    TokenRefreshing --> TokenExpired : Refresh failed
+    
+    TokenActive --> Idle : No activity
+    Idle --> TokenActive : Activity resumed
+    Idle --> SessionTimeout : Timeout reached
+}
+
+Authenticated --> LoggingOut : Click logout
+LoggingOut --> Unauthenticated : Token cleared
+Authenticated --> TokenExpired : Token invalid
+TokenExpired --> Unauthenticated : Redirect to login
+SessionTimeout --> Unauthenticated : Force logout
+
+Unauthenticated --> [*] : Close app
+
+@enduml
+
+@startuml State_ImportProcess
+!theme plain
+title CSV Import Process - State Diagram
+
+[*] --> FileSelection : Click Import
+
+FileSelection --> FileSelected : Choose file
+FileSelected --> ValidatingFormat : Upload
+
+ValidatingFormat --> FormatValid : CSV OK
+ValidatingFormat --> FormatInvalid : Wrong format
+FormatInvalid --> FileSelection : Retry
+
+FormatValid --> ParsingData : Parse CSV
+ParsingData --> DataParsed : Success
+ParsingData --> ParseError : Error
+ParseError --> FileSelection : Retry
+
+DataParsed --> Previewing : Show preview
+Previewing --> ValidatingRows : Check each row
+
+ValidatingRows --> AllValid : No errors
+ValidatingRows --> SomeInvalid : Has errors
+
+SomeInvalid --> EditingRows : Fix in preview
+EditingRows --> ValidatingRows : Validate again
+SomeInvalid --> ImportingValid : Skip invalid
+
+AllValid --> ConfirmingImport : User reviews
+ImportingValid --> ConfirmingImport
+
+ConfirmingImport --> Importing : Click confirm
+Importing --> TransactionStarted : Begin DB transaction
+
+TransactionStarted --> InsertingRows : Insert data
+InsertingRows --> RowInserted : Row success
+RowInserted --> InsertingRows : Next row
+InsertingRows --> InsertFailed : Error
+
+InsertFailed --> RollingBack : Rollback
+RollingBack --> TransactionRolledBack : Done
+TransactionRolledBack --> ShowingErrors : Display errors
+ShowingErrors --> [*] : User fixes
+
+InsertingRows --> TransactionCommitted : All done
+TransactionCommitted --> ImportComplete : Success
+ImportComplete --> RefreshingList : Update UI
+RefreshingList --> [*] : Done
+
+@enduml

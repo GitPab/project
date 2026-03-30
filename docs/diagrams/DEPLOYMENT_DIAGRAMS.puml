@@ -1,0 +1,213 @@
+@startuml Deployment_Development
+!theme plain
+
+title Deployment Diagram - Development Environment
+
+node "Developer Machine" as DevMachine {
+    component "Browser\n(Chrome/Firefox/Edge)" as Browser {
+        [React DevTools]
+        [Network Inspector]
+    }
+    
+    node "Frontend Development" as FrontendDev {
+        [Vite Dev Server] as Vite
+        [React App Source] as ReactSrc
+        [Hot Module Replacement] as HMR
+        portin "5173" as Port5173
+    }
+    
+    node "Backend Development" as BackendDev {
+        [Node.js Runtime] as Node
+        [Express Server] as Express
+        [Nodemon] as Nodemon
+        portin "3001" as Port3001
+    }
+    
+    node "Local Database" as LocalDB {
+        [PostgreSQL Server] as Postgres
+        [pgAdmin / DBeaver] as DBClient
+        database "sacma" as SacmaDB
+    }
+}
+
+node "External Services" as External {
+    cloud "Imgur API" as Imgur
+    cloud "Email SMTP" as SMTP
+}
+
+Browser --> Port5173 : HTTP
+Port5173 --> Vite
+Vite --> ReactSrc
+Vite --> HMR
+HMR --> Browser : Live reload
+
+ReactSrc --> Port3001 : API calls
+Port3001 --> Express
+Express --> Node
+Express --> LocalDB : SQL
+Express --> External : HTTP
+
+Postgres --> SacmaDB
+DBClient --> Postgres
+
+@enduml
+
+@startuml Deployment_Production
+!theme plain
+
+title Deployment Diagram - Production Environment
+
+node "User Devices" as Users {
+    [Desktop Browser] as Desktop
+    [Mobile Browser] as Mobile
+    [Tablet] as Tablet
+}
+
+node "CDN Layer" as CDN {
+    cloud "Cloudflare" as Cloudflare {
+        [DNS Resolution]
+        [DDoS Protection]
+        [SSL/TLS]
+    }
+    
+    cloud "Vercel Edge Network" as VercelEdge {
+        [Global CDN]
+        [Edge Caching]
+        [Auto SSL]
+    }
+}
+
+node "Frontend Hosting" as FrontendHost {
+    cloud "Vercel Platform" as Vercel {
+        [Static Site Hosting]
+        [Serverless Functions]
+        [Build Pipeline]
+        [Environment Variables]
+    }
+    
+    component "Built React App" as ReactApp {
+        [Minified JS/CSS]
+        [Optimized Assets]
+        [Index.html]
+    }
+}
+
+node "Backend Hosting" as BackendHost {
+    cloud "Render Platform" as Render {
+        [Web Service]
+        [Auto Deploy]
+        [Health Checks]
+        [Environment Variables]
+    }
+    
+    component "Node.js API" as NodeAPI {
+        [Express Server]
+        [API Routes]
+        [Middleware Stack]
+    }
+}
+
+node "Database Hosting" as DBHost {
+    cloud "Supabase" as Supabase {
+        [PostgreSQL Database] as Postgres
+        [Connection Pooling]
+        [Row Level Security]
+        [Backups]
+    }
+    
+    database "Production DB" as ProdDB {
+        [Users]
+        [Universities]
+        [Registrations]
+        [Progress]
+    }
+}
+
+node "External APIs" as ExternalAPIs {
+    cloud "Imgur API" as Imgur
+    cloud "SMTP Service\n(Gmail/SendGrid)" as Email
+}
+
+node "Development Tools" as DevTools {
+    [GitHub Repository] as GitHub
+    [GitHub Actions] as Actions
+}
+
+' Connections
+Users --> Cloudflare : HTTPS
+Cloudflare --> VercelEdge
+VercelEdge --> Vercel
+
+Vercel --> ReactApp : Deploy
+ReactApp --> NodeAPI : API Calls HTTPS
+NodeAPI --> Supabase : PostgreSQL
+NodeAPI --> ExternalAPIs : REST API
+
+GitHub --> Actions : CI/CD
+Actions --> Vercel : Auto Deploy
+Actions --> Render : Auto Deploy
+
+Supabase --> ProdDB
+Postgres --> ProdDB
+
+@enduml
+
+@startuml Deployment_Infrastructure
+!theme plain
+
+title Infrastructure Architecture
+
+package "Client Layer" {
+    [Browser Client] as Browser
+}
+
+package "Edge Layer (Vercel)" {
+    [CDN Edge] as Edge
+    [Load Balancer] as LB
+    [Static Assets] as Static
+}
+
+package "Application Layer" {
+    node "Frontend (Vercel)" {
+        [React SPA] as ReactApp
+        [Route Handlers] as Routes
+    }
+    
+    node "Backend (Render)" {
+        [Express API] as API
+        [Auth Middleware] as AuthMW
+        [RBAC Middleware] as RBACMW
+    }
+}
+
+package "Data Layer" {
+    database "PostgreSQL\n(Supabase)" as Postgres {
+        [Primary DB] as Primary
+        [Read Replicas] as Replicas
+    }
+    
+    storage "File Storage\n(Imgur)" as FileStore
+}
+
+package "External Services" {
+    [Email Service] as Email
+    [Monitoring] as Monitor
+}
+
+' Flow
+Browser --> Edge : HTTPS Request
+Edge --> LB
+LB --> Static : Static files
+LB --> ReactApp : Dynamic content
+
+ReactApp --> API : /api/*
+API --> AuthMW
+AuthMW --> RBACMW
+RBACMW --> Primary : Read/Write
+RBACMW --> Replicas : Read only
+
+API --> FileStore : Upload images
+API --> Email : Send notifications
+API --> Monitor : Log metrics
+
+@enduml

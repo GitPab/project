@@ -1,0 +1,411 @@
+@startuml Timing_AuthenticationFlow
+!theme plain
+title Authentication Process - Timing Diagram
+
+robust "Browser" as Browser
+robust "Frontend" as Frontend
+robust "Backend" as Backend
+robust "Database" as Database
+
+@Browser
+0 is Idle
+50 is ClickLogin
+100 is FormFilled
+150 is Submitting
+200 is Waiting
+300 is Redirecting
+350 is DashboardLoaded
+
+@Frontend
+0 is Idle
+100 is FormDisplay
+150 is ValidateInput
+200 is SendRequest
+250 is Processing
+300 is ReceiveResponse
+320 is StoreToken
+350 is RouteChange
+
+@Backend
+0 is Idle
+200 is ReceiveRequest
+220 is QueryDB
+260 is VerifyPassword
+280 is GenerateJWT
+300 is SendResponse
+
+@Database
+0 is Idle
+220 is ExecuteQuery
+240 is ReturnData
+
+Browser -> Frontend @ 100 : User clicks login
+Frontend -> Frontend @ 150 : Validate form
+Frontend -> Backend @ 200 : POST /api/login
+Backend -> Database @ 220 : SELECT user
+Database -> Backend @ 240 : User data
+Backend -> Backend @ 260 : Verify password
+Backend -> Backend @ 280 : Generate token
+Backend -> Frontend @ 300 : {token, user}
+Frontend -> Frontend @ 320 : Store token
+Frontend -> Browser @ 350 : Redirect to dashboard
+
+@enduml
+
+@startuml Timing_APIRequest
+!theme plain
+title API Request Response - Timing Diagram
+
+robust "Client" as Client
+robust "Server" as Server
+robust "Auth Middleware" as Auth
+robust "Controller" as Controller
+robust "Database" as DB
+
+@Client
+0 is Idle
+10 is SendRequest
+20 is Waiting
+80 is ReceiveResponse
+100 is ProcessData
+
+@Server
+10 is ReceiveRequest
+15 is RouteRequest
+
+@Auth
+15 is VerifyToken
+30 is TokenValid
+40 is AttachUser
+
+@Controller
+40 is CheckPermission
+50 is ExecuteLogic
+60 is BuildQuery
+
+@DB
+60 is ExecuteQuery
+70 is ReturnResults
+
+@Controller
+70 is ProcessResults
+75 is FormatResponse
+
+@Server
+75 is SendResponse
+
+@Client
+10 -> @Server @ 10 : HTTP Request
+@Server -> @Auth @ 15 : Verify JWT
+@Auth -> @Controller @ 40 : Next()
+@Controller -> @DB @ 60 : SQL Query
+@DB -> @Controller @ 70 : Results
+@Controller -> @Server @ 75 : Response
+@Server -> @Client @ 80 : HTTP Response
+
+@enduml
+
+@startuml Timing_UniversityCRUD
+!theme plain
+title University CRUD Operations - Timing Diagram
+
+robust "Admin" as Admin
+robust "React Component" as React
+robust "API Client" as API
+robust "Express Route" as Route
+robust "Controller" as Ctrl
+robust "PostgreSQL" as DB
+
+@Admin
+0 is Idle
+10 is ClickAdd
+30 is FillForm
+60 is ClickSave
+
+@React
+10 is OpenModal
+30 is FormDisplay
+60 is ValidateForm
+65 is SendAPIRequest
+100 is UpdateUI
+
+@API
+65 is POSTRequest
+70 is AddHeaders
+
+@Route
+70 is ReceiveRequest
+72 is AuthMiddleware
+
+@Ctrl
+75 is ValidateData
+80 is ExecuteQuery
+95 is FormatResponse
+
+@DB
+80 is INSERT
+90 is ReturnID
+
+Admin -> React @ 10 : Click Add University
+React -> React @ 30 : Display form
+Admin -> React @ 60 : Submit form
+React -> API @ 65 : POST /api/universities
+API -> Route @ 70 : HTTP Request
+Route -> Ctrl @ 75 : Route to controller
+Ctrl -> DB @ 80 : INSERT INTO
+DB -> Ctrl @ 90 : New university ID
+Ctrl -> API @ 95 : 201 Created
+API -> React @ 100 : Response received
+React -> Admin @ 105 : Show success, close modal
+
+@enduml
+
+@startuml Timing_JWTLifecycle
+!theme plain
+title JWT Token Lifecycle - Timing Diagram
+
+concise "Token State" as Token
+robust "User Activity" as User
+robust "Auth Check" as Auth
+
+@Token
+0 is Created
+60 is Active
+120 is NearExpiry
+140 is Refreshed
+180 is Active2
+240 is Expired
+
+@User
+0 is Login
+30 is Browsing
+90 is APIRequest1
+150 is APIRequest2
+250 is ExpiredRedirect
+
+@Auth
+0 is GenerateToken
+120 is CheckExpiry
+140 is RefreshToken
+240 is TokenInvalid
+
+@Token
+0 -> @User @ 0 : Issue token
+@Token
+0 -> @Auth @ 0 : Store secret
+
+@User @ 90 -> @Auth @ 90 : API call
+@Auth @ 90 -> @Token @ 90 : Verify
+@Token -> @Auth : Valid
+
+@Token @ 120 -> @Auth @ 120 : Near expiry
+@Auth @ 140 -> @Token @ 140 : Refresh
+@Token @ 140 -> @User @ 140 : New token
+
+@User @ 250 -> @Auth @ 250 : API call
+@Auth @ 250 -> @Token @ 250 : Verify
+@Token -> @Auth : Expired
+@Auth -> @User : Redirect to login
+
+@enduml
+
+@startuml Timing_DatabaseTransaction
+!theme plain
+title Database Transaction - Timing Diagram
+
+robust "Application" as App
+robust "Connection Pool" as Pool
+robust "Transaction" as Tx
+robust "PostgreSQL" as DB
+
+@App
+0 is BeginOperation
+10 is GetConnection
+50 is ExecuteQueries
+90 is Commit
+100 is Release
+
+@Pool
+0 is Idle
+10 is Checkout
+100 is Checkin
+
+@Tx
+20 is BEGIN
+30 is Query1
+45 is Query2
+60 is Query3
+90 is COMMIT
+
+@DB
+30 is Execute1
+45 is Execute2
+60 is Execute3
+90 is Persist
+
+App -> Pool @ 10 : Acquire connection
+Pool -> Tx @ 20 : BEGIN TRANSACTION
+Tx -> DB @ 30 : INSERT/UPDATE 1
+Tx -> DB @ 45 : INSERT/UPDATE 2
+Tx -> DB @ 60 : INSERT/UPDATE 3
+App -> Tx @ 90 : COMMIT
+Tx -> DB @ 90 : Write to disk
+App -> Pool @ 100 : Release connection
+
+@enduml
+
+@startuml Timing_BulkImport
+!theme plain
+title CSV Import - Timing Diagram
+
+robust "Frontend" as FE
+robust "CSV Parser" as Parser
+robust "Validator" as Validator
+robust "Backend" as BE
+robust "Database" as DB
+
+@FE
+0 is SelectFile
+10 is ReadFile
+20 is ParseCSV
+100 is ShowPreview
+200 is ConfirmImport
+210 is SendData
+500 is ShowResult
+
+@Parser
+20 is ParseRows
+60 is Parsed
+
+@Validator
+60 is ValidateRows
+80 is Valid
+
+@BE
+210 is ReceiveData
+220 is StartTx
+230 is InsertRow1
+240 is InsertRow2
+250 is InsertRow3
+260 is InsertRowN
+470 is CommitTx
+490 is SendResponse
+
+@DB
+220 is Begin
+230 is Execute1
+240 is Execute2
+250 is Execute3
+260 is ExecuteN
+470 is Commit
+480 is Done
+
+FE -> Parser @ 20 : Raw CSV
+Parser -> Validator @ 60 : Parsed data
+Validator -> FE @ 80 : Valid rows
+FE -> BE @ 210 : POST import
+BE -> DB @ 220 : BEGIN
+BE -> DB @ 230 : INSERT row 1
+BE -> DB @ 240 : INSERT row 2
+BE -> DB @ 260 : INSERT row N
+BE -> DB @ 470 : COMMIT
+DB -> BE @ 480 : Success
+BE -> FE @ 490 : Import complete
+
+@enduml
+
+@startuml Timing_FileUpload
+!theme plain
+title Image Upload to Imgur - Timing Diagram
+
+robust "User" as User
+robust "React Component" as React
+robust "API Client" as API
+robust "Backend" as BE
+robust "Imgur API" as Imgur
+
+@User
+0 is SelectImage
+5 is DropImage
+30 is WaitUpload
+100 is SeePreview
+
+@React
+5 is HandleFile
+10 is ValidateSize
+15 is ReadBase64
+20 is POSTtoBackend
+90 is ReceiveURL
+95 is UpdateForm
+
+@API
+20 is SendRequest
+25 is Uploading
+
+@BE
+25 is ReceiveImage
+30 is ValidateType
+35 is ForwardToImgur
+
+@Imgur
+35 is ReceiveImage
+40 is ProcessImage
+60 is StoreImage
+80 is ReturnURL
+
+User -> React @ 5 : Drop image
+React -> API @ 20 : POST with base64
+API -> BE @ 25 : HTTP request
+BE -> Imgur @ 35 : Upload image
+Imgur -> Imgur @ 40 : Process & store
+Imgur -> BE @ 80 : Image URL
+BE -> API @ 85 : Response
+API -> React @ 90 : URL received
+React -> User @ 95 : Show preview
+
+@enduml
+
+@startuml Timing_CacheInvalidation
+!theme plain
+title Frontend Cache & State Updates - Timing Diagram
+
+concise "Browser Cache" as Cache
+robust "React State" as State
+robust "User Action" as User
+robust "API Response" as API
+
+@Cache
+0 is Empty
+50 is Cached
+200 is Stale
+250 is Refreshed
+
+@State
+0 is Initial
+20 is Loading
+60 is DataLoaded
+120 is DataUpdated
+
+@User
+20 is ClickRefresh
+120 is EditUniversity
+
+@API
+40 is FetchRequest
+55 is Response
+130 is UpdateRequest
+150 is UpdateResponse
+
+User @ 20 -> API @ 40 : Refresh list
+API @ 55 -> State @ 60 : Set universities
+State @ 60 -> Cache @ 60 : Cache data
+
+Cache @ 200 -> State @ 200 : Mark stale
+
+User @ 120 -> State @ 120 : Edit university
+State @ 120 -> API @ 130 : PUT update
+API @ 150 -> State @ 150 : Updated data
+State @ 150 -> Cache @ 150 : Invalidate & refresh
+Cache @ 250 -> Cache : Fresh data
+
+@enduml

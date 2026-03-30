@@ -1,0 +1,458 @@
+@startuml Class_FrontendComponents
+!theme plain
+title Frontend Components - Class Diagram
+
+package "React Components" {
+    
+    class Component <<React.Component>> {
+        +props
+        +state
+        +render()
+        +componentDidMount()
+        +componentDidUpdate()
+    }
+    
+    class Layout {
+        +boolean sidebarCollapsed
+        +Array menuItems
+        +User currentUser
+        +toggleSidebar()
+        +handleLogout()
+        +renderSidebar()
+        +renderHeader()
+    }
+    
+    class UniversitiesList {
+        -Array universities
+        -string searchQuery
+        -boolean loading
+        -boolean showAddModal
+        -boolean showEditModal
+        -University selectedUniversity
+        +fetchUniversities()
+        +handleSearch(query)
+        +handleAdd(universityData)
+        +handleEdit(id, data)
+        +handleDelete(id)
+        +handleQuickInfo(id)
+        +openAddModal()
+        +closeAddModal()
+    }
+    
+    class UniversityForm {
+        -object formData
+        -boolean loading
+        -Array uploadedImages
+        +handleInputChange(field, value)
+        +handleImageUpload(file)
+        +handleSubmit()
+        +validateForm()
+        +resetForm()
+    }
+    
+    class EditUniversityModal {
+        -University university
+        -object formData
+        -boolean saving
+        +handleInputChange(field, value)
+        +handleSave()
+        +handleClose()
+    }
+    
+    class AdminInvite {
+        -Array invitedUsers
+        -boolean showInviteForm
+        -string copiedLink
+        -object formData
+        +fetchInvitedUsers()
+        +inviteUser(data)
+        +resendInvite(invitationId)
+        +copyInviteLink(url)
+        +toggleInviteForm()
+    }
+    
+    class AdminDashboard {
+        -object stats
+        -Array recentActivity
+        -Array pendingApprovals
+        +fetchDashboardData()
+        +handleImportCSV()
+        +refreshStats()
+    }
+    
+    class AdminRoles {
+        -Array users
+        -Array roles
+        -boolean loading
+        -string activeTab
+        +fetchUsers()
+        +fetchRoles()
+        +updateUserRole(userId, role)
+        +deleteUser(userId)
+        +switchTab(tab)
+    }
+    
+    class PermissionGuard {
+        +string permission
+        +ReactNode children
+        +ReactNode fallback
+        -boolean hasPermission
+        +checkPermission()
+        +render()
+    }
+    
+    class QuickInfoModal {
+        -University university
+        -boolean loading
+        +fetchUniversityDetails(id)
+        +handleClose()
+    }
+    
+    class ImportUniversitiesModal {
+        -File csvFile
+        -Array previewData
+        -boolean importing
+        -int validRows
+        -int invalidRows
+        +handleFileSelect(file)
+        +parseCSV()
+        +validateData()
+        +handleImport()
+        +handleCancel()
+    }
+}
+
+package "React Context" {
+    
+    class AuthProvider {
+        +User user
+        +boolean isAuthenticated
+        +boolean isAdmin
+        +boolean loading
+        +login(email, password)
+        +logout()
+        +hasPermission(permission)
+        +checkAuthStatus()
+    }
+    
+    class AppProvider {
+        +Array universities
+        +Array students
+        +Array registrations
+        +boolean loading
+        +addUniversity(data)
+        +updateUniversity(id, data)
+        +deleteUniversity(id)
+        +addUniversities(data)
+        +fetchUniversities()
+        +fetchStudents()
+        +fetchRegistrations()
+    }
+}
+
+package "Services" {
+    
+    class universityApi {
+        +{static} getAll()
+        +{static} getById(id)
+        +{static} create(data)
+        +{static} update(id, data)
+        +{static} delete(id)
+        +{static} importCSV(data)
+    }
+    
+    class authApi {
+        +{static} login(email, password)
+        +{static} logout()
+        +{static} getCurrentUser()
+        +{static} refreshToken()
+    }
+    
+    class adminInviteApi {
+        +{static} invite(data)
+        +{static} getInvitedUsers()
+        +{static} verifyToken(token)
+        +{static} setupPassword(token, password)
+        +{static} resendInvite(id)
+    }
+}
+
+package "Types" {
+    
+    class University {
+        +UUID id
+        +string name
+        +string koreanName
+        +string region
+        +string heroImage
+        +string thumbnail
+        +object koreanData
+        +Date createdAt
+        +Date updatedAt
+    }
+    
+    class User {
+        +UUID id
+        +string email
+        +string name
+        +Role role
+        +string phone
+        +Date createdAt
+    }
+    
+    class Registration {
+        +UUID id
+        +UUID studentId
+        +UUID universityId
+        +string status
+        +object formData
+        +Date createdAt
+    }
+    
+    enum Role {
+        SUPER_ADMIN
+        ADMIN
+        ADMIN_MANAGER
+        CONTENT_EDITOR
+        FINANCE_ADMIN
+        VIEWER
+        STUDENT
+    }
+}
+
+Component <|-- Layout
+Component <|-- UniversitiesList
+Component <|-- UniversityForm
+Component <|-- EditUniversityModal
+Component <|-- AdminInvite
+Component <|-- AdminDashboard
+Component <|-- AdminRoles
+Component <|-- PermissionGuard
+Component <|-- QuickInfoModal
+Component <|-- ImportUniversitiesModal
+
+UniversitiesList --> UniversityForm : uses
+UniversitiesList --> EditUniversityModal : uses
+UniversitiesList --> QuickInfoModal : uses
+UniversitiesList --> ImportUniversitiesModal : uses
+UniversitiesList --> universityApi : uses
+
+AdminRoles --> AdminInvite : contains
+AdminRoles --> authApi : uses
+
+PermissionGuard --> AuthProvider : uses
+
+AuthProvider --> authApi : uses
+AppProvider --> universityApi : uses
+
+UniversityForm --> universityApi : uses
+AdminInvite --> adminInviteApi : uses
+
+@enduml
+
+@startuml Class_BackendAPI
+!theme plain
+title Backend API - Class Diagram
+
+package "Express Server" {
+    
+    class Server {
+        +Express app
+        +int port
+        +start()
+        +setupMiddleware()
+        +setupRoutes()
+        +setupErrorHandling()
+    }
+    
+    class DatabaseConnection {
+        -Pool pool
+        +connect()
+        +disconnect()
+        +query(sql, params)
+        +transaction(callback)
+    }
+}
+
+package "Middleware" {
+    
+    class AuthenticationMiddleware {
+        +verifyToken(req, res, next)
+        -decodeToken(token)
+        -validateExpiration(decoded)
+    }
+    
+    class RBACMiddleware {
+        +checkPermission(action, resource)
+        +requirePermission(action, resource)
+        -hasPermission(role, action, resource)
+        -getRolePermissions(role)
+    }
+    
+    class CORSMiddleware {
+        +configureCors()
+        -allowedOrigins
+    }
+    
+    class ErrorHandler {
+        +handleError(err, req, res, next)
+        +logError(err)
+    }
+}
+
+package "Route Controllers" {
+    
+    class AuthController {
+        +login(req, res)
+        +logout(req, res)
+        +getCurrentUser(req, res)
+        +refreshToken(req, res)
+        -generateToken(user)
+        -validatePassword(password, hash)
+    }
+    
+    class UniversityController {
+        +getAll(req, res)
+        +getById(req, res)
+        +create(req, res)
+        +update(req, res)
+        +delete(req, res)
+        +importCSV(req, res)
+        -validateUniversityData(data)
+        -checkDuplicates(name)
+    }
+    
+    class RegistrationController {
+        +getAll(req, res)
+        +getById(req, res)
+        +create(req, res)
+        +update(req, res)
+        +delete(req, res)
+        +approve(req, res)
+        +reject(req, res)
+        -notifyStudent(studentId, status)
+    }
+    
+    class StudentController {
+        +getAll(req, res)
+        +getById(req, res)
+        +create(req, res)
+        +update(req, res)
+        +delete(req, res)
+        +getProgress(req, res)
+        +updateProgress(req, res)
+    }
+    
+    class AdminInviteController {
+        +inviteUser(req, res)
+        +getInvitedUsers(req, res)
+        +verifySetupToken(req, res)
+        +setupPassword(req, res)
+        +resendInvite(req, res)
+        -generateSetupToken()
+        -calculateExpiry()
+        -sendInviteEmail(email, token)
+    }
+}
+
+package "Models" {
+    
+    class UserModel {
+        +UUID id
+        +string email
+        +string name
+        +string passwordHash
+        +string role
+        +string setupToken
+        +Date setupTokenExpiry
+        +create(data)
+        +findByEmail(email)
+        +findById(id)
+        +update(id, data)
+        +delete(id)
+    }
+    
+    class UniversityModel {
+        +UUID id
+        +string name
+        +string koreanName
+        +string region
+        +string heroImage
+        +string thumbnail
+        +object koreanData
+        +create(data)
+        +findAll()
+        +findById(id)
+        +update(id, data)
+        +delete(id)
+    }
+    
+    class RegistrationModel {
+        +UUID id
+        +UUID studentId
+        +UUID universityId
+        +string status
+        +object formData
+        +create(data)
+        +findAll(filters)
+        +findById(id)
+        +update(id, data)
+    }
+    
+    class InvitationModel {
+        +UUID id
+        +string email
+        +string name
+        +string role
+        +UUID invitedBy
+        +string setupToken
+        +Date setupTokenExpiry
+        +boolean used
+        +create(data)
+        +findByToken(token)
+        +markAsUsed(id)
+    }
+}
+
+package "Utilities" {
+    
+    class JWTService {
+        +sign(payload, secret, options)
+        +verify(token, secret)
+        +decode(token)
+    }
+    
+    class PasswordService {
+        +hash(password)
+        +compare(password, hash)
+    }
+    
+    class EmailService {
+        +sendInvite(email, setupUrl)
+        +sendNotification(email, subject, body)
+        +sendWelcome(email, name)
+    }
+}
+
+Server --> DatabaseConnection : uses
+Server --> AuthenticationMiddleware : uses
+Server --> RBACMiddleware : uses
+Server --> CORSMiddleware : uses
+Server --> ErrorHandler : uses
+
+AuthenticationMiddleware --> JWTService : uses
+RBACMiddleware --> JWTService : uses
+
+AuthController --> UserModel : uses
+AuthController --> JWTService : uses
+AuthController --> PasswordService : uses
+
+UniversityController --> UniversityModel : uses
+RegistrationController --> RegistrationModel : uses
+StudentController --> UserModel : uses
+AdminInviteController --> UserModel : uses
+AdminInviteController --> InvitationModel : uses
+AdminInviteController --> EmailService : uses
+AdminInviteController --> PasswordService : uses
+
+@enduml

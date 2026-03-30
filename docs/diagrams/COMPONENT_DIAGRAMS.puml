@@ -1,0 +1,375 @@
+@startuml Component_SystemOverview
+!theme plain
+skinparam componentStyle rectangle
+skinparam linetype ortho
+
+title Du Học Cost - Component Diagram
+
+package "Client Browser" {
+    [Web Browser] as Browser
+}
+
+package "Frontend Application (Vercel)" {
+    package "React Core" {
+        [React App] as ReactApp
+        [React Router DOM] as Router
+        [Vite Build Tool] as Vite
+    }
+    
+    package "Context Providers" {
+        [AuthContext] as AuthCtx
+        [AppContext] as AppCtx
+    }
+    
+    package "UI Components" {
+        [Layout Component] as Layout
+        [UniversitiesList] as UnivList
+        [AdminDashboard] as AdminDash
+        [AdminInvite] as AdminInv
+        [PermissionGuard] as PermGuard
+        [Forms & Modals] as Forms
+    }
+    
+    package "Services" {
+        [API Client (Axios)] as ApiClient
+        [University API] as UnivAPI
+        [Auth API] as AuthAPI
+        [Admin Invite API] as InviteAPI
+    }
+    
+    package "State Management" {
+        [Local Storage] as LocalStorage
+        [useState Hooks] as StateHooks
+    }
+}
+
+package "Backend API (Render)" {
+    package "Express Server" {
+        [Express App] as Express
+        [CORS Middleware] as CORS
+        [Body Parser] as BodyParser
+    }
+    
+    package "Security Layer" {
+        [Authentication Middleware] as AuthMiddleware
+        [RBAC Middleware] as RBACMiddleware
+        [JWT Handler] as JWTHandler
+    }
+    
+    package "Route Handlers" {
+        [Auth Routes] as AuthRoutes
+        [University Routes] as UnivRoutes
+        [Registration Routes] as RegRoutes
+        [Admin Invite Routes] as InviteRoutes
+    }
+    
+    package "Database Access" {
+        [pg Pool] as PgPool
+        [Query Builder] as QueryBuilder
+    }
+}
+
+package "Database (Supabase)" {
+    [PostgreSQL Database] as Postgres
+    
+    package "Tables" {
+        [Users Table] as UsersTbl
+        [Universities Table] as UnivTbl
+        [Registrations Table] as RegTbl
+        [Student Progress Table] as ProgressTbl
+        [Invitations Table] as InviteTbl
+    }
+}
+
+package "External Services" {
+    [Imgur API] as Imgur
+    [JWT Service] as JWT
+    [Email Service (SMTP)] as Email
+}
+
+' Connections
+Browser --> ReactApp : HTTPS
+ReactApp --> Vite
+ReactApp --> Router
+ReactApp --> AuthCtx
+ReactApp --> AppCtx
+
+AuthCtx --> LocalStorage : store/retrieve token
+AuthCtx --> ApiClient : authenticated requests
+AppCtx --> UnivAPI : manage universities
+AppCtx --> AuthAPI : auth operations
+
+Layout --> PermGuard : wrap content
+UnivList --> Forms : open modals
+AdminInv --> InviteAPI : send invites
+
+ApiClient --> Express : REST API calls
+
+Express --> CORS
+Express --> BodyParser
+Express --> AuthMiddleware
+Express --> RBACMiddleware
+
+AuthMiddleware --> JWTHandler : verify tokens
+RBACMiddleware --> JWTHandler : check permissions
+
+AuthMiddleware --> AuthRoutes : protected
+RBACMiddleware --> UnivRoutes : protected
+RBACMiddleware --> RegRoutes : protected
+RBACMiddleware --> InviteRoutes : protected
+
+AuthRoutes --> PgPool : queries
+UnivRoutes --> PgPool : queries
+RegRoutes --> PgPool : queries
+InviteRoutes --> PgPool : queries
+
+PgPool --> QueryBuilder
+QueryBuilder --> Postgres : SQL
+
+Postgres --> UsersTbl
+Postgres --> UnivTbl
+Postgres --> RegTbl
+Postgres --> ProgressTbl
+Postgres --> InviteTbl
+
+UnivRoutes --> Imgur : upload images
+InviteRoutes --> Email : send invites
+JWTHandler --> JWT : sign/verify
+
+@enduml
+
+@startuml Component_FrontendArchitecture
+!theme plain
+skinparam componentStyle rectangle
+
+title Frontend Component Architecture
+
+package "Entry Point" {
+    [main.tsx] as Main
+    [App.tsx] as App
+}
+
+package "Routing" {
+    [BrowserRouter] as Router
+    [Routes Configuration] as Routes
+    [Route Guards] as Guards
+}
+
+package "Layout Components" {
+    [Layout] as Layout
+    [Sidebar] as Sidebar
+    [Header] as Header
+    [Footer] as Footer
+}
+
+package "Page Components" {
+    [AdminDashboard] as AdminDash
+    [AdminRoles] as AdminRoles
+    [UniversitiesList] as UnivList
+    [StudentManagement] as StudentMgmt
+    [RegistrationManagement] as RegMgmt
+    [LoginPage] as Login
+    [FirstTimeSetup] as Setup
+}
+
+package "Feature Components" {
+    [UniversityForm] as UnivForm
+    [EditUniversityModal] as EditModal
+    [ImportUniversitiesModal] as ImportModal
+    [AdminInvite] as AdminInv
+    [PermissionGuard] as PermGuard
+    [QuickInfoModal] as QuickInfo
+}
+
+package "Reusable UI" {
+    [Button] as Button
+    [Input] as Input
+    [Modal] as Modal
+    [Table] as Table
+    [LoadingSpinner] as Spinner
+    [Toast Notifications] as Toast
+}
+
+package "Hooks" {
+    [useAuth] as UseAuth
+    [useApp] as UseApp
+    [usePermission] as UsePerm
+    [useLocalStorage] as UseLocal
+}
+
+package "Services/API" {
+    [api.ts] as Api
+    [universityApi.ts] as UnivApi
+    [authApi.ts] as AuthApi
+    [adminInviteApi.ts] as InviteApi
+}
+
+package "Utilities" {
+    [validators.ts] as Validators
+    [formatters.ts] as Formatters
+    [constants.ts] as Constants
+}
+
+' Relationships
+Main --> App
+App --> Router
+Router --> Routes
+Routes --> Guards
+
+Guards --> Login : public
+Guards --> Layout : protected
+
+Layout --> Sidebar
+Layout --> Header
+Layout --> Footer
+
+Sidebar --> AdminDash
+Sidebar --> AdminRoles
+Sidebar --> UnivList
+Sidebar --> StudentMgmt
+Sidebar --> RegMgmt
+
+AdminDash --> PermGuard
+AdminRoles --> PermGuard
+UnivList --> PermGuard
+
+UnivList --> UnivForm
+UnivList --> EditModal
+UnivList --> ImportModal
+UnivList --> QuickInfo
+AdminRoles --> AdminInv
+
+UnivForm --> Button
+UnivForm --> Input
+UnivForm --> Modal
+EditModal --> Button
+EditModal --> Input
+ImportModal --> Button
+ImportModal --> Table
+AdminInv --> Button
+AdminInv --> Input
+
+PermGuard --> UsePerm
+UsePerm --> UseAuth
+
+UnivList --> UseApp
+UnivList --> UnivApi
+
+Login --> AuthApi
+Login --> UseAuth
+
+Setup --> InviteApi
+
+AdminInv --> InviteApi
+AdminInv --> Toast
+
+Api --> Validators
+Api --> Constants
+
+@enduml
+
+@startuml Component_BackendArchitecture
+!theme plain
+skinparam componentStyle rectangle
+
+title Backend API Component Architecture
+
+package "Server Core" {
+    [server.js] as Server
+    [Express App] as Express
+    [Configuration] as Config
+}
+
+package "Middleware Pipeline" {
+    [CORS Handler] as CORS
+    [JSON Parser] as JSONParser
+    [Static Files] as Static
+    [Error Handler] as ErrorHandler
+}
+
+package "Security Components" {
+    [Auth Middleware] as AuthMiddleware
+    [RBAC Middleware] as RBACMiddleware
+    [Password Hashing] as PasswordHash
+    [JWT Service] as JWTService
+}
+
+package "Route Controllers" {
+    [AuthController] as AuthCtrl
+    [UniversityController] as UnivCtrl
+    [RegistrationController] as RegCtrl
+    [StudentController] as StudentCtrl
+    [AdminInviteController] as InviteCtrl
+    [ProgressController] as ProgressCtrl
+}
+
+package "Data Access Layer" {
+    [Database Pool] as DBPool
+    [Connection Manager] as ConnMgr
+    [Query Executor] as QueryExec
+    [Transaction Manager] as TransMgr
+}
+
+package "External Integrations" {
+    [Email Service] as EmailSvc
+    [Image Upload (Imgur)] as ImgurSvc
+    [JWT Library] as JWTLib
+    [bcrypt Library] as bcrypt
+}
+
+package "Models/Entities" {
+    [User Model] as UserModel
+    [University Model] as UnivModel
+    [Registration Model] as RegModel
+    [Invitation Model] as InviteModel
+    [Progress Model] as ProgressModel
+}
+
+' Data flow
+Server --> Express
+Server --> Config
+
+Express --> CORS : 1st
+Express --> JSONParser : 2nd
+Express --> Static : 3rd
+Express --> AuthMiddleware : 4th
+
+AuthMiddleware --> JWTService : verify
+AuthMiddleware --> RBACMiddleware : next
+
+RBACMiddleware --> AuthCtrl : /api/auth
+RBACMiddleware --> UnivCtrl : /api/universities
+RBACMiddleware --> RegCtrl : /api/registrations
+RBACMiddleware --> StudentCtrl : /api/students
+RBACMiddleware --> InviteCtrl : /api/admin
+RBACMiddleware --> ProgressCtrl : /api/progress
+
+AuthCtrl --> UserModel
+UnivCtrl --> UnivModel
+RegCtrl --> RegModel
+StudentCtrl --> UserModel
+InviteCtrl --> UserModel
+InviteCtrl --> InviteModel
+ProgressCtrl --> ProgressModel
+
+UserModel --> DBPool
+UnivModel --> DBPool
+RegModel --> DBPool
+InviteModel --> DBPool
+ProgressModel --> DBPool
+
+DBPool --> ConnMgr
+DBPool --> QueryExec
+QueryExec --> TransMgr : transactions
+
+InviteCtrl --> EmailSvc : send invites
+UnivCtrl --> ImgurSvc : upload images
+AuthCtrl --> JWTService : generate tokens
+AuthCtrl --> PasswordHash : hash/verify
+
+JWTService --> JWTLib
+PasswordHash --> bcrypt
+
+Express --> ErrorHandler : final
+
+@enduml

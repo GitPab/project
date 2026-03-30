@@ -1,0 +1,302 @@
+@startuml UseCase_SystemOverview
+!theme plain
+title Du Học Cost - Use Case Diagram - System Overview
+
+left to right direction
+
+actor "Super Admin" as SuperAdmin
+actor "Admin" as Admin
+actor "Admin Manager" as AdminManager
+actor "Content Editor" as ContentEditor
+actor "Finance Admin" as FinanceAdmin
+actor "Viewer" as Viewer
+actor "Student" as Student
+
+rectangle "Du Học Cost System" {
+    
+    package "User Management" {
+        usecase "Login" as UC1
+        usecase "Logout" as UC2
+        usecase "Invite Admin" as UC3
+        usecase "Manage Roles" as UC4
+        usecase "View Profile" as UC5
+    }
+    
+    package "University Management" {
+        usecase "View Universities" as UC6
+        usecase "Add University" as UC7
+        usecase "Edit University" as UC8
+        usecase "Delete University" as UC9
+        usecase "Import CSV" as UC10
+        usecase "Export Data" as UC11
+    }
+    
+    package "Student Management" {
+        usecase "View Students" as UC12
+        usecase "Add Student" as UC13
+        usecase "Edit Student" as UC14
+        usecase "Delete Student" as UC15
+        usecase "Track Progress" as UC16
+    }
+    
+    package "Registration Management" {
+        usecase "Submit Registration" as UC17
+        usecase "View Registrations" as UC18
+        usecase "Approve Registration" as UC19
+        usecase "Reject Registration" as UC20
+    }
+    
+    package "Payment Management" {
+        usecase "View Payments" as UC21
+        usecase "Create Payment" as UC22
+        usecase "Approve Payment" as UC23
+    }
+    
+    package "Analytics & Reports" {
+        usecase "View Dashboard" as UC24
+        usecase "View Analytics" as UC25
+        usecase "Generate Reports" as UC26
+    }
+    
+    package "System Administration" {
+        usecase "Manage Settings" as UC27
+        usecase "View Audit Logs" as UC28
+        usecase "Database Management" as UC29
+        usecase "Email Templates" as UC30
+    }
+}
+
+' Super Admin - all permissions
+SuperAdmin --> UC1
+SuperAdmin --> UC2
+SuperAdmin --> UC3
+SuperAdmin --> UC4
+SuperAdmin --> UC5
+SuperAdmin --> UC6
+SuperAdmin --> UC7
+SuperAdmin --> UC8
+SuperAdmin --> UC9
+SuperAdmin --> UC10
+SuperAdmin --> UC11
+SuperAdmin --> UC12
+SuperAdmin --> UC13
+SuperAdmin --> UC14
+SuperAdmin --> UC15
+SuperAdmin --> UC16
+SuperAdmin --> UC17
+SuperAdmin --> UC18
+SuperAdmin --> UC19
+SuperAdmin --> UC20
+SuperAdmin --> UC21
+SuperAdmin --> UC22
+SuperAdmin --> UC23
+SuperAdmin --> UC24
+SuperAdmin --> UC25
+SuperAdmin --> UC26
+SuperAdmin --> UC27
+SuperAdmin --> UC28
+SuperAdmin --> UC29
+SuperAdmin --> UC30
+
+' Admin - same as super admin
+Admin --> UC1
+Admin --> UC2
+Admin --> UC3
+Admin --> UC4
+Admin --> UC5
+Admin --> UC6
+Admin --> UC7
+Admin --> UC8
+Admin --> UC9
+Admin --> UC10
+Admin --> UC11
+Admin --> UC12
+Admin --> UC13
+Admin --> UC14
+Admin --> UC15
+Admin --> UC16
+Admin --> UC18
+Admin --> UC19
+Admin --> UC20
+Admin --> UC21
+Admin --> UC22
+Admin --> UC23
+Admin --> UC24
+Admin --> UC25
+Admin --> UC26
+Admin --> UC27
+Admin --> UC28
+Admin --> UC29
+Admin --> UC30
+
+' Admin Manager
+AdminManager --> UC1
+AdminManager --> UC2
+AdminManager --> UC5
+AdminManager --> UC6
+AdminManager --> UC12
+AdminManager --> UC13
+AdminManager --> UC14
+AdminManager --> UC16
+AdminManager --> UC18
+AdminManager --> UC19
+AdminManager --> UC20
+AdminManager --> UC21
+AdminManager --> UC24
+AdminManager --> UC25
+
+' Content Editor
+ContentEditor --> UC1
+ContentEditor --> UC2
+ContentEditor --> UC5
+ContentEditor --> UC6
+ContentEditor --> UC7
+ContentEditor --> UC8
+ContentEditor --> UC10
+ContentEditor --> UC12
+ContentEditor --> UC18
+ContentEditor --> UC24
+
+' Finance Admin
+FinanceAdmin --> UC1
+FinanceAdmin --> UC2
+FinanceAdmin --> UC5
+FinanceAdmin --> UC6
+FinanceAdmin --> UC12
+FinanceAdmin --> UC18
+FinanceAdmin --> UC21
+FinanceAdmin --> UC22
+FinanceAdmin --> UC23
+FinanceAdmin --> UC24
+FinanceAdmin --> UC25
+
+' Viewer
+Viewer --> UC1
+Viewer --> UC2
+Viewer --> UC5
+Viewer --> UC6
+Viewer --> UC12
+Viewer --> UC18
+Viewer --> UC21
+Viewer --> UC24
+Viewer --> UC25
+
+' Student
+Student --> UC1
+Student --> UC2
+Student --> UC5
+Student --> UC6
+Student --> UC17
+Student --> UC16
+
+@enduml
+
+@startuml UseCase_RegistrationWorkflow
+!theme plain
+title Student Registration - Detailed Use Case
+
+left to right direction
+
+actor "Student" as Student
+actor "Admin" as Admin
+actor "System" as System
+
+rectangle "Registration Workflow" {
+    
+    usecase "Fill Registration Form" as UC1
+    usecase "Upload Documents" as UC2
+    usecase "Submit Application" as UC3
+    usecase "Validate Application" as UC4
+    usecase "Send Confirmation Email" as UC5
+    usecase "Review Application" as UC6
+    usecase "Request Additional Info" as UC7
+    usecase "Approve Application" as UC8
+    usecase "Reject Application" as UC9
+    usecase "Create Student Record" as UC10
+    usecase "Initialize Progress Tracking" as UC11
+    usecase "Send Status Notification" as UC12
+    usecase "View Application Status" as UC13
+    
+    UC1 ..> UC2 : <<include>>
+    UC2 ..> UC3 : <<include>>
+    UC3 ..> UC4 : <<include>>
+    UC4 ..> UC5 : <<include>>
+    UC6 ..> UC7 : <<extend>>
+    UC8 ..> UC10 : <<include>>
+    UC8 ..> UC11 : <<include>>
+    UC8 ..> UC12 : <<include>>
+    UC9 ..> UC12 : <<include>>
+}
+
+Student --> UC1
+Student --> UC13
+
+Admin --> UC6
+Admin --> UC8
+Admin --> UC9
+
+System --> UC4
+System --> UC5
+System --> UC10
+System --> UC11
+System --> UC12
+
+@enduml
+
+@startuml UseCase_UniversityManagement
+!theme plain
+title University Management - Use Case Diagram
+
+left to right direction
+
+actor "Content Editor" as Editor
+actor "Admin" as Admin
+actor "Super Admin" as SuperAdmin
+
+rectangle "University Management Module" {
+    
+    usecase "View University List" as UC1
+    usecase "Search Universities" as UC2
+    usecase "Filter by Region" as UC3
+    usecase "View University Details" as UC4
+    usecase "Add New University" as UC5
+    usecase "Edit University Info" as UC6
+    usecase "Update Korean Data" as UC7
+    usecase "Upload Hero Image" as UC8
+    usecase "Upload Thumbnail" as UC9
+    usecase "Delete University" as UC10
+    usecase "Bulk Import CSV" as UC11
+    usecase "Export University Data" as UC12
+    usecase "View Statistics" as UC13
+    
+    UC1 ..> UC2 : <<extend>>
+    UC1 ..> UC3 : <<extend>>
+    UC1 ..> UC4 : <<extend>>
+    UC5 ..> UC8 : <<include>>
+    UC5 ..> UC9 : <<include>>
+    UC6 ..> UC7 : <<extend>>
+    UC11 ..> UC5 : <<include>>
+}
+
+Editor --> UC1
+Editor --> UC2
+Editor --> UC3
+Editor --> UC4
+Editor --> UC5
+Editor --> UC6
+Editor --> UC7
+Editor --> UC8
+Editor --> UC9
+Editor --> UC11
+
+Admin --> UC1
+Admin --> UC5
+Admin --> UC6
+Admin --> UC10
+Admin --> UC11
+Admin --> UC12
+Admin --> UC13
+
+SuperAdmin --> UC10
+
+@enduml

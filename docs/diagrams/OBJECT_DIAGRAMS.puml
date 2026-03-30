@@ -1,0 +1,258 @@
+@startuml Object_UniversityManagement
+!theme plain
+title University Management - Object Diagram (Runtime Snapshot)
+
+object "universityList:UniversitiesList" as UL {
+    universities = [univ1, univ2, univ3]
+    searchQuery = "Korea"
+    loading = false
+    showAddModal = false
+    showEditModal = true
+    selectedUniversity = univ2
+}
+
+object "univ1:University" as U1 {
+    id = "uuid-001"
+    name = "Seoul National University"
+    koreanName = "서울대학교"
+    region = "Seoul"
+    heroImage = "https://imgur.com/snu.jpg"
+    thumbnail = "https://imgur.com/snu_thumb.jpg"
+}
+
+object "univ2:University" as U2 {
+    id = "uuid-002"
+    name = "Yonsei University"
+    koreanName = "연세대학교"
+    region = "Seoul"
+    heroImage = "https://imgur.com/yonsei.jpg"
+    thumbnail = "https://imgur.com/yonsei_thumb.jpg"
+}
+
+object "univ3:University" as U3 {
+    id = "uuid-003"
+    name = "KAIST"
+    koreanName = "카이스트"
+    region = "Daejeon"
+    heroImage = "https://imgur.com/kaist.jpg"
+    thumbnail = "https://imgur.com/kaist_thumb.jpg"
+}
+
+object "editModal:EditUniversityModal" as EM {
+    university = univ2
+    formData = {name, koreanName, region}
+    saving = false
+}
+
+object "form:UniversityForm" as UF {
+    formData = {name: "", koreanName: "", region: ""}
+    loading = false
+    uploadedImages = []
+}
+
+object "authContext:AuthProvider" as AC {
+    user = adminUser
+    isAuthenticated = true
+    isAdmin = true
+}
+
+object "adminUser:User" as AU {
+    id = "admin-001"
+    email = "admin@duhoccost.vn"
+    name = "Super Admin"
+    role = "super_admin"
+}
+
+object "appContext:AppProvider" as AP {
+    universities = [univ1, univ2, univ3]
+    students = []
+    registrations = []
+    loading = false
+}
+
+object "api:universityApi" as API {
+    baseURL = "http://localhost:3001/api"
+}
+
+UL --> U1 : displays
+UL --> U2 : displays
+UL --> U3 : displays
+UL --> EM : opened for
+UL --> AC : uses
+UL --> AP : uses
+UL --> API : calls
+
+EM --> U2 : editing
+
+AC --> AU : currentUser
+
+AP --> U1 : manages
+AP --> U2 : manages
+AP --> U3 : manages
+
+@enduml
+
+@startuml Object_AuthenticationState
+!theme plain
+title Authentication - Object Diagram (Logged In State)
+
+object "authContext:AuthProvider" as Auth {
+    user = userObj
+    isAuthenticated = true
+    isAdmin = true
+    isLoading = false
+}
+
+object "userObj:User" as User {
+    id = "user-123"
+    email = "admin@duhoccost.vn"
+    name = "Admin User"
+    role = "super_admin"
+    phone = "+84 123 456 789"
+}
+
+object "localStorage:Storage" as LS {
+    token = "eyJhbGciOiJIUzI1NiIs..."
+    refreshToken = "dGhpcyBpcyBhIHJlZnJlc2g..."
+}
+
+object "permissionGuard:PermissionGuard" as PG {
+    permission = "university:create"
+    hasPermission = true
+    children = button
+    fallback = null
+}
+
+object "addButton:Button" as Btn {
+    label = "Add University"
+    disabled = false
+    onClick = handleAdd
+}
+
+object "layout:Layout" as Layout {
+    sidebarCollapsed = false
+    menuItems = [item1, item2, item3, ...]
+    currentUser = userObj
+}
+
+object "menuItem1:MenuItem" as MI1 {
+    path = "/admin/dashboard"
+    label = "Dashboard"
+    icon = "LayoutDashboard"
+}
+
+object "menuItem2:MenuItem" as MI2 {
+    path = "/admin/universities"
+    label = "Universities"
+    icon = "School"
+}
+
+object "menuItem3:MenuItem" as MI3 {
+    path = "/admin/students"
+    label = "Students"
+    icon = "Users"
+}
+
+object "jwt:JWTService" as JWT {
+    secret = "your-jwt-secret"
+    expiresIn = "24h"
+}
+
+object "decodedToken:Object" as Token {
+    userId = "user-123"
+    role = "super_admin"
+    iat = 1699123456
+    exp = 1699209856
+}
+
+Auth --> User : contains
+Auth --> LS : persists to
+Auth --> JWT : uses
+
+PG --> Btn : wraps
+PG --> Auth : checks permissions
+
+Layout --> User : displays
+Layout --> MI1 : renders
+Layout --> MI2 : renders
+Layout --> MI3 : renders
+
+JWT --> Token : decodes to
+
+@enduml
+
+@startuml Object_InviteFlow
+!theme plain
+title Admin Invite - Object Diagram (Invitation Created)
+
+object "adminInvite:AdminInvite" as AI {
+    invitedUsers = [invite1, invite2]
+    showInviteForm = false
+    copiedLink = "http://localhost:5173/setup?token=abc123"
+}
+
+object "invite1:Invitation" as Inv1 {
+    id = "inv-001"
+    email = "newadmin@example.com"
+    name = "New Admin"
+    role = "content_editor"
+    invitedBy = "admin-001"
+    setupToken = "abc123"
+    setupTokenExpiry = "2024-01-15T10:00:00Z"
+    createdAt = "2024-01-14T10:00:00Z"
+    used = false
+}
+
+object "invite2:Invitation" as Inv2 {
+    id = "inv-002"
+    email = "viewer@example.com"
+    name = "Viewer User"
+    role = "viewer"
+    invitedBy = "admin-001"
+    setupToken = "def456"
+    setupTokenExpiry = "2024-01-15T09:00:00Z"
+    createdAt = "2024-01-13T09:00:00Z"
+    used = true
+}
+
+object "pendingUser:User" as PU {
+    id = "user-new-001"
+    email = "newadmin@example.com"
+    name = "New Admin"
+    role = "content_editor"
+    passwordHash = null
+    setupToken = "abc123"
+    setupTokenExpiry = "2024-01-15T10:00:00Z"
+    isFirstLogin = true
+    createdAt = "2024-01-14T10:00:00Z"
+}
+
+object "inviter:User" as Inviter {
+    id = "admin-001"
+    email = "admin@duhoccost.vn"
+    name = "Super Admin"
+    role = "super_admin"
+}
+
+object "emailService:EmailService" as ES {
+    smtpHost = "smtp.gmail.com"
+    smtpPort = 587
+}
+
+object "formData:Object" as Form {
+    email = "newadmin@example.com"
+    name = "New Admin"
+    role = "content_editor"
+}
+
+AI --> Inv1 : manages
+AI --> Inv2 : manages
+AI --> Inviter : current admin
+
+Inv1 --> PU : creates pending
+Inv1 --> Inviter : invited by
+Inv2 --> Inviter : invited by
+
+ES --> Inv1 : sends email to
+
+@enduml

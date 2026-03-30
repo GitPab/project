@@ -1,0 +1,339 @@
+@startuml Sequence_Authentication
+!theme plain
+title Authentication Flow - Sequence Diagram
+
+actor User
+participant "Browser" as Browser
+participant "React Frontend" as Frontend
+participant "Express Backend" as Backend
+participant "Auth Middleware" as Auth
+participant "JWT Service" as JWT
+database "PostgreSQL" as DB
+
+== Login Process ==
+User -> Browser: Enter email & password
+Browser -> Frontend: Submit form
+Frontend -> Backend: POST /api/login
+Backend -> DB: SELECT * FROM users WHERE email=?
+DB --> Backend: user data
+Backend -> Backend: bcrypt.compare(password)
+alt Invalid credentials
+    Backend --> Frontend: 401 Unauthorized
+    Frontend --> Browser: Show error
+else Valid credentials
+    Backend -> JWT: sign({userId, role}, JWT_SECRET)
+    JWT --> Backend: token
+    Backend --> Frontend: {token, user: {id, email, role, name}}
+    Frontend -> Frontend: localStorage.setItem('token', token)
+    Frontend --> Browser: Redirect to dashboard
+end
+
+== Token Verification ==
+User -> Browser: Access protected route
+Browser -> Frontend: Navigate to /admin/dashboard
+Frontend -> Backend: GET /api/me (Authorization: Bearer token)
+Backend -> Auth: verifyToken(token)
+Auth -> JWT: verify(token, JWT_SECRET)
+JWT --> Auth: decoded payload
+Auth --> Backend: req.user = payload
+Backend -> DB: SELECT user data
+DB --> Backend: user
+Backend --> Frontend: user details
+Frontend --> Browser: Render protected page
+
+== Logout Process ==
+User -> Browser: Click logout
+Browser -> Frontend: Trigger logout
+Frontend -> Frontend: localStorage.removeItem('token')
+Frontend -> Backend: POST /api/logout (optional)
+Backend -> Backend: Invalidate token (if using blacklist)
+Backend --> Frontend: 200 OK
+Frontend --> Browser: Redirect to login
+
+@enduml
+
+@startuml Sequence_UniversityCRUD
+!theme plain
+title University Management CRUD - Sequence Diagram
+
+actor Admin
+participant "React Frontend" as Frontend
+participant "Express Backend" as Backend
+participant "RBAC Middleware" as RBAC
+participant "Auth Middleware" as Auth
+database "PostgreSQL" as DB
+
+== Create University ==
+Admin -> Frontend: Click "Add University"
+Frontend -> Frontend: Open UniversityForm modal
+Admin -> Frontend: Fill form & submit
+Frontend -> Backend: POST /api/universities (Authorization: Bearer token, body: universityData)
+Backend -> Auth: verifyToken(token)
+Auth --> Backend: req.user
+Backend -> RBAC: checkPermission(req.user.role, 'create', 'university')
+RBAC --> Backend: true/false
+alt No permission
+    Backend --> Frontend: 403 Forbidden
+else Has permission
+    Backend -> DB: INSERT INTO universities (id, name, korean_name, region, hero_image, thumbnail, korean_data) VALUES (?,?,?,?,?,?,?)
+    DB --> Backend: new university id
+    Backend --> Frontend: 201 Created {id, message}
+    Frontend --> Admin: Show success, refresh list
+end
+
+== Read University List ==
+Admin -> Frontend: Navigate to Universities page
+Frontend -> Backend: GET /api/universities (Authorization: Bearer token)
+Backend -> Auth: verifyToken(token)
+Auth --> Backend: req.user
+Backend -> RBAC: checkPermission(req.user.role, 'view', 'university')
+RBAC --> Backend: true/false
+alt No permission
+    Backend --> Frontend: 403 Forbidden
+else Has permission
+    Backend -> DB: SELECT * FROM universities
+    DB --> Backend: universities array
+    Backend --> Frontend: 200 OK [universities]
+    Frontend --> Admin: Display university list
+end
+
+== Update University ==
+Admin -> Frontend: Click "Edit" on university
+Frontend -> Frontend: Open EditUniversityModal
+Admin -> Frontend: Modify data & save
+Frontend -> Backend: PUT /api/universities/:id (Authorization: Bearer token, body: updatedData)
+Backend -> Auth: verifyToken(token)
+Auth --> Backend: req.user
+Backend -> RBAC: checkPermission(req.user.role, 'edit', 'university')
+RBAC --> Backend: true/false
+alt No permission
+    Backend --> Frontend: 403 Forbidden
+else Has permission
+    Backend -> DB: UPDATE universities SET name=?, korean_name=?, region=?, hero_image=?, thumbnail=?, korean_data=?, updated_at=NOW() WHERE id=?
+    DB --> Backend: success
+    Backend --> Frontend: 200 OK {message: "Updated"}
+    Frontend --> Admin: Show success, refresh list
+end
+
+== Delete University ==
+Admin -> Frontend: Click "Delete" on university
+Frontend -> Frontend: Show confirmation dialog
+Admin -> Frontend: Confirm delete
+Frontend -> Backend: DELETE /api/universities/:id (Authorization: Bearer token)
+Backend -> Auth: verifyToken(token)
+Auth --> Backend: req.user
+Backend -> RBAC: checkPermission(req.user.role, 'delete', 'university')
+RBAC --> Backend: true/false
+alt No permission
+    Backend --> Frontend: 403 Forbidden
+else Has permission
+    Backend -> DB: DELETE FROM universities WHERE id=?
+    DB --> Backend: success
+    Backend --> Frontend: 200 OK {message: "Deleted"}
+    Frontend --> Admin: Show success, remove from list
+end
+
+@enduml
+
+@startuml Sequence_AdminInvite
+!theme plain
+title Admin Invite & Setup - Sequence Diagram
+
+actor SuperAdmin
+actor NewAdmin
+participant "React Frontend" as Frontend
+participant "Express Backend" as Backend
+participant "Email Service" as Email
+database "PostgreSQL" as DB
+
+== Invite Admin ==
+SuperAdmin -> Frontend: Go to Admin Roles page
+Frontend -> Backend: GET /api/admin/invited-users (Authorization: Bearer token)
+Backend --> Frontend: List of invited users
+SuperAdmin -> Frontend: Click "Invite Admin"
+Frontend -> Frontend: Show invite form
+SuperAdmin -> Frontend: Enter email, name, role
+Frontend -> Backend: POST /api/admin/invite (Authorization: Bearer token)
+Backend -> Backend: Check if inviter has 'manage:user' permission
+Backend -> DB: SELECT * FROM users WHERE email=?
+alt Email already exists
+    DB --> Backend: user found
+    Backend --> Frontend: 400 Bad Request {error: "User already exists"}
+else Email available
+    DB --> Backend: no user
+    Backend -> Backend: Generate setup_token (UUID)
+    Backend -> Backend: Calculate expiry (24 hours)
+    Backend -> DB: INSERT INTO invitations (id, email, name, role, invited_by, setup_token, setup_token_expiry, created_at, used)
+    DB --> Backend: success
+    Backend -> DB: INSERT INTO users (id, email, name, role, setup_token, setup_token_expiry, is_first_login)
+    DB --> Backend: success
+    Backend -> Email: Send invitation email with setup link
+    Email --> Backend: sent
+    Backend --> Frontend: 201 Created {success: true, setupUrl: "http://localhost:5173/setup?token=xxx"}
+    Frontend --> SuperAdmin: Show success & invite link
+end
+
+== Verify Setup Token ==
+NewAdmin -> Frontend: Click invite link in email
+Frontend -> Backend: GET /api/admin/verify-setup?token=xxx
+Backend -> DB: SELECT * FROM users WHERE setup_token=?
+alt Token invalid/expired
+    DB --> Backend: no user
+    Backend --> Frontend: 400 Bad Request {error: "Invalid or expired token"}
+else Token valid
+    DB --> Backend: user data
+    Backend -> Backend: Check if token expired
+    alt Token expired
+        Backend --> Frontend: 400 Bad Request {error: "Token expired"}
+    else Token valid
+        Backend --> Frontend: 200 OK {valid: true, email: "user@email.com"}
+        Frontend --> NewAdmin: Show password setup form
+    end
+end
+
+== Set Password ==
+NewAdmin -> Frontend: Enter new password & confirm
+Frontend -> Frontend: Validate passwords match
+Frontend -> Backend: POST /api/admin/setup-password (body: {token, password})
+Backend -> DB: SELECT * FROM users WHERE setup_token=?
+DB --> Backend: user data
+Backend -> Backend: Hash password with bcrypt
+Backend -> DB: UPDATE users SET password_hash=?, setup_token=NULL, setup_token_expiry=NULL, is_first_login=false WHERE id=?
+DB --> Backend: success
+Backend -> DB: UPDATE invitations SET used=true WHERE email=?
+DB --> Backend: success
+Backend --> Frontend: 200 OK {success: true}
+Frontend --> NewAdmin: Redirect to login page
+NewAdmin -> Frontend: Login with new credentials
+Frontend -> Backend: POST /api/login
+Backend --> Frontend: {token, user}
+Frontend --> NewAdmin: Redirect to dashboard
+
+@enduml
+
+@startuml Sequence_StudentRegistration
+!theme plain
+title Student Registration Flow - Sequence Diagram
+
+actor Student
+actor Admin
+participant "React Frontend" as Frontend
+participant "Express Backend" as Backend
+participant "Auth Middleware" as Auth
+participant "RBAC Middleware" as RBAC
+database "PostgreSQL" as DB
+
+== Student Submits Registration ==
+Student -> Frontend: Fill registration form
+Frontend -> Frontend: Validate form data
+Student -> Frontend: Submit registration
+Frontend -> Backend: POST /api/registrations (Authorization: Bearer token, body: formData)
+Backend -> Auth: verifyToken(token)
+Auth --> Backend: req.user
+Backend -> RBAC: checkPermission(req.user.role, 'create', 'application')
+alt No permission
+    Backend --> Frontend: 403 Forbidden
+else Has permission
+    Backend -> DB: INSERT INTO registrations (id, student_id, university_id, status, form_data, created_at)
+    DB --> Backend: new registration id
+    Backend --> Frontend: 201 Created {id, status: "pending"}
+    Frontend --> Student: Show success message
+end
+
+== Admin Reviews Registration ==
+Admin -> Frontend: Navigate to Registrations page
+Frontend -> Backend: GET /api/registrations (Authorization: Bearer token)
+Backend -> Auth: verifyToken(token)
+Auth --> Backend: req.user
+Backend -> RBAC: checkPermission(req.user.role, 'view', 'application')
+alt No permission
+    Backend --> Frontend: 403 Forbidden
+else Has permission
+    Backend -> DB: SELECT r.*, u.name as student_name, un.name as university_name FROM registrations r JOIN users u ON r.student_id=u.id JOIN universities un ON r.university_id=un.id
+    DB --> Backend: registrations array
+    Backend --> Frontend: 200 OK [registrations]
+    Frontend --> Admin: Display registration list
+end
+
+== Admin Approves/Rejects ==
+Admin -> Frontend: Click on registration
+Frontend -> Backend: GET /api/registrations/:id
+Backend --> Frontend: registration details
+Admin -> Frontend: Review details & click Approve/Reject
+Frontend -> Backend: PUT /api/registrations/:id (body: {status: "approved" or "rejected", notes})
+Backend -> Auth: verifyToken(token)
+Auth --> Backend: req.user
+Backend -> RBAC: checkPermission(req.user.role, 'manage', 'application')
+alt No permission
+    Backend --> Frontend: 403 Forbidden
+else Has permission
+    Backend -> DB: UPDATE registrations SET status=?, notes=?, updated_at=NOW() WHERE id=?
+    DB --> Backend: success
+    Backend -> DB: IF approved, INSERT INTO student_progress (student_id, registration_id, stage, progress_data)
+    DB --> Backend: progress created
+    Backend --> Frontend: 200 OK {message: "Updated"}
+    Frontend --> Admin: Show success, refresh list
+end
+
+== Student Views Progress ==
+Student -> Frontend: Navigate to My Progress page
+Frontend -> Backend: GET /api/student-progress (Authorization: Bearer token)
+Backend -> Auth: verifyToken(token)
+Auth --> Backend: req.user
+Backend -> DB: SELECT * FROM student_progress WHERE student_id=?
+DB --> Backend: progress data
+Backend --> Frontend: 200 OK [progress]
+Frontend --> Student: Display progress timeline
+
+@enduml
+
+@startuml Sequence_ImportCSV
+!theme plain
+title CSV Import Universities - Sequence Diagram
+
+actor Admin
+participant "React Frontend" as Frontend
+participant "CSV Parser" as CSV
+participant "Express Backend" as Backend
+participant "Auth Middleware" as Auth
+participant "RBAC Middleware" as RBAC
+database "PostgreSQL" as DB
+
+== Upload CSV File ==
+Admin -> Frontend: Click "Import CSV"
+Frontend -> Frontend: Open ImportUniversitiesModal
+Admin -> Frontend: Select CSV file
+Frontend -> CSV: Parse CSV file
+CSV --> Frontend: parsed data array
+Frontend -> Frontend: Preview data in table
+Admin -> Frontend: Review & confirm import
+
+== Validate & Import ==
+Frontend -> Backend: POST /api/universities/import (Authorization: Bearer token, body: {universities: [...]})
+Backend -> Auth: verifyToken(token)
+Auth --> Backend: req.user
+Backend -> RBAC: checkPermission(req.user.role, 'create', 'university')
+alt No permission
+    Backend --> Frontend: 403 Forbidden
+else Has permission
+    Backend -> Backend: Validate each university data
+    Backend -> Backend: Check for duplicates
+    Backend -> DB: BEGIN TRANSACTION
+    loop For each university
+        Backend -> DB: INSERT INTO universities (id, name, korean_name, region, hero_image, thumbnail, korean_data)
+        DB --> Backend: inserted id
+    end
+    Backend -> DB: COMMIT
+    DB --> Backend: transaction complete
+    Backend --> Frontend: 201 Created {imported: count, message: "Import successful"}
+    Frontend --> Admin: Show success, refresh list
+end
+
+== Error Handling ==
+alt Some records failed
+    Backend -> DB: ROLLBACK
+    Backend --> Frontend: 400 Bad Request {error: "Import failed", details: [...]}
+    Frontend --> Admin: Show error with details
+end
+
+@enduml
