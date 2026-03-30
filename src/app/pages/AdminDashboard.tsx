@@ -1,6 +1,7 @@
 ﻿import React, { useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { useApp } from '../context/AppContext';
+import { usePermission, PermissionGuard } from '../components/PermissionGuard';
 import StatCard from '../components/StatCard';
 import TierBreakdownBar from '../components/TierBreakdownBar';
 import TierMini from '../components/TierMini';
@@ -163,22 +164,24 @@ export default function AdminDashboard() {
             >
               Quản lý trường
             </button>
-            <button
-              onClick={() => setShowImportModal(true)}
-              style={{
-                flex: 1,
-                padding: '8px 10px',
-                borderRadius: 10,
-                border: '1px solid transparent',
-                background: palette.accent,
-                color: '#fff',
-                cursor: 'pointer',
-                fontSize: 12,
-                fontWeight: 600
-              }}
-            >
-              Import CSV
-            </button>
+            <PermissionGuard permission="university:create">
+              <button
+                onClick={() => setShowImportModal(true)}
+                style={{
+                  flex: 1,
+                  padding: '8px 10px',
+                  borderRadius: 10,
+                  border: '1px solid transparent',
+                  background: palette.accent,
+                  color: '#fff',
+                  cursor: 'pointer',
+                  fontSize: 12,
+                  fontWeight: 600
+                }}
+              >
+                Import CSV
+              </button>
+            </PermissionGuard>
           </div>
         </div>
 

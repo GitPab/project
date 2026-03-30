@@ -1,6 +1,7 @@
 ﻿import React from 'react';
 import { Outlet, NavLink, useNavigate, Navigate } from 'react-router';
 import { useAuth } from '../context/AuthContext';
+import { ROLE_DEFINITIONS, type Role } from '../constants/rbac';
 import { LayoutDashboard, School, Users, LogOut, Menu, X, Shield, UserCircle, Lock, Edit3, TrendingUp, ChevronsLeft, ChevronsRight, BarChart3, ClipboardList, Mail, Workflow, Settings, Database, GraduationCap, Calendar, MessageSquare, ShieldCheck } from 'lucide-react';
 
 export default function Layout() {
@@ -8,30 +9,46 @@ export default function Layout() {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
+
+  // Helper to check if user has permission for a feature
+  const hasPermission = (requiredPermission: string): boolean => {
+    if (!user?.role) return false;
+    const role = user.role as Role;
+    const roleDef = ROLE_DEFINITIONS[role];
+    if (!roleDef) return false;
+    // super_admin has all permissions
+    if (roleDef.permissions.includes('*')) return true;
+    return roleDef.permissions.includes(requiredPermission);
+  };
+
   const handleLogout = () => { 
     logout(); 
     navigate('/login'); 
   };
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to='/login' replace />;
 
+  // Admin menu items with required permissions
+  const adminMenuItems = [
+    { path: '/admin/dashboard',     icon: LayoutDashboard, label: 'Trang chủ',        permission: 'university:view' },
+    { path: '/admin/analytics',     icon: BarChart3,       label: 'Thống kê',        permission: 'analytics:view' },
+    { path: '/admin/universities',  icon: School,          label: 'Danh sách trường', permission: 'university:view' },
+    { path: '/admin/students',      icon: Users,           label: 'Theo dõi học viên',permission: 'student:view' },
+    { path: '/admin/registrations', icon: Users,           label: 'Đăng ký',         permission: 'application:view' },
+    { path: '/admin/calendar',      icon: Calendar,        label: 'Lịch hẹn',        permission: 'student:view' },
+    { path: '/admin/scholarships',  icon: GraduationCap,   label: 'Học bổng',        permission: 'university:view' },
+    { path: '/admin/visa',          icon: ShieldCheck,     label: 'Theo dõi Visa',   permission: 'student:view' },
+    { path: '/admin/feedback',      icon: MessageSquare,   label: 'Đánh giá',        permission: 'analytics:view' },
+    { path: '/admin/audit',        icon: ClipboardList,   label: 'Nhật ký',         permission: 'manage:user' },
+    { path: '/admin/templates',     icon: Mail,            label: 'Mẫu Email',       permission: 'manage:settings' },
+    { path: '/admin/workflow',      icon: Workflow,        label: 'Tự động hóa',     permission: 'manage:settings' },
+    { path: '/admin/bulk',         icon: Database,        label: 'Thao tác hàng loạt', permission: 'university:create' },
+    { path: '/admin/roles',        icon: Shield,          label: 'Phân quyền',      permission: 'manage:user' },
+    { path: '/admin/settings',      icon: Settings,        label: 'Cài đặt',         permission: 'manage:settings' },
+  ];
+
+  // Filter menu items - show all for admin, filtered for students
   const menuItems = isAdmin
-    ? [
-        { path: '/admin/dashboard',     icon: LayoutDashboard, label: 'Trang chủ' },
-        { path: '/admin/analytics',     icon: BarChart3,       label: 'Thống kê' },
-        { path: '/admin/universities',  icon: School,          label: 'Danh sách trường' },
-        { path: '/admin/students',      icon: Users,           label: 'Theo dõi học viên' },
-        { path: '/admin/registrations', icon: Users,           label: 'Đăng ký' },
-        { path: '/admin/calendar',      icon: Calendar,        label: 'Lịch hẹn' },
-        { path: '/admin/scholarships',  icon: GraduationCap,   label: 'Học bổng' },
-        { path: '/admin/visa',          icon: ShieldCheck,     label: 'Theo dõi Visa' },
-        { path: '/admin/feedback',      icon: MessageSquare,   label: 'Đánh giá & Phản hồi' },
-        { path: '/admin/audit',        icon: ClipboardList,   label: 'Nhật ký hệ thống' },
-        { path: '/admin/templates',     icon: Mail,            label: 'Mẫu Email' },
-        { path: '/admin/workflow',      icon: Workflow,        label: 'Tự động hóa' },
-        { path: '/admin/bulk',         icon: Database,        label: 'Thao tác hàng loạt' },
-        { path: '/admin/roles',        icon: Shield,          label: 'Phân quyền' },
-        { path: '/admin/settings',      icon: Settings,        label: 'Cài đặt' },
-      ]
+    ? adminMenuItems
     : [
         { path: '/student/home',         icon: LayoutDashboard, label: 'Trang chủ' },
         { path: '/student/universities', icon: School,          label: 'Danh sách trường' },

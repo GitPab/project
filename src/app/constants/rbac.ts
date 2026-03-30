@@ -2,7 +2,7 @@
 // RBAC (Role-Based Access Control) Configuration
 // ============================================
 
-export type Role = 'super_admin' | 'admin_manager' | 'content_editor' | 'finance_admin' | 'viewer';
+export type Role = 'super_admin' | 'admin' | 'admin_manager' | 'content_editor' | 'finance_admin' | 'viewer';
 
 export interface Permission {
   action: string;
@@ -49,6 +49,11 @@ export const ROLE_DEFINITIONS: Record<Role, { label: string; description: string
     label: 'Super Admin',
     description: 'Quyền toàn hệ thống',
     permissions: Object.keys(PERMISSIONS),
+  },
+  admin: {
+    label: 'Admin',
+    description: 'Quản lý toàn bộ hệ thống (legacy)',
+    permissions: Object.keys(PERMISSIONS), // Full access like super_admin
   },
   admin_manager: {
     label: 'Quản lý Admin',

@@ -12,6 +12,14 @@ import axios from 'axios';
 
 dotenv.config();
 
+// ============================================
+// DEFAULT CONFIGURATION (fallback if .env missing)
+// ============================================
+process.env.PORT = process.env.PORT || '3001';
+process.env.FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+process.env.JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+process.env.DATABASE_URL = process.env.DATABASE_URL || 'postgresql://postgres:postgres@127.0.0.1:5432/sacma';
+
 const { Pool } = pkg;
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -68,6 +76,9 @@ const authenticateToken = (req, res, next) => {
 const ROLE_DEFINITIONS = {
   super_admin: {
     permissions: ['*'], // All permissions
+  },
+  admin: {
+    permissions: ['*'], // Same as super_admin - full access
   },
   admin_manager: {
     permissions: [

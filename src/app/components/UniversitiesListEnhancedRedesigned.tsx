@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
+import { usePermission, PermissionGuard } from './PermissionGuard';
 import { toast } from 'sonner';
 import { Search, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router';
@@ -352,6 +353,7 @@ interface UniversitiesListEnhancedProps {
 export default function UniversitiesListEnhancedRedesigned() {
   const { universities, setUniversities, updateUniversity, addUniversities } = useApp();
   const { isAdmin, user } = useAuth();
+  const { hasPermission } = usePermission();
   const navigate = useNavigate();
 
   // Debug logging
@@ -491,6 +493,17 @@ export default function UniversitiesListEnhancedRedesigned() {
     setLoading(false);
   }, [filteredUniversities]);
 
+  const canEdit = hasPermission('university:update');
+  const canQuickInfo = hasPermission('university:quickInfo');
+
+  const handleEdit = (uni: University) => {
+    setEditingUniversity(uni);
+  };
+
+  const handleQuickInfo = (uni: University) => {
+    setQuickInfoUniversity(uni);
+  };
+
   return (
     <div style={{ padding: '24px 28px 32px', background: 'linear-gradient(180deg, #FBF7F2 0%, #F4EEE7 100%)', minHeight: '100%' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginBottom: 18, flexWrap: 'wrap' }}>
@@ -501,44 +514,46 @@ export default function UniversitiesListEnhancedRedesigned() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {isAdmin && (
-            <>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <PermissionGuard permission="university:create">
               <button
                 onClick={() => setShowImportModal(true)}
                 style={{
                   padding: '8px 14px',
                   borderRadius: 10,
-                  border: `1px solid ${palette.border}`,
-                  background: palette.cardBg,
-                  color: palette.text,
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: 'pointer'
+                  border: '1px solid #e2e8f0',
+                  background: '#fff',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6
                 }}
               >
                 Import CSV
               </button>
+            </PermissionGuard>
+            <PermissionGuard permission="university:create">
               <button
                 onClick={() => setShowAddModal(true)}
                 style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 8,
                   padding: '8px 14px',
                   borderRadius: 10,
-                  border: '1px solid transparent',
+                  border: 'none',
                   background: palette.accent,
                   color: '#fff',
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6
                 }}
               >
                 <Plus size={16} />
                 Thêm trường
               </button>
-            </>
-          )}
+            </PermissionGuard>
+          </div>
         </div>
       </div>
 
