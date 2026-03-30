@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { Shield, Plus, Trash2, Edit2, Save, X, UserPlus, CheckSquare, Square, Loader2, AlertCircle } from 'lucide-react';
+import AdminInvite from '../components/AdminInvite';
+import { Shield, Plus, Trash2, Edit2, Save, X, UserPlus, CheckSquare, Square, Loader2, AlertCircle, Users } from 'lucide-react';
 import { Role, UserRole } from '../../types';
 
 const AdminRoles: React.FC = () => {
@@ -10,6 +11,7 @@ const AdminRoles: React.FC = () => {
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'invite' | 'roles'>('invite');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [editingRole, setEditingRole] = useState<Role | null>(null);
@@ -180,117 +182,157 @@ const AdminRoles: React.FC = () => {
 
   return (
     <div className="p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Phân quyền</h1>
-          <p className="text-gray-600 mt-1">Quản lý vai trò và quyền hạn</p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setShowAssignModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-          >
-            <UserPlus className="w-4 h-4" />
-            Gán quyền
-          </button>
-          <button
-            onClick={() => setShowRoleModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            <Plus className="w-4 h-4" />
-            Tạo vai trò
-          </button>
-        </div>
+      {/* Header */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Phân quyền</h1>
+        <p className="text-gray-600 mt-1">Quản lý vai trò và quyền hạn</p>
       </div>
 
-      {/* Roles List */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-        {allRoles.length === 0 ? (
-          <div className="col-span-full bg-white rounded-lg shadow p-8 text-center">
-            <Shield className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-            <p className="text-gray-500">Chưa có vai trò nào</p>
-          </div>
-        ) : (
-          allRoles.map((role) => (
-            <div key={role.id} className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Shield className="w-5 h-5 text-blue-600" />
-                  <h3 className="font-semibold">{role.name}</h3>
-                </div>
-                <div className="flex gap-1">
-                  <button 
-                    onClick={() => handleEditRole(role)}
-                    className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded"
-                    title="Sửa"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setShowDeleteConfirm(role.id)}
-                    className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded"
-                    title="Xóa"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-              <p className="text-sm text-gray-600 mb-4">{role.description}</p>
-              <div>
-                <p className="text-xs font-medium text-gray-500 mb-2">Quyền hạn ({role.permissions?.length || 0}):</p>
-                <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto">
-                  {role.permissions?.slice(0, 8).map((permKey) => {
-                    const perm = availablePermissions.find(p => p.key === permKey);
-                    return (
-                      <span key={permKey} className="px-2 py-1 bg-blue-50 text-blue-700 text-xs rounded" title={perm?.label || permKey}>
-                        {perm?.label || permKey}
-                      </span>
-                    );
-                  }) || <span className="text-sm text-gray-400">Không có quyền</span>}
-                  {(role.permissions?.length || 0) > 8 && (
-                    <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded">
-                      +{role.permissions.length - 8} more
-                    </span>
-                  )}
-                </div>
-              </div>
+      {/* Tabs */}
+      <div className="flex gap-2 mb-6 border-b border-gray-200">
+        <button
+          onClick={() => setActiveTab('invite')}
+          className={`px-4 py-3 font-medium flex items-center gap-2 border-b-2 ${
+            activeTab === 'invite'
+              ? 'border-blue-600 text-blue-600'
+              : 'border-transparent text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          Mời Admin mới
+        </button>
+        <button
+          onClick={() => setActiveTab('roles')}
+          className={`px-4 py-3 font-medium flex items-center gap-2 border-b-2 ${
+            activeTab === 'roles'
+              ? 'border-blue-600 text-blue-600'
+              : 'border-transparent text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          <Shield className="w-4 h-4" />
+          Quản lý vai trò
+        </button>
+      </div>
+
+      {/* Content */}
+      {activeTab === 'invite' ? (
+        <AdminInvite />
+      ) : (
+        <>
+          {/* Roles Management Content */}
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Vai trò</h2>
+              <p className="text-gray-600 mt-1">Tạo và quản lý vai trò</p>
             </div>
-          ))
-        )}
-      </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowAssignModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+              >
+                <UserPlus className="w-4 h-4" />
+                Gán quyền
+              </button>
+              <button
+                onClick={() => setShowRoleModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                <Plus className="w-4 h-4" />
+                Tạo vai trò
+              </button>
+            </div>
+          </div>
 
-      {/* User Roles */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-semibold mb-4">Người dùng và vai trò</h2>
-        {allUserRoles.length === 0 ? (
-          <p className="text-gray-500 text-center py-4">Chưa có gán quyền nào</p>
-        ) : (
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-2 text-left text-sm font-medium">Email</th>
-                <th className="px-4 py-2 text-left text-sm font-medium">Vai trò</th>
-                <th className="px-4 py-2 text-left text-sm font-medium">Ngày gán</th>
-              </tr>
-            </thead>
-            <tbody>
-              {allUserRoles.map((ur) => (
-                <tr key={ur.id} className="border-b">
-                  <td className="px-4 py-3">{ur.userEmail}</td>
-                  <td className="px-4 py-3">
-                    <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-sm">
-                      {allRoles.find(r => r.id === ur.roleId)?.name || ur.roleId}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">
-                    {new Date(ur.assignedAt).toLocaleDateString('vi-VN')}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+          {/* Roles List */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            {allRoles.length === 0 ? (
+              <div className="col-span-full bg-white rounded-lg shadow p-8 text-center">
+                <Shield className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                <p className="text-gray-500">Chưa có vai trò nào</p>
+              </div>
+            ) : (
+              allRoles.map((role) => (
+                <div key={role.id} className="bg-white rounded-lg shadow p-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <Shield className="w-5 h-5 text-blue-600" />
+                      <h3 className="font-semibold">{role.name}</h3>
+                    </div>
+                    <div className="flex gap-1">
+                      <button 
+                        onClick={() => handleEditRole(role)}
+                        className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded"
+                        title="Sửa"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setShowDeleteConfirm(role.id)}
+                        className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded"
+                        title="Xóa"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-sm text-gray-600 mb-4">{role.description}</p>
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 mb-2">Quyền hạn ({role.permissions?.length || 0}):</p>
+                    <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto">
+                      {role.permissions?.slice(0, 8).map((permKey) => {
+                        const perm = availablePermissions.find(p => p.key === permKey);
+                        return (
+                          <span key={permKey} className="px-2 py-1 bg-blue-50 text-blue-700 text-xs rounded" title={perm?.label || permKey}>
+                            {perm?.label || permKey}
+                          </span>
+                        );
+                      }) || <span className="text-sm text-gray-400">Không có quyền</span>}
+                      {(role.permissions?.length || 0) > 8 && (
+                        <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded">
+                          +{role.permissions.length - 8} more
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* User Roles */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold mb-4">Người dùng và vai trò</h2>
+            {allUserRoles.length === 0 ? (
+              <p className="text-gray-500 text-center py-4">Chưa có gán quyền nào</p>
+            ) : (
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-sm font-medium">Email</th>
+                    <th className="px-4 py-2 text-left text-sm font-medium">Vai trò</th>
+                    <th className="px-4 py-2 text-left text-sm font-medium">Ngày gán</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {allUserRoles.map((ur) => (
+                    <tr key={ur.id} className="border-b">
+                      <td className="px-4 py-3">{ur.userEmail}</td>
+                      <td className="px-4 py-3">
+                        <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-sm">
+                          {allRoles.find(r => r.id === ur.roleId)?.name || ur.roleId}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-500">
+                        {new Date(ur.assignedAt).toLocaleDateString('vi-VN')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </>
+      )}
 
       {/* Create Role Modal */}
       {showRoleModal && (

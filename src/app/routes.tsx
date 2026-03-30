@@ -4,6 +4,7 @@ import { useAuth } from './context/AuthContext';
 import Layout from './components/Layout';
 import Register from './pages/Register';
 import Login from './pages/Login';
+import FirstTimeSetup from './pages/FirstTimeSetup';
 import UniversityInfo from './pages/UniversityInfo';
 import UniversityDetailRedesigned from './pages/UniversityDetailRedesigned';
 import PublicOnboarding from './pages/PublicOnboarding';
@@ -86,6 +87,11 @@ export const router = createHashRouter([
   {
     path: '/register',
     Component: Register,
+    errorElement: <RouteError />
+  },
+  {
+    path: '/first-time-setup',
+    Component: FirstTimeSetup,
     errorElement: <RouteError />
   },
   {

@@ -62,16 +62,116 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
+// ============================================
+// RBAC PERMISSIONS CONFIGURATION
+// ============================================
+const ROLE_DEFINITIONS = {
+  super_admin: {
+    permissions: ['*'], // All permissions
+  },
+  admin_manager: {
+    permissions: [
+      'university:view',
+      'student:view', 'student:edit', 'student:progress',
+      'application:view', 'application:manage',
+      'payment:view',
+      'analytics:view',
+    ],
+  },
+  content_editor: {
+    permissions: [
+      'university:view', 'university:create', 'university:edit',
+      'student:view',
+      'application:view',
+    ],
+  },
+  finance_admin: {
+    permissions: [
+      'university:view',
+      'student:view',
+      'application:view',
+      'payment:view', 'payment:create', 'payment:approve',
+      'analytics:view',
+    ],
+  },
+  viewer: {
+    permissions: [
+      'university:view',
+      'student:view',
+      'application:view',
+      'payment:view',
+      'analytics:view',
+    ],
+  },
+};
+
+// Check if user has permission
+function hasPermission(userRole, action, resource) {
+  const roleDef = ROLE_DEFINITIONS[userRole];
+  if (!roleDef) return false;
+  if (roleDef.permissions.includes('*')) return true;
+  return roleDef.permissions.includes(`${action}:${resource}`);
+}
+
+// Permission middleware factory
+const requirePermission = (action, resource) => {
+  return (req, res, next) => {
+    if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
+    if (!hasPermission(req.user.role, action, resource)) {
+      return res.status(403).json({ error: `Permission denied: ${action}:${resource}` });
+    }
+    next();
+  };
+};
+
+// Legacy admin check (backward compatibility)
+const requireAdmin = (req, res, next) => {
+  if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
+  const adminRoles = ['admin', 'super_admin', 'admin_manager', 'content_editor', 'finance_admin', 'viewer'];
+  if (!adminRoles.includes(req.user.role)) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  next();
+};
+
+// ============================================
+// ADMIN INVITE SYSTEM - Add to database schema
+// ============================================
 async function initializeDatabase() {
   try {
+    // Update users table with extended roles and invite system
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        name TEXT NOT NULL, email TEXT UNIQUE NOT NULL,
-        phone TEXT, password TEXT NOT NULL, role TEXT DEFAULT 'student',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        name TEXT NOT NULL, 
+        email TEXT UNIQUE NOT NULL,
+        phone TEXT, 
+        password TEXT NOT NULL, 
+        role TEXT DEFAULT 'student' CHECK (role IN ('student', 'admin', 'super_admin', 'admin_manager', 'content_editor', 'finance_admin', 'viewer')),
+        is_first_login BOOLEAN DEFAULT false,
+        setup_token TEXT,
+        setup_token_expiry TIMESTAMP,
+        invited_by UUID REFERENCES users(id),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    
+    // Add invite system columns if they don't exist
+    await pool.query(`
+      ALTER TABLE users 
+      ADD COLUMN IF NOT EXISTS is_first_login BOOLEAN DEFAULT false,
+      ADD COLUMN IF NOT EXISTS setup_token TEXT,
+      ADD COLUMN IF NOT EXISTS setup_token_expiry TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS invited_by UUID REFERENCES users(id),
+      ADD COLUMN IF NOT EXISTS phone TEXT;
+    `);
+    
+    // Create index for setup token lookups
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_users_setup_token ON users(setup_token) WHERE is_first_login = true;
+    `);
+    
     await pool.query(`
       CREATE TABLE IF NOT EXISTS universities (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -171,7 +271,7 @@ app.post('/api/upload', authenticateToken, upload.single('image'), async (req, r
   }
 });
 
-// University routes
+// University routes with RBAC
 app.get('/api/universities', async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM universities ORDER BY created_at DESC');
   res.json(rows.map(r => ({ ...r, koreanData: r.korean_data ? JSON.parse(r.korean_data) : {} })));
@@ -183,8 +283,8 @@ app.get('/api/universities/:id', async (req, res) => {
   res.json({ ...rows[0], koreanData: rows[0].korean_data ? JSON.parse(rows[0].korean_data) : {} });
 });
 
-app.post('/api/universities', authenticateToken, async (req, res) => {
-  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+// Create university - requires university:create permission
+app.post('/api/universities', authenticateToken, requirePermission('create', 'university'), async (req, res) => {
   const { name, koreanName, region, heroImage, thumbnail, koreanData } = req.body;
   const { rows } = await pool.query(
     'INSERT INTO universities (id, name, korean_name, region, hero_image, thumbnail, korean_data) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id',
@@ -193,8 +293,8 @@ app.post('/api/universities', authenticateToken, async (req, res) => {
   res.status(201).json({ id: rows[0].id });
 });
 
-app.put('/api/universities/:id', authenticateToken, async (req, res) => {
-  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+// Edit university - requires university:edit permission
+app.put('/api/universities/:id', authenticateToken, requirePermission('edit', 'university'), async (req, res) => {
   const { name, koreanName, region, heroImage, thumbnail, koreanData } = req.body;
   await pool.query(
     'UPDATE universities SET name=$1, korean_name=$2, region=$3, hero_image=$4, thumbnail=$5, korean_data=$6, updated_at=NOW() WHERE id=$7',
@@ -203,18 +303,19 @@ app.put('/api/universities/:id', authenticateToken, async (req, res) => {
   res.json({ message: 'Updated' });
 });
 
-app.delete('/api/universities/:id', authenticateToken, async (req, res) => {
-  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+// Delete university - requires university:delete permission (super_admin only by default)
+app.delete('/api/universities/:id', authenticateToken, requirePermission('delete', 'university'), async (req, res) => {
   await pool.query('DELETE FROM universities WHERE id = $1', [req.params.id]);
   res.json({ message: 'Deleted' });
 });
 
-// Registration routes
-app.get('/api/registrations', authenticateToken, async (req, res) => {
-  const query = req.user.role === 'admin'
+// Registration routes with RBAC
+app.get('/api/registrations', authenticateToken, requirePermission('view', 'application'), async (req, res) => {
+  const hasFullAccess = hasPermission(req.user.role, 'manage', 'application');
+  const query = hasFullAccess
     ? `SELECT r.*, u.name as student_name, un.name as university_name FROM registrations r JOIN users u ON r.student_id = u.id JOIN universities un ON r.university_id = un.id ORDER BY r.created_at DESC`
     : `SELECT r.*, un.name as university_name FROM registrations r JOIN universities un ON r.university_id = un.id WHERE r.student_id = $1 ORDER BY r.created_at DESC`;
-  const { rows } = await pool.query(query, req.user.role === 'admin' ? [] : [req.user.id]);
+  const { rows } = await pool.query(query, hasFullAccess ? [] : [req.user.id]);
   res.json(rows);
 });
 
@@ -225,6 +326,207 @@ app.post('/api/registrations', authenticateToken, async (req, res) => {
     [uuidv4(), req.user.id, universityId, visaSystem]
   );
   res.status(201).json({ id: rows[0].id });
+});
+
+// ============================================
+// ADMIN INVITE API - Create users without registration
+// ============================================
+
+// Only super_admin can invite other admins
+const requireInvitePermission = (req, res, next) => {
+  const allowedRoles = ['super_admin', 'admin'];
+  if (!allowedRoles.includes(req.user.role)) {
+    return res.status(403).json({ error: 'Permission denied: Can not invite users' });
+  }
+  next();
+};
+
+// POST /api/admin/invite - Invite new admin user
+app.post('/api/admin/invite', authenticateToken, requireInvitePermission, async (req, res) => {
+  const { email, name, role, phone } = req.body;
+  
+  if (!email || !name || !role) {
+    return res.status(400).json({ error: 'Email, name, and role are required' });
+  }
+  
+  // Valid admin roles that can be invited
+  const validRoles = ['admin_manager', 'content_editor', 'finance_admin', 'viewer', 'admin'];
+  if (!validRoles.includes(role)) {
+    return res.status(400).json({ error: 'Invalid role for invitation' });
+  }
+  
+  try {
+    // Check if email already exists
+    const { rows: existing } = await pool.query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
+    if (existing.length > 0) {
+      return res.status(409).json({ error: 'Email already registered' });
+    }
+    
+    // Generate setup token
+    const setupToken = uuidv4() + uuidv4(); // 64 char random token
+    const setupTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    const tempPassword = await bcrypt.hash(setupToken, 12); // Use token as temp password
+    
+    const userId = uuidv4();
+    
+    // Create user with is_first_login flag
+    await pool.query(
+      `INSERT INTO users (id, name, email, phone, password, role, is_first_login, setup_token, setup_token_expiry, invited_by, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())`,
+      [userId, name, email.toLowerCase(), phone || null, tempPassword, role, true, setupToken, setupTokenExpiry, req.user.id]
+    );
+    
+    // Generate setup link
+    const setupUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/first-time-setup?token=${setupToken}&email=${encodeURIComponent(email)}`;
+    
+    res.status(201).json({
+      message: 'User invited successfully',
+      user: { id: userId, email, name, role, isFirstLogin: true },
+      setupUrl // In production, send this via email instead
+    });
+    
+  } catch (error) {
+    console.error('Invite error:', error);
+    res.status(500).json({ error: 'Failed to create invited user' });
+  }
+});
+
+// GET /api/admin/invited-users - List pending invitations
+app.get('/api/admin/invited-users', authenticateToken, requireInvitePermission, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, name, email, role, is_first_login, setup_token_expiry, created_at 
+       FROM users 
+       WHERE is_first_login = true 
+       ORDER BY created_at DESC`
+    );
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching invited users:', error);
+    res.status(500).json({ error: 'Failed to fetch invited users' });
+  }
+});
+
+// POST /api/auth/verify-setup-token - Verify setup token
+app.post('/api/auth/verify-setup-token', async (req, res) => {
+  const { token, email } = req.body;
+  
+  if (!token || !email) {
+    return res.status(400).json({ error: 'Token and email required' });
+  }
+  
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, email, is_first_login, setup_token_expiry 
+       FROM users 
+       WHERE email = $1 AND setup_token = $2 AND is_first_login = true`,
+      [email.toLowerCase(), token]
+    );
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Invalid or expired setup token' });
+    }
+    
+    const user = rows[0];
+    if (new Date() > new Date(user.setup_token_expiry)) {
+      return res.status(410).json({ error: 'Setup token expired' });
+    }
+    
+    res.json({ valid: true, email: user.email });
+  } catch (error) {
+    console.error('Verify token error:', error);
+    res.status(500).json({ error: 'Failed to verify token' });
+  }
+});
+
+// POST /api/auth/set-password - Set password for first-time login
+app.post('/api/auth/set-password', async (req, res) => {
+  const { token, email, password } = req.body;
+  
+  if (!token || !email || !password) {
+    return res.status(400).json({ error: 'All fields required' });
+  }
+  
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  }
+  
+  try {
+    // Verify token
+    const { rows } = await pool.query(
+      `SELECT id, email, is_first_login, setup_token_expiry, role, name
+       FROM users 
+       WHERE email = $1 AND setup_token = $2 AND is_first_login = true`,
+      [email.toLowerCase(), token]
+    );
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Invalid setup token' });
+    }
+    
+    const user = rows[0];
+    if (new Date() > new Date(user.setup_token_expiry)) {
+      return res.status(410).json({ error: 'Setup token expired' });
+    }
+    
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(password, 12);
+    
+    // Update user
+    await pool.query(
+      `UPDATE users 
+       SET password = $1, is_first_login = false, setup_token = NULL, setup_token_expiry = NULL, updated_at = NOW()
+       WHERE id = $2`,
+      [hashedPassword, user.id]
+    );
+    
+    // Generate JWT for immediate login
+    const authToken = jwt.sign(
+      { id: user.id, email: user.email, role: user.role, name: user.name },
+      process.env.JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+    
+    res.json({
+      message: 'Password set successfully',
+      token: authToken,
+      user: { id: user.id, email: user.email, name: user.name, role: user.role }
+    });
+  } catch (error) {
+    console.error('Set password error:', error);
+    res.status(500).json({ error: 'Failed to set password' });
+  }
+});
+
+// POST /api/admin/resend-invite - Resend invitation
+app.post('/api/admin/resend-invite', authenticateToken, requireInvitePermission, async (req, res) => {
+  const { userId } = req.body;
+  
+  try {
+    const setupToken = uuidv4() + uuidv4();
+    const setupTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const tempPassword = await bcrypt.hash(setupToken, 12);
+    
+    const { rows } = await pool.query(
+      `UPDATE users 
+       SET setup_token = $1, setup_token_expiry = $2, password = $3, updated_at = NOW()
+       WHERE id = $4 AND is_first_login = true
+       RETURNING email, name, role`,
+      [setupToken, setupTokenExpiry, tempPassword, userId]
+    );
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'User not found or already activated' });
+    }
+    
+    const user = rows[0];
+    const setupUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/first-time-setup?token=${setupToken}&email=${encodeURIComponent(user.email)}`;
+    
+    res.json({ message: 'Invitation resent', setupUrl, user });
+  } catch (error) {
+    console.error('Resend invite error:', error);
+    res.status(500).json({ error: 'Failed to resend invitation' });
+  }
 });
 
 app.listen(PORT, () => {
