@@ -4,7 +4,6 @@ import { useApp } from '../context/AppContext';
 import { Search, MapPin, Home, Briefcase, Award } from 'lucide-react';
 import { getMaxScholarship } from '../../utils/universityPerks';
 import type { University } from '../context/AppContext';
-import { getAllUniversities } from '../services/universityService';
 
 interface StudentUniversityListProps {
   onUniversitySelect?: (university: University) => void;
@@ -27,29 +26,10 @@ export default function StudentUniversityList({ onUniversitySelect }: StudentUni
   const [activeTier, setActiveTier] = useState<string>('all');
   const [activeFilter, setActiveFilter] = useState<string>('all');
 
-  // Reload universities from SQLite on mount to get latest updates from admin
+  // NOTE: Removed SQLite reload - now uses live context data from AppContext
+  // Admin updates via QuickInfoModal update the context directly
   useEffect(() => {
-    const reloadUniversities = async () => {
-      try {
-        const dbUniversities = await getAllUniversities();
-        if (dbUniversities.length > 0) {
-          // Parse the universities to match the expected format
-          const parsedUniversities = dbUniversities.map((u: any) => ({
-            ...u,
-            koreanData: typeof u.korean_data === 'string' 
-              ? JSON.parse(u.korean_data) 
-              : u.koreanData || u.korean_data || {}
-          }));
-          setUniversities(() => parsedUniversities);
-        }
-      } catch (error) {
-        console.error('Failed to reload universities:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    reloadUniversities();
+    setLoading(false);
   }, []);
 
   const filteredUniversities = useMemo(() => {
@@ -227,18 +207,52 @@ export default function StudentUniversityList({ onUniversitySelect }: StudentUni
                   const tier = (uni as any).top_tier;
                   const tierBadge = getTierBadge(tier);
                   const koreanData = (uni as any).koreanData || {};
+                  
+                  // Support both data formats: camelCase and snake_case
                   const visaSystemsDetail = koreanData.visaSystemsDetail || {};
+                  const visaSystems = (uni as any).visa_systems || {};
+                  
+                  // Helper to get visa system data from either source
+                  const getVisaSystem = (key: string) => {
+                    // Try camelCase first
+                    const detail = visaSystemsDetail[key];
+                    if (detail?.available) return detail;
+                    
+                    // Fall back to snake_case
+                    const system = visaSystems[key];
+                    if (!system?.available) return null;
+                    
+                    // Convert snake_case to camelCase
+                    return {
+                      available: system.available,
+                      invoiceKRWPerYear: system.invoice_krw,
+                      applyFeeKRW: system.apply_fee_krw,
+                      enrollmentFeeKRW: system.enrollment_fee_krw,
+                      scholarships: (system.scholarships || []).map((s: any) => ({
+                        topikLevel: s.topik_level,
+                        discountPct: s.discount_pct
+                      })),
+                      ktxOptions: (system.ktx_options || []).map((k: any) => ({
+                        name: k.name,
+                        priceKRWPerKy: k.price_krw
+                      }))
+                    };
+                  };
                   
                   // Get D4-1 data
-                  const d41Data = visaSystemsDetail['D4-1'];
+                  const d41Data = getVisaSystem('D4-1');
                   const hasD41 = d41Data?.available;
                   const d41Price = d41Data?.invoiceKRWPerYear;
                   const d41Gpa = koreanData.admission?.['D4-1']?.gpaMin;
                   
-                  // Get other visa systems
-                  const availableVisas = Object.entries(visaSystemsDetail)
-                    .filter(([_, data]: [string, any]) => data?.available)
-                    .map(([key, _]) => key);
+                  // Get all available visas from both sources
+                  const availableVisas: string[] = [];
+                  Object.entries(visaSystemsDetail).forEach(([key, data]: [string, any]) => {
+                    if (data?.available) availableVisas.push(key);
+                  });
+                  Object.entries(visaSystems).forEach(([key, data]: [string, any]) => {
+                    if (data?.available && !availableVisas.includes(key)) availableVisas.push(key);
+                  });
 
                   // Get scholarships for display
                   const scholarships = d41Data?.scholarships || [];

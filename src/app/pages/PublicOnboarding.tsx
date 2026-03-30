@@ -48,26 +48,9 @@ export default function PublicOnboarding() {
   const { formatFrom, convertAmount, currency } = useCurrency();
   const { language } = useLanguage();
 
-  // Reload universities from SQLite on mount
+  // NOTE: Removed SQLite reload - now uses live context data from AppContext
   useEffect(() => {
-    const reloadUniversities = async () => {
-      try {
-        const dbUniversities = await getAllUniversities();
-        if (dbUniversities.length > 0) {
-          const parsedUniversities = dbUniversities.map((u: any) => ({
-            ...u,
-            koreanData: typeof u.korean_data === 'string' 
-              ? JSON.parse(u.korean_data) 
-              : u.koreanData || u.korean_data || {}
-          }));
-          setUniversities(() => parsedUniversities);
-        }
-      } catch (error) {
-        console.error('Failed to reload universities:', error);
-      }
-    };
-
-    reloadUniversities();
+    // No-op: Uses universities from AppContext
   }, []);
 
   // Form state

@@ -25,8 +25,38 @@ function UniversityRow({ university, onEdit, onQuickInfo, palette }: UniversityR
   const formatKRW = (amount?: number | null) => Number(amount ?? 0).toLocaleString('vi-VN');
   const formatVND = (amount?: number | null) => Number(amount ?? 0).toLocaleString('vi-VN');
   
-  const visaSystems = university?.koreanData?.visaSystemsDetail || {};
-  const d41Data = visaSystems['D4-1'];
+  // Support both data formats: camelCase (visaSystemsDetail) and snake_case (visa_systems)
+  const visaSystemsDetail = university?.koreanData?.visaSystemsDetail || {};
+  const visaSystems = (university as any)?.visa_systems || {};
+  
+  // Helper to get data from either format
+  const getVisaSystem = (key: string) => {
+    // Try camelCase first
+    const detail = visaSystemsDetail[key];
+    if (detail?.available) return detail;
+    
+    // Fall back to snake_case
+    const system = visaSystems[key];
+    if (!system?.available) return null;
+    
+    // Convert snake_case to camelCase
+    return {
+      available: system.available,
+      invoiceKRWPerYear: system.invoice_krw,
+      applyFeeKRW: system.apply_fee_krw,
+      enrollmentFeeKRW: system.enrollment_fee_krw,
+      scholarships: (system.scholarships || []).map((s: any) => ({
+        topikLevel: s.topik_level,
+        discountPct: s.discount_pct
+      })),
+      ktxOptions: (system.ktx_options || []).map((k: any) => ({
+        name: k.name,
+        priceKRWPerKy: k.price_krw
+      }))
+    };
+  };
+  
+  const d41Data = getVisaSystem('D4-1');
   const hasD41 = d41Data?.available;
   
   // Calculate Tổng (Total) for D4-1 system
@@ -55,17 +85,27 @@ function UniversityRow({ university, onEdit, onQuickInfo, palette }: UniversityR
       
       const totalKRW = applyFee + enrollmentFee + invoice + cheapestKTX;
       
-      return { totalVND, totalKRW, hasData: true };
+      return { totalVND, totalKRW, hasData: true, tuitionOnly: invoice };
     }
     
-    return { totalVND, totalKRW: 0, hasData: false };
+    return { totalVND, totalKRW: 0, hasData: false, tuitionOnly: 0 };
   };
   
-  const { totalVND, totalKRW, hasData } = calculateTotal();
+  const { totalVND, totalKRW, hasData, tuitionOnly } = calculateTotal();
   
-  const availableVisas = Object.entries(visaSystems)
-    .filter(([_, data]: [string, any]) => data?.available)
-    .map(([key, _]) => key);
+  // Get all available visas from both sources
+  const getAvailableVisas = () => {
+    const visas: string[] = [];
+    Object.entries(visaSystemsDetail).forEach(([key, data]: [string, any]) => {
+      if (data?.available) visas.push(key);
+    });
+    Object.entries(visaSystems).forEach(([key, data]: [string, any]) => {
+      if (data?.available && !visas.includes(key)) visas.push(key);
+    });
+    return visas;
+  };
+  
+  const availableVisas = getAvailableVisas();
   
   const scholarships = d41Data?.scholarships || [];
   const bestScholarship = scholarships.reduce((max: any, s: any) => 
@@ -168,18 +208,27 @@ function UniversityRow({ university, onEdit, onQuickInfo, palette }: UniversityR
         </div>
       </div>
 
-      {/* Column 2: Tổng chi phí ước tính */}
+      {/* Column 2: Show both Tuition and Total Cost */}
       <div style={{ width: 180, flexShrink: 0, textAlign: 'right' }}>
         {hasData ? (
           <>
-            <div style={{ fontSize: 14, fontWeight: 700, color: palette.text }}>
-              {formatVND(totalVND)}đ
+            {/* Tuition Only */}
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#1976D2' }}>
+              {formatKRW(tuitionOnly)} KRW
             </div>
-            <div style={{ fontSize: 11, color: palette.textMuted }}>
-              + {formatKRW(totalKRW)} KRW
+            <div style={{ fontSize: 10, color: '#666', marginBottom: 4 }}>
+              D4-1 · mỗi kỳ
             </div>
-            <div style={{ fontSize: 10, color: '#2D8C4E', marginTop: 2 }}>
-              D4-1 ước tính
+            
+            {/* Divider */}
+            <div style={{ borderTop: '1px dashed #ddd', margin: '6px 0' }} />
+            
+            {/* Total Cost */}
+            <div style={{ fontSize: 11, fontWeight: 600, color: palette.text }}>
+              +{formatKRW(totalKRW)} KRW
+            </div>
+            <div style={{ fontSize: 10, color: '#2D8C4E' }}>
+              Tổng ước tính
             </div>
           </>
         ) : (
@@ -432,29 +481,10 @@ export default function UniversitiesListEnhancedRedesigned() {
     { key: '3', label: 'Top 3', count: tierCounts['3'] }
   ];
 
-  // Reload universities from SQLite on mount to get latest updates
+  // NOTE: Removed SQLite reload - now uses live context data from AppContext
+  // Admin updates via QuickInfoModal update the context directly
   useEffect(() => {
-    const reloadUniversities = async () => {
-      try {
-        const dbUniversities = await getAllUniversities();
-        if (dbUniversities.length > 0) {
-          // Parse the universities to match the expected format
-          const parsedUniversities = dbUniversities.map((u: any) => ({
-            ...u,
-            koreanData: typeof u.korean_data === 'string' 
-              ? JSON.parse(u.korean_data) 
-              : u.koreanData || u.korean_data || {}
-          }));
-          setUniversities(() => parsedUniversities);
-        }
-      } catch (error) {
-        console.error('Failed to reload universities:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    reloadUniversities();
+    setLoading(false);
   }, []);
 
   useEffect(() => {
