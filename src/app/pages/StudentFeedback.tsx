@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { useLanguage } from '../context/LanguageContext';
 import { Star, MessageSquare, Send, CheckCircle, AlertCircle, Building2, HeadphonesIcon } from 'lucide-react';
 import { toast } from 'sonner';
-import { saveUniversityRating, saveServiceFeedback } from '../services/sqliteDatabase';
+import { FeatureAPI } from '../services/featureApi';
 import type { StudentApplication } from '@/types/university';
 
 export default function StudentFeedback() {
@@ -98,17 +98,15 @@ export default function StudentFeedback() {
     
     setIsSubmitting(true);
     try {
-      await saveUniversityRating({
-        id: crypto.randomUUID(),
-        universityId: selectedUniversity,
-        studentEmail: user.email,
-        overallRating: universityRating.overallRating,
-        teachingQuality: universityRating.teachingQuality,
+      await FeatureAPI.UniversityRatings.create({
+        university_id: selectedUniversity,
+        overall_rating: universityRating.overallRating,
+        teaching_quality: universityRating.teachingQuality,
         facilities: universityRating.facilities,
-        supportServices: universityRating.supportServices,
-        valueForMoney: universityRating.valueForMoney,
-        reviewTitle: universityRating.reviewTitle,
-        reviewText: universityRating.reviewText
+        support_services: universityRating.supportServices,
+        value_for_money: universityRating.valueForMoney,
+        review_title: universityRating.reviewTitle,
+        review_text: universityRating.reviewText
       });
       toast.success(t.successUniversity);
       setUniversityRating({
@@ -129,12 +127,10 @@ export default function StudentFeedback() {
     
     setIsSubmitting(true);
     try {
-      await saveServiceFeedback({
-        id: crypto.randomUUID(),
-        studentEmail: user.email,
-        feedbackType: serviceFeedback.feedbackType,
+      await FeatureAPI.ServiceFeedback.create({
+        feedback_type: serviceFeedback.feedbackType,
         rating: serviceFeedback.rating,
-        feedbackText: serviceFeedback.feedbackText
+        feedback_text: serviceFeedback.feedbackText
       });
       toast.success(t.successService);
       setServiceFeedback({ feedbackType: 'general', rating: 5, feedbackText: '' });

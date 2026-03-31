@@ -1,5 +1,4 @@
 @startuml Activity_Login
-!theme plain
 title Login Process - Activity Diagram
 
 |User|
@@ -52,7 +51,6 @@ endif
 @enduml
 
 @startuml Activity_UniversityCRUD
-!theme plain
 title University Management - Activity Diagram
 
 |Admin|
@@ -126,7 +124,6 @@ endif
 @enduml
 
 @startuml Activity_AdminInvite
-!theme plain
 title Admin Invite Process - Activity Diagram
 
 |SuperAdmin|
@@ -203,7 +200,6 @@ endif
 @enduml
 
 @startuml Activity_RegistrationApproval
-!theme plain
 title Registration Approval Workflow - Activity Diagram
 
 |Student|
@@ -291,7 +287,6 @@ endif
 @enduml
 
 @startuml Activity_ImportCSV
-!theme plain
 title CSV Import Process - Activity Diagram
 
 |Admin|
@@ -359,7 +354,6 @@ endif
 @enduml
 
 @startuml Activity_SetupPassword
-!theme plain
 title First-time Password Setup - Activity Diagram
 
 |NewAdmin|

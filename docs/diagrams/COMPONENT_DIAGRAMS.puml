@@ -1,5 +1,4 @@
 @startuml Component_SystemOverview
-!theme plain
 skinparam componentStyle rectangle
 skinparam linetype ortho
 
@@ -139,7 +138,6 @@ JWTHandler --> JWT : sign/verify
 @enduml
 
 @startuml Component_FrontendArchitecture
-!theme plain
 skinparam componentStyle rectangle
 
 title Frontend Component Architecture
@@ -269,7 +267,6 @@ Api --> Constants
 @enduml
 
 @startuml Component_BackendArchitecture
-!theme plain
 skinparam componentStyle rectangle
 
 title Backend API Component Architecture

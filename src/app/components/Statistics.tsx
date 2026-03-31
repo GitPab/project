@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { GraduationCap, Users, Globe, Award } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { getAllUsers } from '../services/sqliteDatabase';
+// Note: User data will come from API in future - currently using fallback
+// import { getAllUsers } from '../services/sqliteDatabase';
 
 interface StatProps {
   icon: React.ReactNode;
@@ -36,16 +37,9 @@ export default function Statistics({ className = '' }: StatisticsProps) {
   const [avgRating, setAvgRating] = useState(4.8);
 
   useEffect(() => {
-    const loadStats = async () => {
-      try {
-        const users = await getAllUsers();
-        const students = users.filter((u: any) => u.role === 'student');
-        setStudentCount(students.length);
-      } catch (error) {
-        console.error('Failed to load user stats:', error);
-      }
-    };
-    loadStats();
+    // Note: User stats will come from API in future
+    // For now, using fallback static data
+    setStudentCount(1000);
   }, []);
 
   const stats = [

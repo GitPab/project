@@ -192,6 +192,7 @@ export interface University {
   overview?: string; // Detailed overview text
   academicPrograms?: AcademicProgram[]; // List of academic programs
   galleryImages?: string[]; // Array of gallery image URLs
+  is_active?: boolean; // Soft delete flag
   
   // New systems-based structure
   systems: UniversitySystem[];

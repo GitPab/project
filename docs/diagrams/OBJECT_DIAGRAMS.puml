@@ -1,5 +1,4 @@
 @startuml Object_UniversityManagement
-!theme plain
 title University Management - Object Diagram (Runtime Snapshot)
 
 object "universityList:UniversitiesList" as UL {
@@ -93,7 +92,6 @@ AP --> U3 : manages
 @enduml
 
 @startuml Object_AuthenticationState
-!theme plain
 title Authentication - Object Diagram (Logged In State)
 
 object "authContext:AuthProvider" as Auth {
@@ -182,7 +180,6 @@ JWT --> Token : decodes to
 @enduml
 
 @startuml Object_InviteFlow
-!theme plain
 title Admin Invite - Object Diagram (Invitation Created)
 
 object "adminInvite:AdminInvite" as AI {

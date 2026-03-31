@@ -1,411 +1,230 @@
-@startuml Timing_AuthenticationFlow
-!theme plain
-title Authentication Process - Timing Diagram
+@startuml Sequence_Timing_Authentication
+title Authentication Process - Sequence with Timing
 
-robust "Browser" as Browser
-robust "Frontend" as Frontend
-robust "Backend" as Backend
-robust "Database" as Database
+actor User
+participant "Browser" as Browser
+participant "Frontend" as Frontend
+participant "Backend" as Backend
+database "Database" as DB
 
-@Browser
-0 is Idle
-50 is ClickLogin
-100 is FormFilled
-150 is Submitting
-200 is Waiting
-300 is Redirecting
-350 is DashboardLoaded
+== Phase 1: User Action (0-100ms) ==
+User -> Browser : Click login button
+Browser -> Frontend : Enter credentials
 
-@Frontend
-0 is Idle
-100 is FormDisplay
-150 is ValidateInput
-200 is SendRequest
-250 is Processing
-300 is ReceiveResponse
-320 is StoreToken
-350 is RouteChange
+== Phase 2: Frontend Validation (100-200ms) ==
+Frontend -> Frontend : Validate form (100ms)
+Frontend -> Backend : POST /api/login (200ms)
 
-@Backend
-0 is Idle
-200 is ReceiveRequest
-220 is QueryDB
-260 is VerifyPassword
-280 is GenerateJWT
-300 is SendResponse
+== Phase 3: Backend Processing (200-300ms) ==
+Backend -> DB : SELECT user (220ms)
+DB --> Backend : Return user data (240ms)
+Backend -> Backend : Verify password (260ms)
+Backend -> Backend : Generate JWT token (280ms)
+Backend --> Frontend : {token, user} (300ms)
 
-@Database
-0 is Idle
-220 is ExecuteQuery
-240 is ReturnData
-
-Browser -> Frontend @ 100 : User clicks login
-Frontend -> Frontend @ 150 : Validate form
-Frontend -> Backend @ 200 : POST /api/login
-Backend -> Database @ 220 : SELECT user
-Database -> Backend @ 240 : User data
-Backend -> Backend @ 260 : Verify password
-Backend -> Backend @ 280 : Generate token
-Backend -> Frontend @ 300 : {token, user}
-Frontend -> Frontend @ 320 : Store token
-Frontend -> Browser @ 350 : Redirect to dashboard
+== Phase 4: Completion (300-350ms) ==
+Frontend -> Frontend : Store token (320ms)
+Frontend --> Browser : Redirect to dashboard (350ms)
+Browser --> User : Display dashboard
 
 @enduml
 
-@startuml Timing_APIRequest
-!theme plain
-title API Request Response - Timing Diagram
+@startuml Sequence_Timing_APIRequest
+title API Request Response - Sequence with Timing
 
-robust "Client" as Client
-robust "Server" as Server
-robust "Auth Middleware" as Auth
-robust "Controller" as Controller
-robust "Database" as DB
+participant "Client" as Client
+participant "Server" as Server
+participant "Auth" as Auth
+participant "Controller" as Ctrl
+database "DB" as DB
 
-@Client
-0 is Idle
-10 is SendRequest
-20 is Waiting
-80 is ReceiveResponse
-100 is ProcessData
+== Phase 1: Request Initiation (0-15ms) ==
+Client -> Server : HTTP Request (10ms)
+Server -> Auth : Route & Verify JWT (15ms)
 
-@Server
-10 is ReceiveRequest
-15 is RouteRequest
+== Phase 2: Authentication (15-40ms) ==
+Auth -> Auth : Verify token (30ms)
+Auth -> Ctrl : Attach user (40ms)
 
-@Auth
-15 is VerifyToken
-30 is TokenValid
-40 is AttachUser
+== Phase 3: Processing (40-75ms) ==
+Ctrl -> Ctrl : Check permission (50ms)
+Ctrl -> DB : SQL Query (60ms)
+DB --> Ctrl : Return results (70ms)
+Ctrl -> Ctrl : Format response (75ms)
 
-@Controller
-40 is CheckPermission
-50 is ExecuteLogic
-60 is BuildQuery
-
-@DB
-60 is ExecuteQuery
-70 is ReturnResults
-
-@Controller
-70 is ProcessResults
-75 is FormatResponse
-
-@Server
-75 is SendResponse
-
-@Client
-10 -> @Server @ 10 : HTTP Request
-@Server -> @Auth @ 15 : Verify JWT
-@Auth -> @Controller @ 40 : Next()
-@Controller -> @DB @ 60 : SQL Query
-@DB -> @Controller @ 70 : Results
-@Controller -> @Server @ 75 : Response
-@Server -> @Client @ 80 : HTTP Response
+== Phase 4: Response (75-80ms) ==
+Ctrl --> Server : Response ready
+Server --> Client : HTTP Response (80ms)
 
 @enduml
 
-@startuml Timing_UniversityCRUD
-!theme plain
-title University CRUD Operations - Timing Diagram
+@startuml Sequence_Timing_UniversityCRUD
+title University CRUD - Sequence with Timing
 
-robust "Admin" as Admin
-robust "React Component" as React
-robust "API Client" as API
-robust "Express Route" as Route
-robust "Controller" as Ctrl
-robust "PostgreSQL" as DB
+actor Admin
+participant "React" as React
+participant "API" as API
+participant "Route" as Route
+participant "Controller" as Ctrl
+database "PostgreSQL" as DB
 
-@Admin
-0 is Idle
-10 is ClickAdd
-30 is FillForm
-60 is ClickSave
+== Phase 1: User Action (0-65ms) ==
+Admin -> React : Click Add University (10ms)
+React -> React : Open Modal (30ms)
+Admin -> React : Submit form (60ms)
+React -> React : Validate form (65ms)
 
-@React
-10 is OpenModal
-30 is FormDisplay
-60 is ValidateForm
-65 is SendAPIRequest
-100 is UpdateUI
+== Phase 2: API Call (65-100ms) ==
+React -> API : POST /api/universities
+API -> Route : HTTP Request (70ms)
+Route -> Ctrl : Route to controller (75ms)
+Ctrl -> DB : INSERT INTO (80ms)
+DB --> Ctrl : New ID (90ms)
+Ctrl --> API : 201 Created (95ms)
+API --> React : Response (100ms)
 
-@API
-65 is POSTRequest
-70 is AddHeaders
-
-@Route
-70 is ReceiveRequest
-72 is AuthMiddleware
-
-@Ctrl
-75 is ValidateData
-80 is ExecuteQuery
-95 is FormatResponse
-
-@DB
-80 is INSERT
-90 is ReturnID
-
-Admin -> React @ 10 : Click Add University
-React -> React @ 30 : Display form
-Admin -> React @ 60 : Submit form
-React -> API @ 65 : POST /api/universities
-API -> Route @ 70 : HTTP Request
-Route -> Ctrl @ 75 : Route to controller
-Ctrl -> DB @ 80 : INSERT INTO
-DB -> Ctrl @ 90 : New university ID
-Ctrl -> API @ 95 : 201 Created
-API -> React @ 100 : Response received
-React -> Admin @ 105 : Show success, close modal
+== Phase 3: UI Update (100-105ms) ==
+React -> React : Update UI
+React --> Admin : Success message (105ms)
 
 @enduml
 
-@startuml Timing_JWTLifecycle
-!theme plain
-title JWT Token Lifecycle - Timing Diagram
+@startuml Sequence_Timing_JWTLifecycle
+title JWT Token Lifecycle - Sequence with Timing
 
-concise "Token State" as Token
-robust "User Activity" as User
-robust "Auth Check" as Auth
+participant "User" as User
+participant "Auth" as Auth
+participant "Token" as Token
 
-@Token
-0 is Created
-60 is Active
-120 is NearExpiry
-140 is Refreshed
-180 is Active2
-240 is Expired
+== Token Creation (0ms) ==
+User -> Auth : Login request
+Auth -> Token : Generate token
+Token --> User : Issue token (0ms)
 
-@User
-0 is Login
-30 is Browsing
-90 is APIRequest1
-150 is APIRequest2
-250 is ExpiredRedirect
+== Active Usage (0-120ms) ==
+User -> User : Browsing (30ms)
+User -> Auth : API call 1 (90ms)
+Auth -> Token : Verify
+Token --> Auth : Valid
+Auth --> User : Response
 
-@Auth
-0 is GenerateToken
-120 is CheckExpiry
-140 is RefreshToken
-240 is TokenInvalid
+== Token Refresh (120-140ms) ==
+Auth -> Token : Check expiry (120ms)
+Auth -> Token : Refresh token (140ms)
+Token --> User : New token (140ms)
 
-@Token
-0 -> @User @ 0 : Issue token
-@Token
-0 -> @Auth @ 0 : Store secret
-
-@User @ 90 -> @Auth @ 90 : API call
-@Auth @ 90 -> @Token @ 90 : Verify
-@Token -> @Auth : Valid
-
-@Token @ 120 -> @Auth @ 120 : Near expiry
-@Auth @ 140 -> @Token @ 140 : Refresh
-@Token @ 140 -> @User @ 140 : New token
-
-@User @ 250 -> @Auth @ 250 : API call
-@Auth @ 250 -> @Token @ 250 : Verify
-@Token -> @Auth : Expired
-@Auth -> @User : Redirect to login
+== Token Expired (250ms) ==
+User -> Auth : API call 2 (250ms)
+Auth -> Token : Verify
+Token --> Auth : Expired!
+Auth --> User : Redirect to login
 
 @enduml
 
-@startuml Timing_DatabaseTransaction
-!theme plain
-title Database Transaction - Timing Diagram
+@startuml Sequence_Timing_DatabaseTransaction
+title Database Transaction - Sequence with Timing
 
-robust "Application" as App
-robust "Connection Pool" as Pool
-robust "Transaction" as Tx
-robust "PostgreSQL" as DB
+participant "Application" as App
+participant "Pool" as Pool
+participant "Transaction" as Tx
+database "PostgreSQL" as DB
 
-@App
-0 is BeginOperation
-10 is GetConnection
-50 is ExecuteQueries
-90 is Commit
-100 is Release
+== Acquire Connection (0-10ms) ==
+App -> Pool : Acquire connection (10ms)
 
-@Pool
-0 is Idle
-10 is Checkout
-100 is Checkin
+== Execute Transaction (10-90ms) ==
+Pool -> Tx : BEGIN TRANSACTION (20ms)
+Tx -> DB : INSERT/UPDATE 1 (30ms)
+Tx -> DB : INSERT/UPDATE 2 (45ms)
+Tx -> DB : INSERT/UPDATE 3 (60ms)
 
-@Tx
-20 is BEGIN
-30 is Query1
-45 is Query2
-60 is Query3
-90 is COMMIT
-
-@DB
-30 is Execute1
-45 is Execute2
-60 is Execute3
-90 is Persist
-
-App -> Pool @ 10 : Acquire connection
-Pool -> Tx @ 20 : BEGIN TRANSACTION
-Tx -> DB @ 30 : INSERT/UPDATE 1
-Tx -> DB @ 45 : INSERT/UPDATE 2
-Tx -> DB @ 60 : INSERT/UPDATE 3
-App -> Tx @ 90 : COMMIT
-Tx -> DB @ 90 : Write to disk
-App -> Pool @ 100 : Release connection
+== Commit (90-100ms) ==
+App -> Tx : COMMIT (90ms)
+Tx -> DB : Write to disk
+DB --> Tx : Persist complete
+Tx --> Pool : Transaction complete
+Pool --> App : Release connection (100ms)
 
 @enduml
 
-@startuml Timing_BulkImport
-!theme plain
-title CSV Import - Timing Diagram
+@startuml Sequence_Timing_BulkImport
+title CSV Import - Sequence with Timing
 
-robust "Frontend" as FE
-robust "CSV Parser" as Parser
-robust "Validator" as Validator
-robust "Backend" as BE
-robust "Database" as DB
+participant "Frontend" as FE
+participant "Parser" as Parser
+participant "Validator" as Validator
+participant "Backend" as BE
+database "Database" as DB
 
-@FE
-0 is SelectFile
-10 is ReadFile
-20 is ParseCSV
-100 is ShowPreview
-200 is ConfirmImport
-210 is SendData
-500 is ShowResult
+== Parse & Validate (0-80ms) ==
+FE -> FE : Select & Read file (10ms)
+FE -> Parser : Parse CSV (20ms)
+Parser --> FE : Parsed data (60ms)
+FE -> Validator : Validate rows (60ms)
+Validator --> FE : Valid rows (80ms)
 
-@Parser
-20 is ParseRows
-60 is Parsed
-
-@Validator
-60 is ValidateRows
-80 is Valid
-
-@BE
-210 is ReceiveData
-220 is StartTx
-230 is InsertRow1
-240 is InsertRow2
-250 is InsertRow3
-260 is InsertRowN
-470 is CommitTx
-490 is SendResponse
-
-@DB
-220 is Begin
-230 is Execute1
-240 is Execute2
-250 is Execute3
-260 is ExecuteN
-470 is Commit
-480 is Done
-
-FE -> Parser @ 20 : Raw CSV
-Parser -> Validator @ 60 : Parsed data
-Validator -> FE @ 80 : Valid rows
-FE -> BE @ 210 : POST import
-BE -> DB @ 220 : BEGIN
-BE -> DB @ 230 : INSERT row 1
-BE -> DB @ 240 : INSERT row 2
-BE -> DB @ 260 : INSERT row N
-BE -> DB @ 470 : COMMIT
-DB -> BE @ 480 : Success
-BE -> FE @ 490 : Import complete
+== Database Import (210-490ms) ==
+FE -> BE : POST import (210ms)
+BE -> DB : BEGIN transaction (220ms)
+BE -> DB : INSERT row 1 (230ms)
+BE -> DB : INSERT row 2 (240ms)
+BE -> DB : INSERT row N (260ms)
+BE -> DB : COMMIT (470ms)
+DB --> BE : Success (480ms)
+BE --> FE : Import complete (490ms)
 
 @enduml
 
-@startuml Timing_FileUpload
-!theme plain
-title Image Upload to Imgur - Timing Diagram
+@startuml Sequence_Timing_FileUpload
+title Image Upload - Sequence with Timing
 
-robust "User" as User
-robust "React Component" as React
-robust "API Client" as API
-robust "Backend" as BE
-robust "Imgur API" as Imgur
+participant "User" as User
+participant "React" as React
+participant "API" as API
+participant "Backend" as BE
+participant "Imgur" as Imgur
 
-@User
-0 is SelectImage
-5 is DropImage
-30 is WaitUpload
-100 is SeePreview
+== Frontend Processing (0-20ms) ==
+User -> React : Drop image (5ms)
+React -> React : Validate size (10ms)
+React -> React : Read base64 (15ms)
+React -> API : POST to backend (20ms)
 
-@React
-5 is HandleFile
-10 is ValidateSize
-15 is ReadBase64
-20 is POSTtoBackend
-90 is ReceiveURL
-95 is UpdateForm
+== Backend & External (20-90ms) ==
+API -> BE : HTTP request (25ms)
+BE -> Imgur : Upload image (35ms)
+Imgur -> Imgur : Process & store (40-60ms)
+Imgur --> BE : Image URL (80ms)
+BE --> API : Response (85ms)
+API --> React : URL received (90ms)
 
-@API
-20 is SendRequest
-25 is Uploading
-
-@BE
-25 is ReceiveImage
-30 is ValidateType
-35 is ForwardToImgur
-
-@Imgur
-35 is ReceiveImage
-40 is ProcessImage
-60 is StoreImage
-80 is ReturnURL
-
-User -> React @ 5 : Drop image
-React -> API @ 20 : POST with base64
-API -> BE @ 25 : HTTP request
-BE -> Imgur @ 35 : Upload image
-Imgur -> Imgur @ 40 : Process & store
-Imgur -> BE @ 80 : Image URL
-BE -> API @ 85 : Response
-API -> React @ 90 : URL received
-React -> User @ 95 : Show preview
+== Display Result (90-100ms) ==
+React --> User : Show preview (95ms)
 
 @enduml
 
-@startuml Timing_CacheInvalidation
-!theme plain
-title Frontend Cache & State Updates - Timing Diagram
+@startuml Sequence_Timing_CacheInvalidation
+title Frontend Cache & State Updates - Sequence with Timing
 
-concise "Browser Cache" as Cache
-robust "React State" as State
-robust "User Action" as User
-robust "API Response" as API
+participant "User" as User
+participant "API" as API
+participant "React State" as State
+participant "Browser Cache" as Cache
 
-@Cache
-0 is Empty
-50 is Cached
-200 is Stale
-250 is Refreshed
+== Initial Load (0-60ms) ==
+User -> API : Click refresh (20ms)
+API -> State : Fetch request (40ms)
+API --> State : Response (55ms)
+State -> Cache : Cache data (60ms)
 
-@State
-0 is Initial
-20 is Loading
-60 is DataLoaded
-120 is DataUpdated
+== Edit Operation (60-150ms) ==
+User -> State : Edit university (120ms)
+State -> API : PUT update (130ms)
+API --> State : Updated data (150ms)
 
-@User
-20 is ClickRefresh
-120 is EditUniversity
-
-@API
-40 is FetchRequest
-55 is Response
-130 is UpdateRequest
-150 is UpdateResponse
-
-User @ 20 -> API @ 40 : Refresh list
-API @ 55 -> State @ 60 : Set universities
-State @ 60 -> Cache @ 60 : Cache data
-
-Cache @ 200 -> State @ 200 : Mark stale
-
-User @ 120 -> State @ 120 : Edit university
-State @ 120 -> API @ 130 : PUT update
-API @ 150 -> State @ 150 : Updated data
-State @ 150 -> Cache @ 150 : Invalidate & refresh
-Cache @ 250 -> Cache : Fresh data
+== Cache Refresh (150-250ms) ==
+State -> Cache : Invalidate & refresh (150ms)
+State -> State : Mark stale (200ms)
+Cache -> State : Fresh data (250ms)
 
 @enduml

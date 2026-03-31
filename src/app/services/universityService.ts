@@ -15,15 +15,106 @@ export interface UniversityRecord {
   website?: string;
   description?: string;
   korean_data?: string;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
-export async function getAllUniversities(): Promise<UniversityRecord[]> {
+export async function getAllUniversities(includeInactive = false): Promise<UniversityRecord[]> {
   await initDatabase();
-  const results = runQuery('SELECT * FROM universities ORDER BY name');
+  let whereClause = '';
+  if (!includeInactive) {
+    whereClause = 'WHERE is_active IS NULL OR is_active = 1';
+  }
+  const results = runQuery(`SELECT * FROM universities ${whereClause} ORDER BY name`);
   return results.map(row => ({
     ...row,
-    korean_data: row.korean_data ? JSON.parse(row.korean_data) : undefined
+    korean_data: row.korean_data ? JSON.parse(row.korean_data) : undefined,
+    is_active: row.is_active === null ? true : row.is_active === 1
   }));
+}
+
+export interface PaginationParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  includeInactive?: boolean;
+}
+
+export interface PaginatedResult<T> {
+  data: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export async function getAllUniversitiesPaginated(params: PaginationParams = {}): Promise<PaginatedResult<UniversityRecord>> {
+  const { page = 1, limit = 20, search, includeInactive = false } = params;
+  const offset = (page - 1) * limit;
+  
+  await initDatabase();
+  
+  // Build WHERE clause
+  let whereClause = 'WHERE 1=1';
+  const queryParams: any[] = [];
+  
+  if (!includeInactive) {
+    whereClause += ' AND (is_active IS NULL OR is_active = 1)';
+  }
+  
+  if (search) {
+    whereClause += ' AND (name LIKE ? OR name_korean LIKE ?)';
+    const term = `%${search}%`;
+    queryParams.push(term, term);
+  }
+  
+  // Get total count
+  const countResults = runQuery(`SELECT COUNT(*) as total FROM universities ${whereClause}`, queryParams);
+  const total = countResults[0]?.total || 0;
+  
+  // Get paginated data
+  const dataParams = [...queryParams, limit, offset];
+  const results = runQuery(
+    `SELECT * FROM universities ${whereClause} ORDER BY name LIMIT ? OFFSET ?`,
+    dataParams
+  );
+  
+  return {
+    data: results.map(row => ({
+      ...row,
+      korean_data: row.korean_data ? JSON.parse(row.korean_data) : undefined,
+      is_active: row.is_active === null ? true : row.is_active === 1
+    })),
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit)
+    }
+  };
+}
+
+export async function softDeleteUniversity(id: string): Promise<void> {
+  await initDatabase();
+  runExec(`
+    UPDATE universities 
+    SET is_active = 0, updated_at = datetime('now') 
+    WHERE id = '${id.replace(/'/g, "''")}'
+  `);
+  saveDatabase();
+}
+
+export async function restoreUniversity(id: string): Promise<void> {
+  await initDatabase();
+  runExec(`
+    UPDATE universities 
+    SET is_active = 1, updated_at = datetime('now') 
+    WHERE id = '${id.replace(/'/g, "''")}'
+  `);
+  saveDatabase();
 }
 
 export async function getUniversityById(id: string): Promise<UniversityRecord | null> {
@@ -34,7 +125,8 @@ export async function getUniversityById(id: string): Promise<UniversityRecord | 
   const row = results[0];
   return {
     ...row,
-    korean_data: row.korean_data ? JSON.parse(row.korean_data) : undefined
+    korean_data: row.korean_data ? JSON.parse(row.korean_data) : undefined,
+    is_active: row.is_active === null ? true : row.is_active === 1
   };
 }
 
@@ -47,16 +139,23 @@ export async function getUniversitiesByTier(tier: 'Top1' | 'Top2' | 'Top3'): Pro
   }));
 }
 
-export async function searchUniversities(searchTerm: string): Promise<UniversityRecord[]> {
+export async function searchUniversities(searchTerm: string, includeInactive = false): Promise<UniversityRecord[]> {
   await initDatabase();
   const term = `%${searchTerm}%`;
+  let whereClause = 'WHERE (name LIKE ? OR name_korean LIKE ? OR region LIKE ?)';
+  
+  if (!includeInactive) {
+    whereClause += ' AND (is_active IS NULL OR is_active = 1)';
+  }
+  
   const results = runQuery(
-    'SELECT * FROM universities WHERE name LIKE ? OR name_korean LIKE ? OR region LIKE ? ORDER BY name',
+    `SELECT * FROM universities ${whereClause} ORDER BY name`,
     [term, term, term]
   );
   return results.map(row => ({
     ...row,
-    korean_data: row.korean_data ? JSON.parse(row.korean_data) : undefined
+    korean_data: row.korean_data ? JSON.parse(row.korean_data) : undefined,
+    is_active: row.is_active === null ? true : row.is_active === 1
   }));
 }
 
@@ -121,10 +220,13 @@ export async function bulkInsertUniversities(universities: UniversityRecord[]): 
 
 export default {
   getAllUniversities,
+  getAllUniversitiesPaginated,
   getUniversityById,
   getUniversitiesByTier,
   searchUniversities,
   saveUniversity,
   deleteUniversity,
+  softDeleteUniversity,
+  restoreUniversity,
   bulkInsertUniversities
 };

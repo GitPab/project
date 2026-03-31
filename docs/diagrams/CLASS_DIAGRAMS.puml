@@ -1,5 +1,4 @@
 @startuml Class_FrontendComponents
-!theme plain
 title Frontend Components - Class Diagram
 
 package "React Components" {
@@ -251,7 +250,6 @@ AdminInvite --> adminInviteApi : uses
 @enduml
 
 @startuml Class_BackendAPI
-!theme plain
 title Backend API - Class Diagram
 
 package "Express Server" {

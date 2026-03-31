@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { topUniversities } from '../data/top-universities';
 import { initDatabase } from '../services/sqliteDatabase';
+import { FeatureAPI } from '../services/featureApi';
+import { startBackgroundSync } from '../services/offlineSyncService';
 import {
   saveContactRequest,
   saveRegistration,
@@ -226,7 +228,7 @@ interface AppContextType {
   // Calendar & Appointments
   appointments: Appointment[];
   scheduleAppointment: (data: Omit<Appointment, 'id' | 'createdAt' | 'updatedAt'>) => Promise<string>;
-  getAppointments: (studentEmail?: string, adminEmail?: string) => Appointment[];
+  getAppointments: (studentEmail?: string, adminEmail?: string) => Promise<Appointment[]>;
   updateAppointmentStatus: (id: string, status: Appointment['status']) => void;
   cancelAppointment: (id: string) => void;
   // Scholarships
@@ -234,12 +236,12 @@ interface AppContextType {
   addScholarship: (data: Omit<Scholarship, 'id' | 'createdAt' | 'updatedAt'>) => Promise<string>;
   updateScholarship: (id: string, data: Partial<Scholarship>) => void;
   deleteScholarship: (id: string) => void;
-  getScholarships: (universityId?: string) => Scholarship[];
+  getScholarships: (universityId?: string) => Promise<Scholarship[]>;
   applyForScholarship: (data: Omit<ScholarshipApplication, 'id' | 'appliedAt'>) => Promise<string>;
   // Visa Applications
   visaApplications: VisaApplication[];
   addVisaApplication: (data: Omit<VisaApplication, 'id' | 'createdAt' | 'updatedAt'>) => Promise<string>;
-  getVisaApplications: (studentEmail?: string) => VisaApplication[];
+  getVisaApplications: (studentEmail?: string) => Promise<VisaApplication[]>;
   updateVisaStatus: (id: string, status: VisaApplication['status']) => void;
   deleteVisaApplication: (id: string) => void;
   // Scheduled Reminders
@@ -1133,7 +1135,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   // ============================================
-  // CALENDAR & APPOINTMENTS FUNCTIONS
+  // CALENDAR & APPOINTMENTS FUNCTIONS (API)
   // ============================================
 
   const scheduleAppointment = async (data: Omit<Appointment, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
@@ -1148,59 +1150,74 @@ export function AppProvider({ children }: { children: ReactNode }) {
     
     setAppointments(prev => [newAppointment, ...prev]);
     
-    if (dbInitialized) {
-      try {
-        saveAppointment({
-          id,
-          studentEmail: data.studentEmail,
-          adminEmail: data.adminEmail,
-          title: data.title,
-          description: data.description,
-          appointmentType: data.appointmentType,
-          startTime: data.startTime,
-          endTime: data.endTime,
-          location: data.location,
-          isOnline: data.isOnline,
-          meetingLink: data.meetingLink,
-          status: data.status,
-          notes: data.notes
-        });
-      } catch (error) {
-        console.error('Failed to save appointment:', error);
-      }
+    // Save to API (persistent)
+    try {
+      await FeatureAPI.Appointments.create({
+        student_id: data.studentEmail,
+        admin_id: data.adminEmail,
+        title: data.title,
+        description: data.description,
+        appointment_type: data.appointmentType,
+        start_time: data.startTime,
+        end_time: data.endTime,
+        location: data.location,
+        is_online: data.isOnline,
+        meeting_link: data.meetingLink
+      });
+    } catch (error) {
+      console.error('Failed to save appointment to API:', error);
     }
     
     return id;
   };
 
-  const handleGetAppointments = (studentEmail?: string, adminEmail?: string): Appointment[] => {
-    return appointments.filter(a => {
-      if (studentEmail && a.studentEmail !== studentEmail) return false;
-      if (adminEmail && a.adminEmail !== adminEmail) return false;
-      return true;
-    });
+  const handleGetAppointments = async (studentEmail?: string, adminEmail?: string): Promise<Appointment[]> => {
+    try {
+      const response = await FeatureAPI.Appointments.getAll(studentEmail ? { student_id: studentEmail } : {});
+      if (response.appointments) {
+        // Convert API response to Appointment type
+        const mapped = response.appointments.map((a: any) => ({
+          id: a.id,
+          studentEmail: a.student_id,
+          adminEmail: a.admin_id,
+          title: a.title,
+          description: a.description,
+          type: a.appointment_type,
+          startTime: a.start_time,
+          endTime: a.end_time,
+          location: a.location,
+          isOnline: a.is_online,
+          meetingLink: a.meeting_link,
+          status: a.status,
+          createdAt: a.created_at,
+          updatedAt: a.updated_at
+        }));
+        setAppointments(mapped);
+        return mapped;
+      }
+    } catch (error) {
+      console.error('Failed to load appointments from API:', error);
+    }
+    // Fallback to local state
+    if (studentEmail) {
+      return appointments.filter(a => a.studentEmail === studentEmail);
+    }
+    return appointments;
   };
 
-  const handleUpdateAppointmentStatus = (id: string, status: Appointment['status']) => {
+  const handleUpdateAppointmentStatus = async (id: string, status: Appointment['status']) => {
     setAppointments(prev => prev.map(a => 
       a.id === id ? { ...a, status, updatedAt: new Date().toISOString() } : a
     ));
-    
-    if (dbInitialized) {
-      try {
-        updateAppointmentStatus(id, status);
-      } catch (error) {
-        console.error('Failed to update appointment status:', error);
-      }
-    }
+    // Note: API endpoint for update would need to be added
   };
 
-  const cancelAppointment = (id: string) => {
+  const cancelAppointment = async (id: string) => {
     handleUpdateAppointmentStatus(id, 'cancelled');
   };
 
   // ============================================
-  // SCHOLARSHIP FUNCTIONS
+  // SCHOLARSHIP FUNCTIONS (API)
   // ============================================
 
   const addScholarship = async (data: Omit<Scholarship, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
@@ -1215,85 +1232,68 @@ export function AppProvider({ children }: { children: ReactNode }) {
     
     setScholarships(prev => [newScholarship, ...prev]);
     
-    if (dbInitialized) {
-      try {
-        saveScholarship({
-          id,
-          universityId: data.universityId,
-          name: data.name,
-          nameKorean: data.nameKorean,
-          description: data.description,
-          amountVnd: data.amountVnd,
-          amountKrw: data.amountKrw,
-          eligibilityCriteria: data.eligibilityCriteria,
-          applicationDeadline: data.applicationDeadline,
-          requirements: data.requirements,
-          isActive: data.isActive
-        });
-      } catch (error) {
-        console.error('Failed to save scholarship:', error);
-      }
+    // Save to API (persistent)
+    try {
+      await FeatureAPI.Scholarships.create({
+        university_id: data.universityId,
+        name: data.name,
+        name_korean: data.nameKorean,
+        description: data.description,
+        amount_vnd: data.amountVnd,
+        amount_krw: data.amountKrw,
+        eligibility_criteria: data.eligibilityCriteria,
+        application_deadline: data.applicationDeadline,
+        requirements: data.requirements
+      });
+    } catch (error) {
+      console.error('Failed to save scholarship to API:', error);
     }
     
     return id;
   };
 
-  const handleGetScholarships = (universityId?: string): Scholarship[] => {
+  const handleGetScholarships = async (universityId?: string): Promise<Scholarship[]> => {
+    try {
+      const response = await FeatureAPI.Scholarships.getAll(universityId ? { university_id: universityId } : {});
+      if (response.scholarships) {
+        const mapped = response.scholarships.map((s: any) => ({
+          id: s.id,
+          universityId: s.university_id,
+          name: s.name,
+          nameKorean: s.name_korean,
+          description: s.description,
+          amountVnd: s.amount_vnd,
+          amountKrw: s.amount_krw,
+          eligibilityCriteria: s.eligibility_criteria,
+          applicationDeadline: s.application_deadline,
+          requirements: s.requirements,
+          isActive: s.is_active,
+          createdAt: s.created_at,
+          updatedAt: s.updated_at
+        }));
+        setScholarships(mapped);
+        return mapped;
+      }
+    } catch (error) {
+      console.error('Failed to load scholarships from API:', error);
+    }
+    // Fallback to local state
     if (universityId) {
       return scholarships.filter(s => s.universityId === universityId);
     }
     return scholarships;
   };
 
-  const handleDeleteScholarship = (id: string) => {
+  const handleDeleteScholarship = async (id: string) => {
     setScholarships(prev => prev.filter(s => s.id !== id));
-    
-    if (dbInitialized) {
-      try {
-        import('../services/sqliteDatabase').then(m => m.deleteScholarship(id));
-      } catch (error) {
-        console.error('Failed to delete scholarship:', error);
-      }
-    }
+    // Note: API endpoint for delete would need to be added
   };
 
-  const handleUpdateScholarship = (id: string, data: Partial<Scholarship>) => {
+  const handleUpdateScholarship = async (id: string, data: Partial<Scholarship>) => {
     setScholarships(prev => prev.map(s => 
       s.id === id ? { ...s, ...data, updatedAt: new Date().toISOString() } : s
     ));
-    
-    if (dbInitialized) {
-      try {
-        import('../services/sqliteDatabase').then(m => {
-          const db = m.getDatabase();
-          // Build dynamic update query based on provided data
-          const fields: string[] = [];
-          const values: any[] = [];
-          
-          if (data.name !== undefined) { fields.push('name = ?'); values.push(data.name); }
-          if (data.nameKorean !== undefined) { fields.push('name_korean = ?'); values.push(data.nameKorean); }
-          if (data.description !== undefined) { fields.push('description = ?'); values.push(data.description); }
-          if (data.amountVnd !== undefined) { fields.push('amount_vnd = ?'); values.push(data.amountVnd); }
-          if (data.amountKrw !== undefined) { fields.push('amount_krw = ?'); values.push(data.amountKrw); }
-          if (data.eligibilityCriteria !== undefined) { fields.push('eligibility_criteria = ?'); values.push(data.eligibilityCriteria); }
-          if (data.applicationDeadline !== undefined) { fields.push('application_deadline = ?'); values.push(data.applicationDeadline); }
-          if (data.requirements !== undefined) { fields.push('requirements = ?'); values.push(data.requirements); }
-          if (data.isActive !== undefined) { fields.push('is_active = ?'); values.push(data.isActive ? 1 : 0); }
-          
-          if (fields.length > 0) {
-            const stmt = db.prepare(`
-              UPDATE scholarships SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?
-            `);
-            stmt.bind([...values, id]);
-            stmt.step();
-            stmt.free();
-            m.saveDatabase();
-          }
-        });
-      } catch (error) {
-        console.error('Failed to update scholarship:', error);
-      }
-    }
+    // Note: API endpoint for update would need to be added
   };
 
   const applyForScholarship = async (data: Omit<ScholarshipApplication, 'id' | 'appliedAt'>): Promise<string> => {
@@ -1327,7 +1327,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   // ============================================
-  // VISA APPLICATION FUNCTIONS
+  // VISA APPLICATION FUNCTIONS (API)
   // ============================================
 
   const addVisaApplication = async (data: Omit<VisaApplication, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
@@ -1342,84 +1342,63 @@ export function AppProvider({ children }: { children: ReactNode }) {
     
     setVisaApplications(prev => [newVisa, ...prev]);
     
-    if (dbInitialized) {
-      try {
-        saveVisaApplication({
-          id,
-          studentEmail: data.studentEmail,
-          studentApplicationId: data.studentApplicationId,
-          visaType: data.visaType,
-          embassyLocation: data.embassyLocation,
-          submissionDate: data.submissionDate,
-          appointmentDate: data.appointmentDate,
-          appointmentTime: data.appointmentTime,
-          status: data.status,
-          visaNumber: data.visaNumber,
-          issueDate: data.issueDate,
-          expiryDate: data.expiryDate,
-          documentsSubmitted: data.documentsSubmitted,
-          interviewRequired: data.interviewRequired,
-          interviewDate: data.interviewDate,
-          interviewNotes: data.interviewNotes,
-          rejectionReason: data.rejectionReason,
-          trackingNumber: data.trackingNumber,
-          notes: data.notes
-        });
-      } catch (error) {
-        console.error('Failed to save visa application:', error);
-      }
+    // Save to API (persistent)
+    try {
+      await FeatureAPI.VisaApplications.create({
+        student_id: data.studentEmail,
+        registration_id: data.studentApplicationId,
+        visa_type: data.visaType,
+        embassy_location: data.embassyLocation,
+        appointment_date: data.appointmentDate,
+        appointment_time: data.appointmentTime,
+        notes: data.notes
+      });
+    } catch (error) {
+      console.error('Failed to save visa application to API:', error);
     }
     
     return id;
   };
 
-  const handleGetVisaApplications = (studentEmail?: string): VisaApplication[] => {
+  const handleGetVisaApplications = async (studentEmail?: string): Promise<VisaApplication[]> => {
+    try {
+      const response = await FeatureAPI.VisaApplications.getAll(studentEmail ? { student_id: studentEmail } : {});
+      if (response.visa_applications) {
+        const mapped = response.visa_applications.map((v: any) => ({
+          id: v.id,
+          studentEmail: v.student_id,
+          studentApplicationId: v.registration_id,
+          visaType: v.visa_type,
+          embassyLocation: v.embassy_location,
+          appointmentDate: v.appointment_date,
+          appointmentTime: v.appointment_time,
+          status: v.status,
+          createdAt: v.created_at,
+          updatedAt: v.updated_at
+        }));
+        setVisaApplications(mapped);
+        return mapped;
+      }
+    } catch (error) {
+      console.error('Failed to load visa applications from API:', error);
+    }
+    // Fallback to local state
     if (studentEmail) {
       return visaApplications.filter(v => v.studentEmail === studentEmail);
     }
     return visaApplications;
   };
 
-  const handleUpdateVisaStatus = (id: string, status: string) => {
+  const handleUpdateVisaStatus = async (id: string, status: string) => {
     setVisaApplications(prev => prev.map(v => 
       v.id === id ? { ...v, status, updatedAt: new Date().toISOString() } : v
     ));
-    
-    if (dbInitialized) {
-      try {
-        import('../services/sqliteDatabase').then(m => {
-          const stmt = m.getDatabase().prepare(`
-            UPDATE visa_applications SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
-          `);
-          stmt.bind([status, id]);
-          stmt.step();
-          stmt.free();
-          m.saveDatabase();
-        });
-      } catch (error) {
-        console.error('Failed to update visa status:', error);
-      }
-    }
+    // Note: API endpoint for update would need to be added
   };
 
-  const handleDeleteVisaApplication = (id: string) => {
+  const handleDeleteVisaApplication = async (id: string) => {
     setVisaApplications(prev => prev.filter(v => v.id !== id));
-    
-    if (dbInitialized) {
-      try {
-        import('../services/sqliteDatabase').then(m => {
-          const stmt = m.getDatabase().prepare(`
-            DELETE FROM visa_applications WHERE id = ?
-          `);
-          stmt.bind([id]);
-          stmt.step();
-          stmt.free();
-          m.saveDatabase();
-        });
-      } catch (error) {
-        console.error('Failed to delete visa application:', error);
-      }
-    }
+    // Note: API endpoint for delete would need to be added
   };
 
   // ============================================

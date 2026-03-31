@@ -1,0 +1,228 @@
+@startuml Sequence_Timing_Auth
+title Authentication Flow with Timing
+
+actor User
+participant Browser
+participant Frontend
+participant Backend
+database DB
+
+== 0-100ms: User Input ==
+User -> Browser : Click login
+Browser -> Frontend : Submit credentials
+
+== 100-200ms: Frontend ==
+Frontend -> Frontend : Validate form
+Frontend -> Backend : POST /api/login
+
+== 200-300ms: Backend ==
+Backend -> DB : SELECT user (220ms)
+DB --> Backend : User data (240ms)
+Backend -> Backend : Verify password (260ms)
+Backend -> Backend : Generate JWT (280ms)
+Backend --> Frontend : {token, user} (300ms)
+
+== 300-350ms: Complete ==
+Frontend -> Frontend : Store token (320ms)
+Frontend --> Browser : Redirect (350ms)
+
+@enduml
+
+@startuml Sequence_Timing_API
+title API Request with Timing
+
+participant Client
+participant Server
+participant Auth
+participant Controller
+database DB
+
+== 0-15ms: Request ==
+Client -> Server : HTTP Request (10ms)
+Server -> Auth : Verify JWT (15ms)
+
+== 15-40ms: Auth ==
+Auth -> Auth : Check token (30ms)
+Auth -> Controller : Attach user (40ms)
+
+== 40-75ms: Processing ==
+Controller -> Controller : Check permission (50ms)
+Controller -> DB : SQL Query (60ms)
+DB --> Controller : Results (70ms)
+Controller -> Controller : Format (75ms)
+
+== 75-80ms: Response ==
+Controller --> Server : Ready
+Server --> Client : HTTP Response (80ms)
+
+@enduml
+
+@startuml Sequence_Timing_University
+title University CRUD with Timing
+
+actor Admin
+participant React
+participant API
+participant Route
+participant Ctrl
+database DB
+
+== 0-65ms: User Action ==
+Admin -> React : Click Add (10ms)
+React -> React : Open modal (30ms)
+Admin -> React : Submit (60ms)
+React -> React : Validate (65ms)
+
+== 65-100ms: Backend ==
+React -> API : POST /api/universities
+API -> Route : Request (70ms)
+Route -> Ctrl : Route (75ms)
+Ctrl -> DB : INSERT (80ms)
+DB --> Ctrl : New ID (90ms)
+Ctrl --> API : 201 Created (95ms)
+API --> React : Response (100ms)
+
+== 100-105ms: UI ==
+React -> React : Update UI
+React --> Admin : Success (105ms)
+
+@enduml
+
+@startuml Sequence_Timing_JWT
+title JWT Lifecycle with Timing
+
+participant User
+participant Auth
+participant Token
+
+== 0ms: Creation ==
+User -> Auth : Login
+Auth -> Token : Generate
+Token --> User : Issue token
+
+== 0-120ms: Active ==
+User -> User : Browse (30ms)
+User -> Auth : API call (90ms)
+Auth -> Token : Verify
+Token --> Auth : Valid
+
+== 120-140ms: Refresh ==
+Auth -> Token : Check expiry (120ms)
+Auth -> Token : Refresh (140ms)
+Token --> User : New token
+
+== 250ms: Expired ==
+User -> Auth : API call (250ms)
+Auth -> Token : Verify
+Token --> Auth : Expired!
+Auth --> User : Redirect
+
+@enduml
+
+@startuml Sequence_Timing_Transaction
+title Database Transaction with Timing
+
+participant App
+participant Pool
+participant Tx
+database DB
+
+== 0-10ms ==
+App -> Pool : Acquire (10ms)
+
+== 10-90ms ==
+Pool -> Tx : BEGIN (20ms)
+Tx -> DB : INSERT 1 (30ms)
+Tx -> DB : INSERT 2 (45ms)
+Tx -> DB : INSERT 3 (60ms)
+
+== 90-100ms ==
+App -> Tx : COMMIT (90ms)
+Tx -> DB : Persist
+DB --> Tx : Complete
+Tx --> Pool : Done
+Pool --> App : Release (100ms)
+
+@enduml
+
+@startuml Sequence_Timing_Import
+title CSV Import with Timing
+
+participant FE
+participant Parser
+participant Validator
+participant BE
+database DB
+
+== 0-80ms ==
+FE -> FE : Read file (10ms)
+FE -> Parser : Parse (20ms)
+Parser --> FE : Data (60ms)
+FE -> Validator : Validate (60ms)
+Validator --> FE : Valid (80ms)
+
+== 210-490ms ==
+FE -> BE : POST import (210ms)
+BE -> DB : BEGIN (220ms)
+BE -> DB : INSERT 1 (230ms)
+BE -> DB : INSERT 2 (240ms)
+BE -> DB : INSERT N (260ms)
+BE -> DB : COMMIT (470ms)
+DB --> BE : Success (480ms)
+BE --> FE : Complete (490ms)
+
+@enduml
+
+@startuml Sequence_Timing_Upload
+title File Upload with Timing
+
+participant User
+participant React
+participant API
+participant BE
+participant Imgur
+
+== 0-20ms ==
+User -> React : Drop (5ms)
+React -> React : Validate (10ms)
+React -> React : Base64 (15ms)
+React -> API : POST (20ms)
+
+== 20-90ms ==
+API -> BE : Request (25ms)
+BE -> Imgur : Upload (35ms)
+Imgur -> Imgur : Process
+Imgur --> BE : URL (80ms)
+BE --> API : Response (85ms)
+API --> React : URL (90ms)
+
+== 90-100ms ==
+React --> User : Preview (95ms)
+
+@enduml
+
+@startuml Sequence_Timing_Cache
+title Cache & State with Timing
+
+participant User
+participant API
+participant State
+participant Cache
+
+== 0-60ms ==
+User -> API : Refresh (20ms)
+API -> State : Fetch (40ms)
+API --> State : Response (55ms)
+State -> Cache : Store (60ms)
+
+== 60-150ms ==
+User -> State : Edit (120ms)
+State -> API : PUT (130ms)
+API --> State : Update (150ms)
+
+== 150-250ms ==
+State -> Cache : Invalidate (150ms)
+State -> State : Stale (200ms)
+Cache -> State : Fresh (250ms)
+
+@enduml

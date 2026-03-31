@@ -23,7 +23,7 @@ const AdminScholarships = lazy(() => import('./pages/AdminScholarships'));
 const AdminVisaTracking = lazy(() => import('./pages/AdminVisaTracking'));
 const AdminCalendar = lazy(() => import('./pages/AdminCalendar'));
 const AdminFeedback = lazy(() => import('./pages/AdminFeedback'));
-const AdminRoles = lazy(() => import('./pages/AdminRoles'));
+const AdminUsers = lazy(() => import('./pages/AdminUsers'));
 const AdminAnalyticsDashboard = lazy(() => import('./pages/AdminAnalyticsDashboard'));
 const AdminRegistrations = lazy(() => import('./pages/AdminRegistrations'));
 const StudentMonitoring = lazy(() => import('./pages/StudentMonitoring'));
@@ -178,8 +178,8 @@ export const router = createHashRouter([
             Component: withSuspense(AdminAnalyticsDashboard)
           },
           {
-            path: 'roles',
-            Component: withSuspense(AdminRoles)
+            path: 'users',
+            Component: withSuspense(AdminUsers)
           }
         ]
       }

@@ -1,5 +1,4 @@
 @startuml Deployment_Development
-!theme plain
 
 title Deployment Diagram - Development Environment
 
@@ -53,7 +52,6 @@ DBClient --> Postgres
 @enduml
 
 @startuml Deployment_Production
-!theme plain
 
 title Deployment Diagram - Production Environment
 
@@ -153,7 +151,6 @@ Postgres --> ProdDB
 @enduml
 
 @startuml Deployment_Infrastructure
-!theme plain
 
 title Infrastructure Architecture
 

@@ -1,6 +1,108 @@
 import * as XLSX from 'xlsx';
 import type { FlexibleFee, FeeOption, FeeCondition } from '../types/fees';
 
+// CSV Input Sanitization - Prevents injection attacks
+const DANGEROUS_PATTERNS = [
+  /(\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|EXECUTE|UNION|SCRIPT)\b)/i,
+  /(--|;|\/\*|\*\/)/,
+  /[;&|`$(){}[\]\\]/,
+  /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
+  /javascript:/gi,
+  /on\w+\s*=/gi,
+  /\.\.[\/\\]/,
+  /\x00/,
+];
+
+const MAX_FIELD_LENGTHS: Record<string, number> = {
+  name: 200,
+  name_korean: 200,
+  country: 100,
+  address: 500,
+  area: 100,
+  notes: 2000,
+};
+
+export interface SanitizationResult {
+  isValid: boolean;
+  sanitizedValue: string;
+  errors: string[];
+  warnings: string[];
+}
+
+export function sanitizeField(value: string, fieldName: string): SanitizationResult {
+  const result: SanitizationResult = {
+    isValid: true,
+    sanitizedValue: value,
+    errors: [],
+    warnings: [],
+  };
+
+  if (value == null) {
+    result.sanitizedValue = '';
+    return result;
+  }
+
+  let sanitized = String(value).trim();
+
+  // Check for dangerous patterns
+  for (const pattern of DANGEROUS_PATTERNS) {
+    if (pattern.test(sanitized)) {
+      result.errors.push(`Trường "${fieldName}" chứa ký tự nguy hiểm`);
+      result.isValid = false;
+      sanitized = sanitized.replace(pattern, '');
+    }
+  }
+
+  // Check field length
+  const maxLength = MAX_FIELD_LENGTHS[fieldName] || 1000;
+  if (sanitized.length > maxLength) {
+    result.warnings.push(`Trường "${fieldName}" bị cắt xuống ${maxLength} ký tự`);
+    sanitized = sanitized.substring(0, maxLength);
+  }
+
+  // Remove control characters
+  sanitized = sanitized
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+    .replace(/\s+/g, ' ');
+
+  // Neutralize formula injection
+  if (/^[+=\-@]/.test(sanitized)) {
+    sanitized = `"${sanitized}"`;
+  }
+
+  result.sanitizedValue = sanitized;
+  return result;
+}
+
+export function detectInjectionAttempts(csvData: string[][]): string[] {
+  const issues: string[] = [];
+  const suspiciousPatterns = [
+    /^[=+\-@]/,
+    /\|\s*cmd\s*\|/i,
+    /powershell|cmd\.exe/i,
+    /bash|sh\s+-c/i,
+  ];
+
+  for (let rowIndex = 0; rowIndex < csvData.length; rowIndex++) {
+    const row = csvData[rowIndex];
+    for (let colIndex = 0; colIndex < row.length; colIndex++) {
+      const cell = String(row[colIndex] || '');
+      
+      for (const pattern of suspiciousPatterns) {
+        if (pattern.test(cell)) {
+          issues.push(`Dòng ${rowIndex + 1}, Cột ${colIndex + 1}: Phát hiện công thức/lệnh nguy hiểm`);
+        }
+      }
+
+      if (cell.length > 10000) {
+        issues.push(`Dòng ${rowIndex + 1}, Cột ${colIndex + 1}: Giá trị quá dài (${cell.length} ký tự)`);
+      }
+    }
+  }
+
+  return issues;
+}
+
 export interface ParsedCSVData {
   fees: FlexibleFee[];
   errors: string[];

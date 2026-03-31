@@ -9,7 +9,8 @@ import ImportUniversitiesModal from '../components/ImportUniversitiesModal';
 import DatabaseExportPanel from '../components/DatabaseExportPanel';
 import { toast } from 'sonner';
 import { getAllUniversities } from '../services/universityService';
-import { getAllUsers, getAuditLogs } from '../services/sqliteDatabase';
+// Note: User/audit data will come from API in future
+// import { getAllUsers, getAuditLogs } from '../services/sqliteDatabase';
 
 const fetchDashboardStats = (universities: any[]) => {
   const top1Count = universities.filter(u => u.koreanData?.topTier === 'Top1' || u.top_tier === 'Top1').length;
@@ -57,14 +58,11 @@ export default function AdminDashboard() {
     return { ...baseStats, activeStudents };
   }, [universities, activeStudents]);
 
-  // Reload universities from SQLite on mount
+  // Reload universities from API on mount
   useEffect(() => {
     const reloadUniversities = async () => {
       try {
-        const [dbUniversities, users] = await Promise.all([
-          getAllUniversities(),
-          getAllUsers()
-        ]);
+        const dbUniversities = await getAllUniversities();
         
         if (dbUniversities.length > 0) {
           const parsedUniversities = dbUniversities.map((u: any) => ({
@@ -76,21 +74,10 @@ export default function AdminDashboard() {
           setUniversities(() => parsedUniversities);
         }
         
-        // Count students
-        const students = users.filter((u: any) => u.role === 'student');
-        setActiveStudents(students.length);
-        
-        // Load recent activity from audit logs
-        const logs = await getAuditLogs(undefined, undefined, undefined, 10);
-        const formattedLogs = logs.map((log: any) => ({
-          id: log.id,
-          action: log.action,
-          entityType: log.entity_type,
-          entityName: log.new_values ? JSON.parse(log.new_values || '{}').name || log.entity_id : log.entity_id,
-          performedBy: log.performed_by_email || log.performed_by || 'System',
-          timestamp: new Date(log.created_at).toLocaleString('vi-VN')
-        }));
-        setRecentActivity(formattedLogs);
+        // Note: User counts and audit logs will come from API in future
+        // For now, using fallback data
+        setActiveStudents(0);
+        setRecentActivity([]);
       } catch (error) {
         console.error('Failed to reload data:', error);
       } finally {
@@ -99,7 +86,7 @@ export default function AdminDashboard() {
     };
 
     reloadUniversities();
-  }, []);
+  }, [setUniversities]);
 
   const palette = {
     pageBg: '#FBF7F2',

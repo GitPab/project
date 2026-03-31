@@ -1,13 +1,16 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
 
 interface Props {
   children: ReactNode;
   fallback?: ReactNode;
+  onError?: (error: Error, errorInfo: ErrorInfo) => void;
 }
 
 interface State {
   hasError: boolean;
   error?: Error;
+  errorInfo?: ErrorInfo;
 }
 
 class ErrorBoundary extends Component<Props, State> {
@@ -21,37 +24,120 @@ class ErrorBoundary extends Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('Uncaught error:', error, errorInfo);
+    this.props.onError?.(error, errorInfo);
+    this.setState({ errorInfo });
   }
+
+  private handleReset = () => {
+    this.setState({ hasError: false, error: undefined, errorInfo: undefined });
+  };
+
+  private handleReload = () => {
+    window.location.reload();
+  };
+
+  private handleGoHome = () => {
+    window.location.href = '/';
+  };
 
   public render() {
     if (this.state.hasError) {
-      return this.props.fallback || (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
-          <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-6">
-            <div className="text-center">
-              <div className="w-16 h-16 mx-auto mb-4 bg-red-100 rounded-full flex items-center justify-center">
-                <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </div>
-              <h2 className="text-xl font-bold text-gray-900 mb-2">Đã xảy ra lỗi</h2>
-              <p className="text-gray-600 mb-4">
-                Rất tiếc, có lỗi không mong muốn đã xảy ra. Vui lòng thử tải lại trang.
-              </p>
+      if (this.props.fallback) {
+        return <>{this.props.fallback}</>;
+      }
+
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+          <div className="max-w-lg w-full bg-white rounded-xl shadow-lg p-8 text-center">
+            <div className="w-16 h-16 mx-auto mb-4 bg-red-100 rounded-full flex items-center justify-center">
+              <AlertTriangle className="w-8 h-8 text-red-600" />
+            </div>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">Đã xảy ra lỗi</h2>
+            <p className="text-gray-600 mb-6">
+              Rất tiếc, có lỗi không mong muốn đã xảy ra. Vui lòng thử tải lại trang.
+            </p>
+
+            <div className="flex gap-3 justify-center">
               <button
-                onClick={() => window.location.reload()}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                onClick={this.handleReset}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
               >
-                Tải lại trang
+                <RefreshCw className="w-4 h-4" />
+                Thử lại
+              </button>
+              <button
+                onClick={this.handleReload}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Làm mới
+              </button>
+              <button
+                onClick={this.handleGoHome}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                <Home className="w-4 h-4" />
+                Trang chủ
               </button>
             </div>
+
             {process.env.NODE_ENV === 'development' && this.state.error && (
-              <div className="mt-4 p-4 bg-gray-100 rounded text-left overflow-auto">
-                <p className="text-sm font-mono text-red-600">{this.state.error.message}</p>
-                <pre className="text-xs text-gray-600 mt-2">{this.state.error.stack}</pre>
+              <div className="mt-6 p-4 bg-gray-100 rounded-lg text-left overflow-auto">
+                <p className="text-sm font-mono text-red-600 mb-2">{this.state.error.message}</p>
+                {this.state.errorInfo && (
+                  <pre className="text-xs text-gray-600 max-h-40 overflow-auto">
+                    {this.state.errorInfo.componentStack}
+                  </pre>
+                )}
               </div>
             )}
           </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+/**
+ * Smaller error boundary for component-level error handling
+ */
+export class ComponentErrorBoundary extends Component<
+  { children: ReactNode; fallback?: ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: ReactNode; fallback?: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(): { hasError: boolean } {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('ComponentErrorBoundary caught error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      if (this.props.fallback) {
+        return <>{this.props.fallback}</>;
+      }
+
+      return (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-center gap-2 text-red-700">
+            <AlertTriangle className="w-5 h-5" />
+            <span className="font-medium">Component failed to load</span>
+          </div>
+          <button
+            onClick={() => this.setState({ hasError: false })}
+            className="mt-2 text-sm text-red-600 hover:text-red-700 underline"
+          >
+            Retry
+          </button>
         </div>
       );
     }

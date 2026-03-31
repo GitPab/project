@@ -1,156 +1,149 @@
+/**
+ * SACMA API Server - Organized Routes Version
+ * Main server file with modular route imports
+ */
+
 import express from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
-import multer from 'multer';
-import { createClient } from '@supabase/supabase-js';
-import pkg from 'pg';
-import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { v4 as uuidv4 } from 'uuid';
 import dotenv from 'dotenv';
-import axios from 'axios';
 
+// Database adapter
+import { db, getPool } from './dbAdapter.js';
+import { initializeMySQLDatabase } from './mysqlAdapter.js';
+
+// Middleware & Utilities
+import { logger, requestLogger } from './logger.js';
+import { connectRedis, disconnectRedis } from './cache.js';
+import { ConnectionPoolMonitor } from './poolMonitor.js';
+import { setupSwagger } from './swagger.js';
+
+// Route Modules
+import authRoutes from './routes/auth.js';
+import universityRoutes from './routes/universities.js';
+import studentRoutes from './routes/students.js';
+import registrationRoutes from './routes/registrations.js';
+import databaseRoutes from './routes/database.js';
+import uploadRoutes from './routes/uploads.js';
+import healthRoutes from './routes/health.js';
+import featureRoutes from './routes/features.js';
+
+// Load environment variables
 dotenv.config();
 
 // ============================================
-// DEFAULT CONFIGURATION (fallback if .env missing)
+// CONFIGURATION
 // ============================================
 process.env.PORT = process.env.PORT || '3001';
 process.env.FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-process.env.DATABASE_URL = process.env.DATABASE_URL || 'postgresql://postgres:postgres@127.0.0.1:5432/sacma';
 
-const { Pool } = pkg;
+const DB_TYPE = process.env.DB_TYPE || 'postgresql';
+if (DB_TYPE === 'postgresql' && !process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = 'postgresql://postgres:postgres@127.0.0.1:5432/sacma';
+}
+
+// ============================================
+// EXPRESS SETUP
+// ============================================
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Rate limiting - 100 requests per 15 minutes per IP
+// Swagger documentation
+setupSwagger(app);
+
+// Rate limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  windowMs: 15 * 60 * 1000,
+  max: 100,
   message: { error: 'Too many requests, please try again later' },
   standardHeaders: true,
   legacyHeaders: false,
 });
 
-// Stricter rate limit for auth endpoints
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10, // 10 login/register attempts per 15 minutes
+  max: 10,
   message: { error: 'Too many auth attempts, please try again later' },
 });
 
-app.use(limiter); // Apply to all routes
+app.use(limiter);
+app.use(requestLogger);
 app.use(cors({
   origin: process.env.FRONTEND_URL || '*',
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
 
-// Supabase client
-const supabase = process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY
-  ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
-  : null;
-
-// PostgreSQL pool
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-});
-
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
-
+// ============================================
+// AUTHENTICATION MIDDLEWARE
+// ============================================
 const authenticateToken = (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) return res.status(401).json({ error: 'Access token required' });
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => { // Removed fallback
+  
+  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
     if (err) return res.status(403).json({ error: 'Invalid token' });
     req.user = user;
     next();
   });
 };
 
-// ============================================
-// RBAC PERMISSIONS CONFIGURATION
-// ============================================
-const ROLE_DEFINITIONS = {
-  super_admin: {
-    permissions: ['*'], // All permissions
-  },
-  admin: {
-    permissions: ['*'], // Same as super_admin - full access
-  },
-  admin_manager: {
-    permissions: [
-      'university:view',
-      'student:view', 'student:edit', 'student:progress',
-      'application:view', 'application:manage',
-      'payment:view',
-      'analytics:view',
-    ],
-  },
-  content_editor: {
-    permissions: [
-      'university:view', 'university:create', 'university:edit',
-      'student:view',
-      'application:view',
-    ],
-  },
-  finance_admin: {
-    permissions: [
-      'university:view',
-      'student:view',
-      'application:view',
-      'payment:view', 'payment:create', 'payment:approve',
-      'analytics:view',
-    ],
-  },
-  viewer: {
-    permissions: [
-      'university:view',
-      'student:view',
-      'application:view',
-      'payment:view',
-      'analytics:view',
-    ],
-  },
-};
-
-// Check if user has permission
-function hasPermission(userRole, action, resource) {
-  const roleDef = ROLE_DEFINITIONS[userRole];
-  if (!roleDef) return false;
-  if (roleDef.permissions.includes('*')) return true;
-  return roleDef.permissions.includes(`${action}:${resource}`);
-}
-
-// Permission middleware factory
-const requirePermission = (action, resource) => {
-  return (req, res, next) => {
-    if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
-    if (!hasPermission(req.user.role, action, resource)) {
-      return res.status(403).json({ error: `Permission denied: ${action}:${resource}` });
-    }
-    next();
-  };
-};
-
-// Legacy admin check (backward compatibility)
-const requireAdmin = (req, res, next) => {
-  if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
-  const adminRoles = ['admin', 'super_admin', 'admin_manager', 'content_editor', 'finance_admin', 'viewer'];
-  if (!adminRoles.includes(req.user.role)) {
-    return res.status(403).json({ error: 'Admin access required' });
+// Apply auth middleware to routes that need it
+app.use((req, res, next) => {
+  const publicPaths = [
+    '/api/auth/register',
+    '/api/auth/login',
+    '/api/auth/verify-setup-token',
+    '/api/auth/set-password',
+    '/api/health',
+    '/api/test-db-connection',
+    '/api/docs',
+    '/api/docs.json'
+  ];
+  
+  if (publicPaths.some(path => req.path.startsWith(path))) {
+    return next();
   }
-  next();
-};
+  
+  authenticateToken(req, res, next);
+});
+
+// Apply stricter rate limit to auth routes
+app.use('/api/auth', authLimiter);
 
 // ============================================
-// ADMIN INVITE SYSTEM - Add to database schema
+// ROUTES
+// ============================================
+app.use('/api/auth', authRoutes);
+app.use('/api/universities', universityRoutes);
+app.use('/api/students', studentRoutes);
+app.use('/api/registrations', registrationRoutes);
+app.use('/api/admin/db', databaseRoutes);
+app.use('/api/upload', uploadRoutes);
+app.use('/api', healthRoutes);
+app.use('/api/features', featureRoutes);
+
+// ============================================
+// DATABASE INITIALIZATION
 // ============================================
 async function initializeDatabase() {
+  const pool = await getPool();
+  
+  if (DB_TYPE === 'mysql') {
+    try {
+      await initializeMySQLDatabase();
+      await pool.query('SELECT 1');
+      logger.info('MySQL database connected');
+      console.log('✅ MySQL Database ready');
+    } catch (err) {
+      console.error('❌ MySQL DB connection error:', err);
+    }
+    return;
+  }
+  
   try {
-    // Update users table with extended roles and invite system
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -163,24 +156,11 @@ async function initializeDatabase() {
         setup_token TEXT,
         setup_token_expiry TIMESTAMP,
         invited_by UUID REFERENCES users(id),
+        is_active BOOLEAN DEFAULT true,
+        last_login TIMESTAMP,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
-    `);
-    
-    // Add invite system columns if they don't exist
-    await pool.query(`
-      ALTER TABLE users 
-      ADD COLUMN IF NOT EXISTS is_first_login BOOLEAN DEFAULT false,
-      ADD COLUMN IF NOT EXISTS setup_token TEXT,
-      ADD COLUMN IF NOT EXISTS setup_token_expiry TIMESTAMP,
-      ADD COLUMN IF NOT EXISTS invited_by UUID REFERENCES users(id),
-      ADD COLUMN IF NOT EXISTS phone TEXT;
-    `);
-    
-    // Create index for setup token lookups
-    await pool.query(`
-      CREATE INDEX IF NOT EXISTS idx_users_setup_token ON users(setup_token) WHERE is_first_login = true;
     `);
     
     await pool.query(`
@@ -188,365 +168,639 @@ async function initializeDatabase() {
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         name TEXT NOT NULL, korean_name TEXT, region TEXT,
         country TEXT DEFAULT 'Hàn Quốc', ranking INTEGER, top_tier TEXT,
-        location TEXT, hero_image TEXT, thumbnail TEXT, korean_data TEXT,
+        hero_image TEXT, thumbnail TEXT, korean_data TEXT,
+        is_active BOOLEAN DEFAULT true,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    
     await pool.query(`
       CREATE TABLE IF NOT EXISTS registrations (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         student_id UUID REFERENCES users(id) ON DELETE CASCADE,
         university_id UUID REFERENCES universities(id) ON DELETE CASCADE,
         visa_system TEXT, status TEXT DEFAULT 'pending',
+        form_data JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS audit_logs (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID REFERENCES users(id),
+        action TEXT NOT NULL CHECK (action IN ('CREATE', 'UPDATE', 'DELETE', 'RESTORE', 'LOGIN', 'LOGOUT', 'SYNC', 'OPTIMIZE', 'BACKUP')),
+        entity_type TEXT NOT NULL,
+        entity_id UUID,
+        old_values JSONB,
+        new_values JSONB,
+        ip_address INET,
+        user_agent TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    console.log('✅ Database ready');
+    
+    // Payments table - Financial transactions
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS payments (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        student_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        registration_id UUID REFERENCES registrations(id) ON DELETE SET NULL,
+        amount DECIMAL(15, 2) NOT NULL,
+        currency VARCHAR(3) DEFAULT 'VND',
+        payment_method VARCHAR(50) NOT NULL,
+        payment_type VARCHAR(50) DEFAULT 'application_fee',
+        status VARCHAR(50) DEFAULT 'pending',
+        transaction_id VARCHAR(255),
+        payment_proof_url TEXT,
+        description TEXT,
+        notes TEXT,
+        processed_by UUID REFERENCES users(id),
+        paid_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    // Documents table - File uploads
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS documents (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        student_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        document_type VARCHAR(50) NOT NULL,
+        file_name VARCHAR(255) NOT NULL,
+        file_url TEXT NOT NULL,
+        file_size INTEGER,
+        mime_type VARCHAR(100),
+        status VARCHAR(50) DEFAULT 'pending',
+        notes TEXT,
+        reviewed_by UUID REFERENCES users(id),
+        reviewed_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    // Notifications table - System alerts
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        type VARCHAR(20) DEFAULT 'info',
+        title VARCHAR(255) NOT NULL,
+        message TEXT NOT NULL,
+        link VARCHAR(500),
+        is_read BOOLEAN DEFAULT false,
+        read_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    // Programs table - Available study programs
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS programs (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        university_id UUID REFERENCES universities(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        korean_name VARCHAR(255),
+        degree_type VARCHAR(50) NOT NULL,
+        language VARCHAR(20) DEFAULT 'korean',
+        duration_months INTEGER,
+        tuition_fee DECIMAL(15, 2),
+        currency VARCHAR(3) DEFAULT 'KRW',
+        description TEXT,
+        requirements TEXT,
+        deadline DATE,
+        intake_dates JSONB,
+        is_active BOOLEAN DEFAULT true,
+        created_by UUID REFERENCES users(id),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    // Student Profiles table - Extended student information
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS student_profiles (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID REFERENCES users(id) ON DELETE CASCADE UNIQUE,
+        date_of_birth DATE,
+        gender VARCHAR(20),
+        nationality VARCHAR(100),
+        passport_number VARCHAR(100),
+        passport_expiry DATE,
+        address TEXT,
+        city VARCHAR(100),
+        country VARCHAR(100),
+        emergency_contact_name VARCHAR(200),
+        emergency_contact_phone VARCHAR(50),
+        emergency_contact_relation VARCHAR(50),
+        education_level VARCHAR(50) NOT NULL,
+        school_name VARCHAR(255),
+        graduation_year INTEGER,
+        gpa DECIMAL(3, 2),
+        korean_level VARCHAR(20),
+        english_level VARCHAR(20),
+        has_korean_certificate BOOLEAN DEFAULT false,
+        korean_certificate_score VARCHAR(50),
+        bio TEXT,
+        profile_image_url TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    // Messages table - Internal messaging
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS messages (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        sender_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        recipient_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        subject VARCHAR(255),
+        content TEXT NOT NULL,
+        is_read BOOLEAN DEFAULT false,
+        read_at TIMESTAMP,
+        parent_id UUID REFERENCES messages(id),
+        attachments JSONB,
+        is_deleted_by_sender BOOLEAN DEFAULT false,
+        is_deleted_by_recipient BOOLEAN DEFAULT false,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    // Application Timeline table - Track application progress
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS application_timeline (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        registration_id UUID REFERENCES registrations(id) ON DELETE CASCADE,
+        stage VARCHAR(50) NOT NULL,
+        status VARCHAR(50) DEFAULT 'pending',
+        notes TEXT,
+        completed_at TIMESTAMP,
+        completed_by UUID REFERENCES users(id),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    // Appointments table - Calendar & scheduling
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS appointments (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        student_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        admin_id UUID REFERENCES users(id),
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        appointment_type VARCHAR(50) DEFAULT 'consultation',
+        start_time TIMESTAMP NOT NULL,
+        end_time TIMESTAMP,
+        location VARCHAR(255),
+        is_online BOOLEAN DEFAULT false,
+        meeting_link VARCHAR(500),
+        status VARCHAR(50) DEFAULT 'scheduled',
+        reminder_sent BOOLEAN DEFAULT false,
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    // Scholarships table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS scholarships (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        university_id UUID REFERENCES universities(id) ON DELETE SET NULL,
+        name VARCHAR(255) NOT NULL,
+        name_korean VARCHAR(255),
+        description TEXT,
+        amount_vnd DECIMAL(15,2),
+        amount_krw DECIMAL(15,2),
+        eligibility_criteria TEXT,
+        application_deadline DATE,
+        requirements TEXT,
+        is_active BOOLEAN DEFAULT true,
+        max_recipients INTEGER,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    // Scholarship applications table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS scholarship_applications (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        scholarship_id UUID REFERENCES scholarships(id) ON DELETE CASCADE,
+        student_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        registration_id UUID REFERENCES registrations(id) ON DELETE SET NULL,
+        status VARCHAR(50) DEFAULT 'pending',
+        documents JSONB,
+        applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        decision_date TIMESTAMP,
+        decision_notes TEXT,
+        amount_awarded_vnd DECIMAL(15,2),
+        amount_awarded_krw DECIMAL(15,2)
+      )
+    `);
+    
+    // Visa applications tracking table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS visa_applications (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        student_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        registration_id UUID REFERENCES registrations(id) ON DELETE SET NULL,
+        visa_type VARCHAR(50) NOT NULL,
+        embassy_location VARCHAR(255),
+        submission_date TIMESTAMP,
+        appointment_date TIMESTAMP,
+        appointment_time VARCHAR(20),
+        status VARCHAR(50) DEFAULT 'preparing',
+        visa_number VARCHAR(100),
+        issue_date DATE,
+        expiry_date DATE,
+        documents_submitted JSONB,
+        interview_required BOOLEAN DEFAULT false,
+        interview_date TIMESTAMP,
+        interview_notes TEXT,
+        rejection_reason TEXT,
+        tracking_number VARCHAR(100),
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    // University ratings table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS university_ratings (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        university_id UUID REFERENCES universities(id) ON DELETE CASCADE,
+        student_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        registration_id UUID REFERENCES registrations(id),
+        overall_rating INTEGER CHECK (overall_rating BETWEEN 1 AND 5),
+        teaching_quality INTEGER CHECK (teaching_quality BETWEEN 1 AND 5),
+        facilities INTEGER CHECK (facilities BETWEEN 1 AND 5),
+        support_services INTEGER CHECK (support_services BETWEEN 1 AND 5),
+        value_for_money INTEGER CHECK (value_for_money BETWEEN 1 AND 5),
+        review_title VARCHAR(255),
+        review_text TEXT,
+        is_approved BOOLEAN DEFAULT false,
+        approved_by UUID REFERENCES users(id),
+        approved_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    // Service feedback table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS service_feedback (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        student_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        feedback_type VARCHAR(50) DEFAULT 'general',
+        rating INTEGER CHECK (rating BETWEEN 1 AND 5),
+        feedback_text TEXT,
+        is_resolved BOOLEAN DEFAULT false,
+        resolved_by UUID REFERENCES users(id),
+        resolved_at TIMESTAMP,
+        resolution_notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    // Email templates table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS email_templates (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name VARCHAR(255) NOT NULL UNIQUE,
+        subject VARCHAR(255) NOT NULL,
+        content TEXT NOT NULL,
+        template_type VARCHAR(50) DEFAULT 'general',
+        variables JSONB,
+        is_active BOOLEAN DEFAULT true,
+        created_by UUID REFERENCES users(id),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    // Workflow automation rules table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS workflow_rules (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name VARCHAR(255) NOT NULL,
+        description TEXT,
+        trigger_type VARCHAR(50) NOT NULL,
+        trigger_condition TEXT NOT NULL,
+        action_type VARCHAR(50) NOT NULL,
+        action_config JSONB,
+        is_active BOOLEAN DEFAULT true,
+        priority INTEGER DEFAULT 1,
+        created_by UUID REFERENCES users(id),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    // Bulk operations log table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS bulk_operations (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        operation_type VARCHAR(50) NOT NULL,
+        operation_status VARCHAR(50) DEFAULT 'pending',
+        total_records INTEGER,
+        processed_records INTEGER DEFAULT 0,
+        success_records INTEGER DEFAULT 0,
+        failed_records INTEGER DEFAULT 0,
+        input_data JSONB,
+        result_data JSONB,
+        error_log TEXT,
+        performed_by UUID REFERENCES users(id),
+        started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        completed_at TIMESTAMP
+      )
+    `);
+    
+    // Communication logs table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS communication_logs (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        recipient_email VARCHAR(255),
+        recipient_phone VARCHAR(50),
+        communication_type VARCHAR(50) NOT NULL,
+        subject VARCHAR(255),
+        content TEXT,
+        status VARCHAR(50) DEFAULT 'pending',
+        sent_at TIMESTAMP,
+        delivered_at TIMESTAMP,
+        opened_at TIMESTAMP,
+        error_message TEXT,
+        template_used VARCHAR(255) REFERENCES email_templates(name),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    // Student Progress table - 8 stage pipeline
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS student_progress (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        student_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        university_id UUID REFERENCES universities(id) ON DELETE CASCADE,
+        stage_id INTEGER NOT NULL,
+        stage_name VARCHAR(100),
+        status VARCHAR(50) DEFAULT 'pending',
+        start_date TIMESTAMP,
+        completed_date TIMESTAMP,
+        notes TEXT,
+        updated_by UUID REFERENCES users(id),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    // Student Applications table (multi-university)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS student_applications (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        student_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        university_id UUID REFERENCES universities(id) ON DELETE CASCADE,
+        tracking_code VARCHAR(50),
+        application_status VARCHAR(50) DEFAULT 'pending',
+        priority INTEGER DEFAULT 1,
+        is_primary BOOLEAN DEFAULT false,
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    // Scheduled Reminders table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS scheduled_reminders (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        recipient_role VARCHAR(50) DEFAULT 'student',
+        title VARCHAR(255) NOT NULL,
+        message TEXT NOT NULL,
+        reminder_type VARCHAR(50) DEFAULT 'payment',
+        related_entity_type VARCHAR(100),
+        related_entity_id UUID,
+        scheduled_date TIMESTAMP NOT NULL,
+        is_recurring BOOLEAN DEFAULT false,
+        recurrence_pattern VARCHAR(100),
+        is_sent BOOLEAN DEFAULT false,
+        sent_at TIMESTAMP,
+        created_by UUID REFERENCES users(id),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    // Analytics Metrics table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS analytics_metrics (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        metric_name VARCHAR(100) NOT NULL,
+        metric_category VARCHAR(100),
+        metric_value DECIMAL(15,4),
+        metric_data JSONB,
+        dimension1 VARCHAR(100),
+        dimension2 VARCHAR(100),
+        recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    // User Preferences table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_preferences (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID REFERENCES users(id) ON DELETE CASCADE UNIQUE,
+        language VARCHAR(10) DEFAULT 'vi',
+        theme VARCHAR(20) DEFAULT 'light',
+        email_notifications BOOLEAN DEFAULT true,
+        sms_notifications BOOLEAN DEFAULT false,
+        push_notifications BOOLEAN DEFAULT true,
+        timezone VARCHAR(50) DEFAULT 'Asia/Ho_Chi_Minh',
+        date_format VARCHAR(20) DEFAULT 'DD/MM/YYYY',
+        preferences_data JSONB,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    // Two-Factor Authentication table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_2fa (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID REFERENCES users(id) ON DELETE CASCADE UNIQUE,
+        secret VARCHAR(255) NOT NULL,
+        backup_codes JSONB,
+        is_enabled BOOLEAN DEFAULT false,
+        verified_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    // User Sessions table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_sessions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        session_token VARCHAR(255) NOT NULL,
+        ip_address VARCHAR(45),
+        user_agent TEXT,
+        device_info VARCHAR(255),
+        is_active BOOLEAN DEFAULT true,
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        last_activity_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    // Saved Filters table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS saved_filters (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        filter_name VARCHAR(255) NOT NULL,
+        filter_type VARCHAR(100) NOT NULL,
+        filter_criteria JSONB NOT NULL,
+        is_default BOOLEAN DEFAULT false,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    // Create indexes
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_universities_name ON universities(name)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_registrations_student ON registrations(student_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_logs_entity ON audit_logs(entity_type, entity_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at DESC)`);
+    
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_payments_student ON payments(student_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_payments_created ON payments(created_at)`);
+    
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_documents_student ON documents(student_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_documents_type ON documents(document_type)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_documents_status ON documents(status)`);
+    
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(created_at)`);
+    
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_programs_university ON programs(university_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_programs_degree ON programs(degree_type)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_programs_is_active ON programs(is_active)`);
+    
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_student_profiles_user ON student_profiles(user_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_student_profiles_nationality ON student_profiles(nationality)`);
+    
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(sender_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_messages_recipient ON messages(recipient_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_messages_is_read ON messages(is_read)`);
+    
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_application_timeline_registration ON application_timeline(registration_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_application_timeline_stage ON application_timeline(stage)`);
+    
+    // Indexes for new feature tables
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_appointments_student ON appointments(student_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_appointments_start_time ON appointments(start_time)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_appointments_status ON appointments(status)`);
+    
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_scholarships_university ON scholarships(university_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_scholarships_active ON scholarships(is_active)`);
+    
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_scholarship_apps_student ON scholarship_applications(student_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_scholarship_apps_scholarship ON scholarship_applications(scholarship_id)`);
+    
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_visa_apps_student ON visa_applications(student_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_visa_apps_status ON visa_applications(status)`);
+    
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_university_ratings_university ON university_ratings(university_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_university_ratings_student ON university_ratings(student_id)`);
+    
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_service_feedback_student ON service_feedback(student_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_service_feedback_resolved ON service_feedback(is_resolved)`);
+    
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_email_templates_name ON email_templates(name)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_email_templates_type ON email_templates(template_type)`);
+    
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_workflow_rules_active ON workflow_rules(is_active)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_workflow_rules_trigger ON workflow_rules(trigger_type)`);
+    
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_bulk_operations_status ON bulk_operations(operation_status)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_bulk_operations_type ON bulk_operations(operation_type)`);
+    
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_comm_logs_recipient ON communication_logs(recipient_email)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_comm_logs_status ON communication_logs(status)`);
+    
+    // Indexes for additional tables
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_student_progress_student ON student_progress(student_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_student_applications_student ON student_applications(student_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_scheduled_reminders_user ON scheduled_reminders(user_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_user_preferences_user ON user_preferences(user_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON user_sessions(user_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_saved_filters_user ON saved_filters(user_id)`);
+    
+    console.log('✅ PostgreSQL Database ready');
   } catch (err) {
     console.error('❌ DB init error:', err);
   }
 }
 
-initializeDatabase();
+import autoSyncManager from './autoSync.js';
 
-// Auth routes - SECURE VERSION
-app.post('/api/auth/register', authLimiter, async (req, res) => {
-  const { name, email, password } = req.body;
-  if (!name || !email || !password) return res.status(400).json({ error: 'Name, email, password required' });
-  if (password.length < 6) return res.status(400).json({ error: 'Password must be 6+ characters' });
+// ============================================
+// SERVER STARTUP
+// ============================================
+let pool;
+let poolMonitor = null;
+
+async function startServer() {
+  pool = await getPool();
   
-  try {
-    // Check if any users exist - first user becomes admin
-    const { rows: existingUsers } = await pool.query('SELECT COUNT(*) as count FROM users');
-    const isFirstUser = existingUsers[0].count === '0';
-    const role = isFirstUser ? 'admin' : 'student';
+  if (DB_TYPE === 'postgresql') {
+    poolMonitor = new ConnectionPoolMonitor(pool);
+    poolMonitor.startMonitoring(30000);
+  }
+  
+  await initializeDatabase();
+  await connectRedis();
+  
+  app.listen(PORT, () => {
+    logger.info('Server started', { 
+      port: PORT, 
+      url: `http://localhost:${PORT}/api`,
+      database: { type: DB_TYPE, status: 'connected' },
+      swagger: `http://localhost:${PORT}/api/docs`
+    });
+    console.log(`\n🚀 Server running at http://localhost:${PORT}/api`);
+    console.log(`📚 API Docs at http://localhost:${PORT}/api/docs\n`);
     
-    const hash = await bcrypt.hash(password, 12); // Increased from 10 to 12
-    const id = uuidv4();
-    const { rows } = await pool.query(
-      'INSERT INTO users (id, name, email, password, role) VALUES ($1, $2, $3, $4, $5) RETURNING id, name, email, role',
-      [id, name, email, hash, role]
-    );
-    const token = jwt.sign(rows[0], process.env.JWT_SECRET, { expiresIn: '24h' }); // Removed fallback
-    res.status(201).json({ user: rows[0], token });
-  } catch (e) {
-    res.status(409).json({ error: 'Email exists' });
-  }
-});
+    // Start automatic sync if enabled
+    autoSyncManager.start();
+  });
+}
 
-app.post('/api/auth/login', authLimiter, async (req, res) => {
-  const { email, password } = req.body;
-  const { rows } = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
-  if (!rows[0] || !await bcrypt.compare(password, rows[0].password)) {
-    return res.status(401).json({ error: 'Invalid credentials' });
-  }
-  const user = { id: rows[0].id, name: rows[0].name, email: rows[0].email, role: rows[0].role };
-  const token = jwt.sign(user, process.env.JWT_SECRET, { expiresIn: '24h' }); // Removed fallback
-  res.json({ user, token });
-});
-
-app.get('/api/auth/me', authenticateToken, async (req, res) => {
-  const { rows } = await pool.query('SELECT id, name, email, role FROM users WHERE id = $1', [req.user.id]);
-  res.json(rows[0]);
-});
-
-// Image upload - Supabase primary, Imgur fallback
-app.post('/api/upload', authenticateToken, upload.single('image'), async (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'No image file' });
-
-  // Try Supabase first
-  if (supabase) {
-    try {
-      const filename = `${uuidv4()}-${req.file.originalname}`;
-      const { data, error } = await supabase.storage.from('university-images').upload(filename, req.file.buffer, { contentType: req.file.mimetype });
-      if (!error) {
-        const { data: urlData } = supabase.storage.from('university-images').getPublicUrl(filename);
-        return res.json({ url: urlData.publicUrl });
-      }
-    } catch (e) {
-      console.log('Supabase failed, trying Imgur...');
-    }
-  }
-
-  // Fallback to Imgur
-  try {
-    const base64 = req.file.buffer.toString('base64');
-    const response = await axios.post('https://api.imgur.com/3/image', 
-      { image: base64, type: 'base64' },
-      { headers: { Authorization: 'Client-ID 546c25a59c58ad7' } }
-    );
-    res.json({ url: response.data.data.link });
-  } catch (e) {
-    res.status(500).json({ error: 'Upload failed' });
-  }
-});
-
-// University routes with RBAC
-app.get('/api/universities', async (req, res) => {
-  const { rows } = await pool.query('SELECT * FROM universities ORDER BY created_at DESC');
-  res.json(rows.map(r => ({ ...r, koreanData: r.korean_data ? JSON.parse(r.korean_data) : {} })));
-});
-
-app.get('/api/universities/:id', async (req, res) => {
-  const { rows } = await pool.query('SELECT * FROM universities WHERE id = $1', [req.params.id]);
-  if (!rows[0]) return res.status(404).json({ error: 'Not found' });
-  res.json({ ...rows[0], koreanData: rows[0].korean_data ? JSON.parse(rows[0].korean_data) : {} });
-});
-
-// Create university - requires university:create permission
-app.post('/api/universities', authenticateToken, requirePermission('create', 'university'), async (req, res) => {
-  const { name, koreanName, region, heroImage, thumbnail, koreanData } = req.body;
-  const { rows } = await pool.query(
-    'INSERT INTO universities (id, name, korean_name, region, hero_image, thumbnail, korean_data) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id',
-    [uuidv4(), name, koreanName, region, heroImage, thumbnail, JSON.stringify(koreanData || {})]
-  );
-  res.status(201).json({ id: rows[0].id });
-});
-
-// Edit university - requires university:edit permission
-app.put('/api/universities/:id', authenticateToken, requirePermission('edit', 'university'), async (req, res) => {
-  const { name, koreanName, region, heroImage, thumbnail, koreanData } = req.body;
-  await pool.query(
-    'UPDATE universities SET name=$1, korean_name=$2, region=$3, hero_image=$4, thumbnail=$5, korean_data=$6, updated_at=NOW() WHERE id=$7',
-    [name, koreanName, region, heroImage, thumbnail, JSON.stringify(koreanData || {}), req.params.id]
-  );
-  res.json({ message: 'Updated' });
-});
-
-// Delete university - requires university:delete permission (super_admin only by default)
-app.delete('/api/universities/:id', authenticateToken, requirePermission('delete', 'university'), async (req, res) => {
-  await pool.query('DELETE FROM universities WHERE id = $1', [req.params.id]);
-  res.json({ message: 'Deleted' });
-});
-
-// Registration routes with RBAC
-app.get('/api/registrations', authenticateToken, requirePermission('view', 'application'), async (req, res) => {
-  const hasFullAccess = hasPermission(req.user.role, 'manage', 'application');
-  const query = hasFullAccess
-    ? `SELECT r.*, u.name as student_name, un.name as university_name FROM registrations r JOIN users u ON r.student_id = u.id JOIN universities un ON r.university_id = un.id ORDER BY r.created_at DESC`
-    : `SELECT r.*, un.name as university_name FROM registrations r JOIN universities un ON r.university_id = un.id WHERE r.student_id = $1 ORDER BY r.created_at DESC`;
-  const { rows } = await pool.query(query, hasFullAccess ? [] : [req.user.id]);
-  res.json(rows);
-});
-
-app.post('/api/registrations', authenticateToken, async (req, res) => {
-  const { universityId, visaSystem } = req.body;
-  const { rows } = await pool.query(
-    'INSERT INTO registrations (id, student_id, university_id, visa_system) VALUES ($1, $2, $3, $4) RETURNING id',
-    [uuidv4(), req.user.id, universityId, visaSystem]
-  );
-  res.status(201).json({ id: rows[0].id });
+startServer().catch(err => {
+  console.error('Failed to start server:', err);
+  process.exit(1);
 });
 
 // ============================================
-// ADMIN INVITE API - Create users without registration
+// GRACEFUL SHUTDOWN
 // ============================================
-
-// Only super_admin can invite other admins
-const requireInvitePermission = (req, res, next) => {
-  const allowedRoles = ['super_admin', 'admin'];
-  if (!allowedRoles.includes(req.user.role)) {
-    return res.status(403).json({ error: 'Permission denied: Can not invite users' });
-  }
-  next();
-};
-
-// POST /api/admin/invite - Invite new admin user
-app.post('/api/admin/invite', authenticateToken, requireInvitePermission, async (req, res) => {
-  const { email, name, role, phone } = req.body;
-  
-  if (!email || !name || !role) {
-    return res.status(400).json({ error: 'Email, name, and role are required' });
-  }
-  
-  // Valid admin roles that can be invited
-  const validRoles = ['admin_manager', 'content_editor', 'finance_admin', 'viewer', 'admin'];
-  if (!validRoles.includes(role)) {
-    return res.status(400).json({ error: 'Invalid role for invitation' });
-  }
-  
-  try {
-    // Check if email already exists
-    const { rows: existing } = await pool.query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
-    if (existing.length > 0) {
-      return res.status(409).json({ error: 'Email already registered' });
-    }
-    
-    // Generate setup token
-    const setupToken = uuidv4() + uuidv4(); // 64 char random token
-    const setupTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-    const tempPassword = await bcrypt.hash(setupToken, 12); // Use token as temp password
-    
-    const userId = uuidv4();
-    
-    // Create user with is_first_login flag
-    await pool.query(
-      `INSERT INTO users (id, name, email, phone, password, role, is_first_login, setup_token, setup_token_expiry, invited_by, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())`,
-      [userId, name, email.toLowerCase(), phone || null, tempPassword, role, true, setupToken, setupTokenExpiry, req.user.id]
-    );
-    
-    // Generate setup link
-    const setupUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/first-time-setup?token=${setupToken}&email=${encodeURIComponent(email)}`;
-    
-    res.status(201).json({
-      message: 'User invited successfully',
-      user: { id: userId, email, name, role, isFirstLogin: true },
-      setupUrl // In production, send this via email instead
-    });
-    
-  } catch (error) {
-    console.error('Invite error:', error);
-    res.status(500).json({ error: 'Failed to create invited user' });
-  }
-});
-
-// GET /api/admin/invited-users - List pending invitations
-app.get('/api/admin/invited-users', authenticateToken, requireInvitePermission, async (req, res) => {
-  try {
-    const { rows } = await pool.query(
-      `SELECT id, name, email, role, is_first_login, setup_token_expiry, created_at 
-       FROM users 
-       WHERE is_first_login = true 
-       ORDER BY created_at DESC`
-    );
-    res.json(rows);
-  } catch (error) {
-    console.error('Error fetching invited users:', error);
-    res.status(500).json({ error: 'Failed to fetch invited users' });
-  }
-});
-
-// POST /api/auth/verify-setup-token - Verify setup token
-app.post('/api/auth/verify-setup-token', async (req, res) => {
-  const { token, email } = req.body;
-  
-  if (!token || !email) {
-    return res.status(400).json({ error: 'Token and email required' });
-  }
-  
-  try {
-    const { rows } = await pool.query(
-      `SELECT id, email, is_first_login, setup_token_expiry 
-       FROM users 
-       WHERE email = $1 AND setup_token = $2 AND is_first_login = true`,
-      [email.toLowerCase(), token]
-    );
-    
-    if (rows.length === 0) {
-      return res.status(404).json({ error: 'Invalid or expired setup token' });
-    }
-    
-    const user = rows[0];
-    if (new Date() > new Date(user.setup_token_expiry)) {
-      return res.status(410).json({ error: 'Setup token expired' });
-    }
-    
-    res.json({ valid: true, email: user.email });
-  } catch (error) {
-    console.error('Verify token error:', error);
-    res.status(500).json({ error: 'Failed to verify token' });
-  }
-});
-
-// POST /api/auth/set-password - Set password for first-time login
-app.post('/api/auth/set-password', async (req, res) => {
-  const { token, email, password } = req.body;
-  
-  if (!token || !email || !password) {
-    return res.status(400).json({ error: 'All fields required' });
-  }
-  
-  if (password.length < 6) {
-    return res.status(400).json({ error: 'Password must be at least 6 characters' });
-  }
-  
-  try {
-    // Verify token
-    const { rows } = await pool.query(
-      `SELECT id, email, is_first_login, setup_token_expiry, role, name
-       FROM users 
-       WHERE email = $1 AND setup_token = $2 AND is_first_login = true`,
-      [email.toLowerCase(), token]
-    );
-    
-    if (rows.length === 0) {
-      return res.status(404).json({ error: 'Invalid setup token' });
-    }
-    
-    const user = rows[0];
-    if (new Date() > new Date(user.setup_token_expiry)) {
-      return res.status(410).json({ error: 'Setup token expired' });
-    }
-    
-    // Hash new password
-    const hashedPassword = await bcrypt.hash(password, 12);
-    
-    // Update user
-    await pool.query(
-      `UPDATE users 
-       SET password = $1, is_first_login = false, setup_token = NULL, setup_token_expiry = NULL, updated_at = NOW()
-       WHERE id = $2`,
-      [hashedPassword, user.id]
-    );
-    
-    // Generate JWT for immediate login
-    const authToken = jwt.sign(
-      { id: user.id, email: user.email, role: user.role, name: user.name },
-      process.env.JWT_SECRET,
-      { expiresIn: '24h' }
-    );
-    
-    res.json({
-      message: 'Password set successfully',
-      token: authToken,
-      user: { id: user.id, email: user.email, name: user.name, role: user.role }
-    });
-  } catch (error) {
-    console.error('Set password error:', error);
-    res.status(500).json({ error: 'Failed to set password' });
-  }
-});
-
-// POST /api/admin/resend-invite - Resend invitation
-app.post('/api/admin/resend-invite', authenticateToken, requireInvitePermission, async (req, res) => {
-  const { userId } = req.body;
-  
-  try {
-    const setupToken = uuidv4() + uuidv4();
-    const setupTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    const tempPassword = await bcrypt.hash(setupToken, 12);
-    
-    const { rows } = await pool.query(
-      `UPDATE users 
-       SET setup_token = $1, setup_token_expiry = $2, password = $3, updated_at = NOW()
-       WHERE id = $4 AND is_first_login = true
-       RETURNING email, name, role`,
-      [setupToken, setupTokenExpiry, tempPassword, userId]
-    );
-    
-    if (rows.length === 0) {
-      return res.status(404).json({ error: 'User not found or already activated' });
-    }
-    
-    const user = rows[0];
-    const setupUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/first-time-setup?token=${setupToken}&email=${encodeURIComponent(user.email)}`;
-    
-    res.json({ message: 'Invitation resent', setupUrl, user });
-  } catch (error) {
-    console.error('Resend invite error:', error);
-    res.status(500).json({ error: 'Failed to resend invitation' });
-  }
-});
-
-app.listen(PORT, () => {
-  console.log(`✅ Server: http://localhost:${PORT}/api`);
-  console.log(process.env.DATABASE_URL ? '✅ PostgreSQL ready' : '❌ No DATABASE_URL');
-  console.log(supabase ? '✅ Supabase ready' : '⚠️ Using Imgur only');
-});
-
 process.on('SIGINT', async () => {
-  await pool.end();
+  logger.info('Shutting down server gracefully');
+  if (poolMonitor) poolMonitor.stopMonitoring();
+  await disconnectRedis();
+  await db.end();
+  logger.info('Server shutdown complete');
+  process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+  logger.info('Shutting down server gracefully (SIGTERM)');
+  if (poolMonitor) poolMonitor.stopMonitoring();
+  await disconnectRedis();
+  await db.end();
+  logger.info('Server shutdown complete');
   process.exit(0);
 });

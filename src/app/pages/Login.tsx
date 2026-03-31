@@ -1,31 +1,35 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../context/AuthContext';
-import { initDatabase } from '../services/sqliteDatabase';
 import { Mail, Lock, ArrowLeft, GraduationCap } from 'lucide-react';
 
 export default function Login() {
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [dbStatus, setDbStatus] = useState<'init'|'loading'|'ready'|'error'>('init');
+  const [apiStatus, setApiStatus] = useState<'init'|'loading'|'ready'|'error'>('init');
   const { login, user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
-  // Initialize database on mount
+  // Check API connection on mount
   useEffect(() => {
-    const initDb = async () => {
-      setDbStatus('loading');
+    const checkApi = async () => {
+      setApiStatus('loading');
       try {
-        await initDatabase();
-        setDbStatus('ready');
-      } catch (err: any) {
-        console.error('Database init error:', err);
-        setDbStatus('error');
-        setError('Database error: ' + (err.message || 'Unknown error'));
+        // Simple health check - try to connect to API
+        const response = await fetch(import.meta.env.VITE_API_URL || 'http://localhost:3001/api/health');
+        if (response.ok) {
+          setApiStatus('ready');
+        } else {
+          setApiStatus('error');
+        }
+      } catch (err) {
+        console.warn('API connection failed, continuing anyway:', err);
+        // Don't block login if API check fails
+        setApiStatus('ready');
       }
     };
-    initDb();
+    checkApi();
   }, []);
 
   // Already logged in → auto redirect based on role
@@ -122,20 +126,20 @@ export default function Login() {
                 <div className="text-red-500 text-sm text-center">{error}</div>
               )}
 
-              {dbStatus === 'loading' && (
-                <div className="text-blue-600 text-sm text-center">Initializing database...</div>
+              {apiStatus === 'loading' && (
+                <div className="text-blue-600 text-sm text-center">Connecting to server...</div>
               )}
 
-              {dbStatus === 'error' && (
-                <div className="text-red-500 text-sm text-center">Database failed to load. Check console for details.</div>
+              {apiStatus === 'error' && (
+                <div className="text-yellow-500 text-sm text-center">Server connection issue. Login may still work.</div>
               )}
 
               <button
                 type="submit"
-                disabled={loading || dbStatus !== 'ready'}
+                disabled={loading || apiStatus === 'loading'}
                 className="w-full bg-[#003AB7] text-white py-3 rounded-lg font-semibold hover:bg-[#002A8F] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? 'Đang đăng nhập...' : dbStatus === 'ready' ? 'Đăng nhập' : 'Loading database...'}
+                {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
               </button>
             </form>
 

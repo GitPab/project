@@ -1,9 +1,8 @@
-@startuml DuHocCost_SystemArchitecture
-!theme plain
+@startuml DuHocCost_SystemArchitecture_Updated
 skinparam componentStyle rectangle
 skinparam linetype ortho
 
-title Du Học Cost - System Architecture Overview
+title Du Học Cost - Updated System Architecture with Improvements
 
 package "Client Layer" {
     [Web Browser] as Client
@@ -12,18 +11,29 @@ package "Client Layer" {
 package "Frontend (Vercel)" {
     [React + Vite App] as Frontend
     [React Router] as Router
-    [AuthContext] as AuthCtx
-    [AppContext] as AppCtx
+    [Zustand Store] as Zustand
+    [React Query] as ReactQuery
+    [Error Boundaries] as ErrorBoundaries
     [RBAC Components] as RBAC
     [UI Components] as UI
 }
 
 package "Backend (Render)" {
     [Node.js + Express] as Backend
+    [Rate Limiting] as RateLimit
     [Authentication Middleware] as AuthMiddleware
     [RBAC Middleware] as RBACMiddleware
     [API Routes] as Routes
     [File Upload Handler] as Upload
+    
+    package "New Improvements" {
+        [Redis Cache] as Redis
+        [Winston Logger] as Logger
+        [Connection Pool Monitor] as PoolMonitor
+        [CSV Sanitizer] as CSVSanitizer
+        [Email Service] as EmailService
+        [Swagger Docs] as Swagger
+    }
 }
 
 package "Database Layer" {
@@ -32,40 +42,48 @@ package "Database Layer" {
         [Universities Table] as UnivTbl
         [Registrations Table] as RegTbl
         [Student Progress Table] as ProgTbl
+        [Audit Logs Table] as AuditTbl
     }
 }
 
 package "External Services" {
+    [Supabase Storage] as Supabase
     [Imgur API] as Imgur
+    [SendGrid/SMTP] as EmailProvider
     [JWT Token Service] as JWT
 }
 
 Client --> Frontend : HTTPS
 Frontend --> Backend : REST API
+Frontend --> Zustand : State Management
+Frontend --> ReactQuery : Data Fetching
+Frontend --> ErrorBoundaries : Error Handling
+
 Backend --> DB : SQL Queries
-Backend --> Imgur : Image Upload
+Backend --> Redis : Cache Operations
+Backend --> Logger : Structured Logging
+Backend --> PoolMonitor : Connection Metrics
+Backend --> CSVSanitizer : Input Validation
+Backend --> EmailService : Email Sending
+Backend --> Swagger : API Documentation
+
+Backend --> Supabase : Image Storage (Primary)
+Backend --> Imgur : Image Storage (Fallback)
+Backend --> EmailProvider : Email Delivery
 Backend --> JWT : Token Verify
 
-Frontend --> Router
-Frontend --> AuthCtx
-Frontend --> AppCtx
-Frontend --> RBAC
-Frontend --> UI
-
-Backend --> AuthMiddleware
-Backend --> RBACMiddleware
-Backend --> Routes
-Backend --> Upload
+Redis --> DB : Cache Invalidation
+PoolMonitor --> DB : Monitor Connections
 
 DB --> UsersTbl
 DB --> UnivTbl
 DB --> RegTbl
 DB --> ProgTbl
+DB --> AuditTbl
 
 @enduml
 
 @startuml DuHocCost_FrontendComponents
-!theme plain
 skinparam componentStyle rectangle
 
 title Frontend Component Architecture
@@ -140,7 +158,6 @@ AdminRoles --> AdminInvite
 @enduml
 
 @startuml DuHocCost_BackendAPI
-!theme plain
 skinparam componentStyle rectangle
 
 title Backend API Architecture
@@ -191,10 +208,9 @@ Pool --> Queries
 
 @enduml
 
-@startuml DuHocCost_DatabaseER
-!theme plain
+@startuml DuHocCost_DatabaseER_Updated
 
-title Database Schema - ER Diagram
+title Database Schema - Updated ER Diagram
 
 entity "USERS" as Users {
     * id : UUID <<PK>>
@@ -204,8 +220,11 @@ entity "USERS" as Users {
     * password_hash : String
     * role : Enum
     phone : String
+    last_login : Timestamp
+    is_active : Boolean <<Default: true>>
     setup_token : String
     setup_token_expiry : Timestamp
+    invited_by : UUID <<FK>>
     created_at : Timestamp
     updated_at : Timestamp
 }
@@ -215,10 +234,16 @@ entity "UNIVERSITIES" as Universities {
     --
     * name : String
     korean_name : String
+    country : String <<Default: 'Hàn Quốc'>>
     region : String
+    ranking : Integer
+    top_tier : String
     hero_image : String
     thumbnail : String
     korean_data : JSONB
+    cache_version : Integer
+    updated_by : UUID <<FK>>
+    is_active : Boolean <<Default: true>>
     created_at : Timestamp
     updated_at : Timestamp
 }
@@ -229,6 +254,7 @@ entity "REGISTRATIONS" as Registrations {
     * student_id : UUID <<FK>>
     * university_id : UUID <<FK>>
     * status : Enum
+    visa_system : String
     form_data : JSONB
     created_at : Timestamp
     updated_at : Timestamp
@@ -245,6 +271,20 @@ entity "STUDENT_PROGRESS" as Progress {
     updated_at : Timestamp
 }
 
+entity "AUDIT_LOGS" as AuditLogs {
+    * id : UUID <<PK>>
+    --
+    * user_id : UUID <<FK>>
+    * action : Enum <<CREATE|UPDATE|DELETE|RESTORE|LOGIN|LOGOUT>>
+    * entity_type : String
+    entity_id : UUID
+    old_values : JSONB
+    new_values : JSONB
+    ip_address : INET
+    user_agent : Text
+    created_at : Timestamp
+}
+
 entity "INVITATIONS" as Invitations {
     * id : UUID <<PK>>
     --
@@ -254,20 +294,23 @@ entity "INVITATIONS" as Invitations {
     invited_by : UUID <<FK>>
     setup_token : String
     setup_token_expiry : Timestamp
+    email_sent : Boolean <<Default: false>>
+    email_sent_at : Timestamp
     created_at : Timestamp
-    used : Boolean
+    used : Boolean <<Default: false>>
 }
 
 Users ||--o{ Registrations : "makes"
 Users ||--o{ Progress : "has"
 Users ||--o{ Invitations : "invited_by"
+Users ||--o{ AuditLogs : "performs"
 Universities ||--o{ Registrations : "receives"
+Universities ||--o{ AuditLogs : "tracked_in"
 Registrations ||--o{ Progress : "tracks"
 
 @enduml
 
 @startuml DuHocCost_RBACHierarchy
-!theme plain
 
 title RBAC Role Hierarchy & Permissions
 
@@ -338,7 +381,6 @@ Viewer --> V5
 @enduml
 
 @startuml DuHocCost_AuthSequence
-!theme plain
 
 title Authentication Flow - Sequence Diagram
 
@@ -373,7 +415,6 @@ Frontend --> User: Display data
 @enduml
 
 @startuml DuHocCost_AdminInviteSequence
-!theme plain
 
 title Admin Invite Flow - Sequence Diagram
 
@@ -411,7 +452,6 @@ Frontend --> Email: Redirect to login
 @enduml
 
 @startuml DuHocCost_ClassDiagram
-!theme plain
 
 title Component Class Diagram
 
@@ -502,7 +542,6 @@ PermissionRoute ..> PermissionGuard : uses
 @enduml
 
 @startuml DuHocCost_Deployment
-!theme plain
 
 title Deployment Architecture
 
@@ -543,7 +582,6 @@ ProdDB -[#2979FF]-> Render : Data
 @enduml
 
 @startuml DuHocCost_APIEndpoints
-!theme plain
 
 title API Endpoints Summary
 

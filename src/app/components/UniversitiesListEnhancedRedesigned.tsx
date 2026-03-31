@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { usePermission, PermissionGuard } from './PermissionGuard';
 import { toast } from 'sonner';
-import { Search, Plus } from 'lucide-react';
+import { Search, Plus, Trash2, RefreshCw, Eye, EyeOff } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { getMaxScholarship } from '../../utils/universityPerks';
 import UniversityForm from './UniversityForm';
@@ -11,17 +11,20 @@ import EditUniversityModal from './EditUniversityModal';
 import QuickInfoModal from './QuickInfoModal';
 import ImportUniversitiesModal from './ImportUniversitiesModal';
 import type { University } from '../context/AppContext';
-import { getAllUniversities } from '../services/universityService';
+import { getAllUniversities, softDeleteUniversity, restoreUniversity } from '../services/universityService';
 
 interface UniversityRowProps {
   university: University;
   onEdit?: (uni: University) => void;
   onQuickInfo?: (uni: University) => void;
+  onDelete?: (uni: University) => void;
+  onRestore?: (uni: University) => void;
   palette: any;
 }
 
-function UniversityRow({ university, onEdit, onQuickInfo, palette }: UniversityRowProps) {
+function UniversityRow({ university, onEdit, onQuickInfo, onDelete, onRestore, palette }: UniversityRowProps) {
   const navigate = useNavigate();
+  const isDeleted = university.is_active === false;
   
   const formatKRW = (amount?: number | null) => Number(amount ?? 0).toLocaleString('vi-VN');
   const formatVND = (amount?: number | null) => Number(amount ?? 0).toLocaleString('vi-VN');
@@ -122,12 +125,13 @@ function UniversityRow({ university, onEdit, onQuickInfo, palette }: UniversityR
         display: 'flex',
         alignItems: 'center',
         padding: '14px 16px',
-        background: palette.cardBg,
-        border: `1px solid ${palette.border}`,
+        background: isDeleted ? '#f5f5f5' : palette.cardBg,
+        border: `1px solid ${isDeleted ? '#ddd' : palette.border}`,
         borderRadius: 10,
-        cursor: 'pointer',
+        cursor: isDeleted ? 'default' : 'pointer',
+        opacity: isDeleted ? 0.7 : 1,
       }}
-      onClick={() => navigate(`/admin/university/${university.id}`)}
+      onClick={() => !isDeleted && navigate(`/admin/university/${university.id}`)}
       onMouseEnter={(e) => {
         e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)';
       }}
@@ -302,43 +306,94 @@ function UniversityRow({ university, onEdit, onQuickInfo, palette }: UniversityR
       {/* Column 5: Actions */}
       <div style={{ flex: 1, textAlign: 'right' }}>
         <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-          {onQuickInfo && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onQuickInfo(university);
-              }}
-              style={{
-                padding: '6px 12px',
-                borderRadius: 6,
-                border: `1px solid ${palette.border}`,
-                background: '#fff',
-                color: palette.text,
-                fontSize: 12,
-                cursor: 'pointer',
-              }}
-            >
-              TT
-            </button>
-          )}
-          {onEdit && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onEdit(university);
-              }}
-              style={{
-                padding: '6px 12px',
-                borderRadius: 6,
-                border: `1px solid ${palette.accent}`,
-                background: palette.accent,
-                color: '#fff',
-                fontSize: 12,
-                cursor: 'pointer',
-              }}
-            >
-              Sửa
-            </button>
+          {isDeleted ? (
+            onRestore && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRestore(university);
+                }}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: 6,
+                  border: '1px solid #22c55e',
+                  background: '#dcfce7',
+                  color: '#15803d',
+                  fontSize: 12,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                }}
+              >
+                <RefreshCw size={14} />
+                Khôi phục
+              </button>
+            )
+          ) : (
+            <>
+              {onQuickInfo && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onQuickInfo(university);
+                  }}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: 6,
+                    border: `1px solid ${palette.border}`,
+                    background: '#fff',
+                    color: palette.text,
+                    fontSize: 12,
+                    cursor: 'pointer',
+                  }}
+                >
+                  TT
+                </button>
+              )}
+              {onEdit && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEdit(university);
+                  }}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: 6,
+                    border: `1px solid ${palette.accent}`,
+                    background: palette.accent,
+                    color: '#fff',
+                    fontSize: 12,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Sửa
+                </button>
+              )}
+              {onDelete && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete(university);
+                  }}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: 6,
+                    border: '1px solid #ef4444',
+                    background: '#fee2e2',
+                    color: '#dc2626',
+                    fontSize: 12,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                  }}
+                >
+                  <Trash2 size={14} />
+                  Xóa
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -367,6 +422,7 @@ export default function UniversitiesListEnhancedRedesigned() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [editingUniversity, setEditingUniversity] = useState<University | null>(null);
   const [quickInfoUniversity, setQuickInfoUniversity] = useState<University | null>(null);
+  const [showDeleted, setShowDeleted] = useState(false);
 
   const palette = {
     pageBg: '#FBF7F2',
@@ -431,6 +487,10 @@ export default function UniversitiesListEnhancedRedesigned() {
     const safeUniversities = (universities ?? []).filter(u => u && u.id && u.name && u.koreanData);
 
     return safeUniversities.filter(university => {
+      // Filter by active status
+      if (!showDeleted && university.is_active === false) return false;
+      if (showDeleted && university.is_active !== false) return false;
+
       if (!university.koreanData?.isKoreanUniversity) return false;
 
       if (activeTier !== 'all') {
@@ -455,7 +515,7 @@ export default function UniversitiesListEnhancedRedesigned() {
 
       return true;
     });
-  }, [universities, activeTier, activePerk, searchTerm]);
+  }, [universities, activeTier, activePerk, searchTerm, showDeleted]);
 
   const sortedUniversities = useMemo(() => {
     return [...filteredUniversities].sort((a, b) => a.name.localeCompare(b.name));
@@ -500,8 +560,33 @@ export default function UniversitiesListEnhancedRedesigned() {
     setEditingUniversity(uni);
   };
 
-  const handleQuickInfo = (uni: University) => {
-    setQuickInfoUniversity(uni);
+  const handleDelete = async (uni: University) => {
+    if (!confirm('Bạn có chắc muốn xóa trường này?')) return;
+    try {
+      await softDeleteUniversity(uni.id);
+      // Update local state
+      const updated = universities.map(u => 
+        u.id === uni.id ? { ...u, is_active: false } : u
+      );
+      setUniversities(() => updated);
+      toast.success('Đã xóa trường');
+    } catch (error) {
+      toast.error('Không thể xóa trường');
+    }
+  };
+
+  const handleRestore = async (uni: University) => {
+    try {
+      await restoreUniversity(uni.id);
+      // Update local state
+      const updated = universities.map(u => 
+        u.id === uni.id ? { ...u, is_active: true } : u
+      );
+      setUniversities(() => updated);
+      toast.success('Đã khôi phục trường');
+    } catch (error) {
+      toast.error('Không thể khôi phục trường');
+    }
   };
 
   return (
@@ -515,6 +600,26 @@ export default function UniversitiesListEnhancedRedesigned() {
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', gap: 10 }}>
+            <PermissionGuard permission="university:create">
+              <button
+                onClick={() => setShowDeleted(!showDeleted)}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: 10,
+                  border: `1px solid ${showDeleted ? '#ef4444' : '#e2e8f0'}`,
+                  background: showDeleted ? '#fee2e2' : '#fff',
+                  color: showDeleted ? '#dc2626' : '#374151',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6
+                }}
+              >
+                {showDeleted ? <EyeOff size={16} /> : <Eye size={16} />}
+                {showDeleted ? 'Ẩn đã xóa' : 'Hiện đã xóa'}
+              </button>
+            </PermissionGuard>
             <PermissionGuard permission="university:create">
               <button
                 onClick={() => setShowImportModal(true)}
@@ -693,6 +798,8 @@ export default function UniversitiesListEnhancedRedesigned() {
               university={university}
               onEdit={isAdmin ? (uni) => setEditingUniversity(uni) : undefined}
               onQuickInfo={isAdmin ? (uni) => setQuickInfoUniversity(uni) : undefined}
+              onDelete={isAdmin ? handleDelete : undefined}
+              onRestore={isAdmin ? handleRestore : undefined}
               palette={palette}
             />
           ))}

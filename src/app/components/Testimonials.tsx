@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Star, Quote } from 'lucide-react';
-import { getServiceFeedback } from '../services/sqliteDatabase';
+import { FeatureAPI } from '../services/featureApi';
 
 interface TestimonialProps {
   name: string;
@@ -61,7 +61,10 @@ export default function Testimonials({ className = '' }: TestimonialsProps) {
   useEffect(() => {
     const loadTestimonials = async () => {
       try {
-        const feedback = await getServiceFeedback();
+        // Try to load from API first
+        const response = await FeatureAPI.ServiceFeedback.getAll({ is_resolved: false });
+        const feedback = response.feedback || [];
+        
         // Filter approved feedback with ratings >= 4
         const approved = feedback
           .filter((f: any) => f.rating >= 4 && f.is_approved)
@@ -81,7 +84,7 @@ export default function Testimonials({ className = '' }: TestimonialsProps) {
           setTestimonials(approved);
         }
       } catch (error) {
-        console.log('Using static testimonials (database not ready)');
+        console.log('Using static testimonials (API not ready)');
         setTestimonials(staticTestimonials);
       }
     };

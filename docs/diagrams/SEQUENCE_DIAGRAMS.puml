@@ -1,5 +1,4 @@
 @startuml Sequence_Authentication
-!theme plain
 title Authentication Flow - Sequence Diagram
 
 actor User
@@ -53,7 +52,6 @@ Frontend --> Browser: Redirect to login
 @enduml
 
 @startuml Sequence_UniversityCRUD
-!theme plain
 title University Management CRUD - Sequence Diagram
 
 actor Admin
@@ -136,7 +134,6 @@ end
 @enduml
 
 @startuml Sequence_AdminInvite
-!theme plain
 title Admin Invite & Setup - Sequence Diagram
 
 actor SuperAdmin
@@ -212,7 +209,6 @@ Frontend --> NewAdmin: Redirect to dashboard
 @enduml
 
 @startuml Sequence_StudentRegistration
-!theme plain
 title Student Registration Flow - Sequence Diagram
 
 actor Student
@@ -288,7 +284,6 @@ Frontend --> Student: Display progress timeline
 @enduml
 
 @startuml Sequence_ImportCSV
-!theme plain
 title CSV Import Universities - Sequence Diagram
 
 actor Admin

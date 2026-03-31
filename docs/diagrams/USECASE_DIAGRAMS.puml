@@ -1,5 +1,4 @@
 @startuml UseCase_SystemOverview
-!theme plain
 title Du Học Cost - Use Case Diagram - System Overview
 
 left to right direction
@@ -192,7 +191,6 @@ Student --> UC16
 @enduml
 
 @startuml UseCase_RegistrationWorkflow
-!theme plain
 title Student Registration - Detailed Use Case
 
 left to right direction
@@ -244,7 +242,6 @@ System --> UC12
 @enduml
 
 @startuml UseCase_UniversityManagement
-!theme plain
 title University Management - Use Case Diagram
 
 left to right direction

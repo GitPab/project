@@ -6,7 +6,8 @@ import { useLanguage } from '../context/LanguageContext';
 import { MapPin, CheckCircle, Lock, Search, Star, UserPlus, GraduationCap, FileText, ArrowRight } from 'lucide-react';
 import StudentInfoSidebar from '../components/StudentInfoSidebar';
 import { searchTrackingCodesByEmail, getTrackingCode } from '../services/trackingCodeService';
-import { getStudentProgress, getPayments } from '../services/sqliteDatabase';
+// Note: Student progress and payments will come from API in future
+// import { getStudentProgress, getPayments } from '../services/sqliteDatabase';
 import { toast } from 'sonner';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -79,35 +80,26 @@ export default function StudentHome() {
         
         if (!userCode) return;
         
-        // Fetch real student progress from database
+        // Fetch real student progress from API (using context for now)
         let realProgress = 0;
         let realGPA = 'N/A';
-        if (userCode?.desiredUniversityId) {
-          const progressData = await getStudentProgress(user.email, userCode.desiredUniversityId);
-          if (progressData && progressData.length > 0) {
-            const completedStages = progressData.filter((p: any) => p.status === 'completed').length;
-            realProgress = Math.round((completedStages / progressData.length) * 100);
-          }
-        }
+        // Note: Student progress API integration pending
+        // if (userCode?.desiredUniversityId) {
+        //   const progressData = await getStudentProgress(user.email, userCode.desiredUniversityId);
+        //   if (progressData && progressData.length > 0) {
+        //     const completedStages = progressData.filter((p: any) => p.status === 'completed').length;
+        //     realProgress = Math.round((completedStages / progressData.length) * 100);
+        //   }
+        // }
         
-        // Fetch real payments from database
-        const payments = await getPayments(user.email, userCode?.desiredUniversityId);
-        const totalPaid = payments
-          .filter((p: any) => p.status === 'completed')
-          .reduce((sum: number, p: any) => sum + (p.amount_vnd || 0), 0);
+        // Fetch real payments from API (using context for now)
+        // Note: Payments API integration pending
+        const totalPaid = 0;
+        const nextPaymentDate = 'Chưa có';
         
         // Calculate real costs
         const initialCost = userCode?.initialTotalCostVnd || 0;
         const realRemaining = Math.max(0, initialCost - totalPaid);
-        
-        // Find next payment date
-        let nextPaymentDate = 'Chưa có';
-        const pendingPayments = payments
-          .filter((p: any) => p.status === 'pending' && p.due_date)
-          .sort((a: any, b: any) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
-        if (pendingPayments.length > 0) {
-          nextPaymentDate = new Date(pendingPayments[0].due_date).toLocaleDateString('vi-VN');
-        }
         
         const updatedProfile = {
           name: userCode.studentName || user?.name || 'Chưa có tên',

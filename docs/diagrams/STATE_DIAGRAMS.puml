@@ -1,5 +1,4 @@
 @startuml State_UserRegistration
-!theme plain
 title User Registration - State Diagram
 
 [*] --> Guest : Visit website
@@ -81,7 +80,6 @@ Guest --> [*] : Close browser
 @enduml
 
 @startuml State_UniversityLifecycle
-!theme plain
 title University - Lifecycle State Diagram
 
 [*] --> Draft : Create new
@@ -116,7 +114,6 @@ Deprecated --> [*] : Delete
 @enduml
 
 @startuml State_RegistrationWorkflow
-!theme plain
 title Registration Application - State Diagram
 
 [*] --> Started : Student starts application
@@ -161,7 +158,6 @@ Rejected --> [*] : Closed
 @enduml
 
 @startuml State_InvitationLifecycle
-!theme plain
 title Admin Invitation - State Diagram
 
 [*] --> Created : SuperAdmin creates
@@ -207,7 +203,6 @@ Cancelled --> [*] : Closed
 @enduml
 
 @startuml State_AuthenticationSession
-!theme plain
 title Authentication Session - State Diagram
 
 [*] --> Unauthenticated : Initial state
@@ -252,7 +247,6 @@ Unauthenticated --> [*] : Close app
 @enduml
 
 @startuml State_ImportProcess
-!theme plain
 title CSV Import Process - State Diagram
 
 [*] --> FileSelection : Click Import
