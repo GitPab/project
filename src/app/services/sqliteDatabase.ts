@@ -59,8 +59,8 @@ export async function initDatabase(): Promise<any> {
         const uint8Array = new Uint8Array(storedData.split(',').map(Number));
         db = new SQL.Database(uint8Array);
         console.log('Database restored, size:', uint8Array.length, 'bytes');
-        // Run schema migration to add missing columns
-        await migrateSchema();
+        // Run schema migration to add missing columns (force=true to ensure fixes are applied)
+        await migrateSchema(true);
       } else {
         console.log('Creating new database...');
         db = new SQL.Database();
@@ -115,6 +115,7 @@ export async function initializeSchema(): Promise<void> {
       website TEXT,
       description TEXT,
       korean_data TEXT,
+      is_active INTEGER DEFAULT 1,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
@@ -674,53 +675,134 @@ export async function initializeSchema(): Promise<void> {
   saveDatabase();
 }
 
-// Schema migration - add missing columns to existing tables
-async function migrateSchema(): Promise<void> {
+// Database schema version tracking
+const DB_SCHEMA_VERSION_KEY = 'sacma_schema_version';
+const CURRENT_SCHEMA_VERSION = 2; // Increment when schema changes
+
+// Versioned migrations
+const migrations: { [version: number]: () => void } = {
+  1: () => {
+    console.log('Migration v1: Initial schema - already handled by initializeSchema');
+  },
+  2: () => {
+    console.log('Migration v2: Adding is_active column to universities...');
+    try {
+      // Check if universities table exists
+      const tableCheck = db.exec("SELECT name FROM sqlite_master WHERE type='table' AND name='universities'");
+      if (tableCheck[0]?.values?.length) {
+        const uniTableInfo = db.exec("PRAGMA table_info(universities)");
+        const uniColumns = uniTableInfo[0]?.values?.map((row: any[]) => row[1]) || [];
+        
+        if (!uniColumns.includes('is_active')) {
+          db.run('ALTER TABLE universities ADD COLUMN is_active INTEGER DEFAULT 1');
+          console.log('Added is_active column successfully');
+        }
+      }
+    } catch (e) {
+      console.error('Migration v2 failed:', e);
+    }
+  }
+};
+
+// Schema migration - runs versioned migrations
+async function migrateSchema(force = false): Promise<void> {
   if (!db) return;
   
-  console.log('Running schema migration...');
+  // Get current version from localStorage
+  const storedVersion = parseInt(localStorage.getItem(DB_SCHEMA_VERSION_KEY) || '0');
+  console.log(`Current schema version: ${storedVersion}, Target: ${CURRENT_SCHEMA_VERSION}`);
   
+  // ALWAYS check and fix is_active column regardless of version (defensive)
   try {
-    // Check if users table has phone column
-    const tableInfo = db.exec("PRAGMA table_info(users)");
-    const columns = tableInfo[0]?.values.map((row: any[]) => row[1]) || [];
-    
-    if (!columns.includes('phone')) {
-      console.log('Adding phone column to users table...');
-      db.run('ALTER TABLE users ADD COLUMN phone TEXT');
+    const tableCheck = db.exec("SELECT name FROM sqlite_master WHERE type='table' AND name='universities'");
+    if (tableCheck[0]?.values?.length) {
+      const uniTableInfo = db.exec("PRAGMA table_info(universities)");
+      const uniColumns = uniTableInfo[0]?.values?.map((row: any[]) => row[1]) || [];
+      
+      if (!uniColumns.includes('is_active')) {
+        console.log('FORCE: Adding missing is_active column to universities...');
+        db.run('ALTER TABLE universities ADD COLUMN is_active INTEGER DEFAULT 1');
+        console.log('FORCE: is_active column added successfully');
+        
+        // Immediately save after adding column
+        saveDatabase();
+        
+        // Verify column was added
+        const verifyInfo = db.exec("PRAGMA table_info(universities)");
+        const verifyColumns = verifyInfo[0]?.values?.map((row: any[]) => row[1]) || [];
+        if (!verifyColumns.includes('is_active')) {
+          throw new Error('Failed to verify is_active column after ALTER TABLE');
+        }
+        console.log('FORCE: Verified is_active column exists');
+      }
     }
-    
-    if (!columns.includes('tracking_code')) {
-      console.log('Adding tracking_code column to users table...');
-      db.run('ALTER TABLE users ADD COLUMN tracking_code TEXT');
+  } catch (e) {
+    console.error('FORCE migration failed:', e);
+    throw e; // Don't proceed if we can't fix the schema
+  }
+  
+  if (!force && storedVersion >= CURRENT_SCHEMA_VERSION) {
+    console.log('Schema is up to date');
+    return;
+  }
+  
+  // Run pending migrations in order
+  for (let v = storedVersion + 1; v <= CURRENT_SCHEMA_VERSION; v++) {
+    if (migrations[v]) {
+      console.log(`Running migration to version ${v}...`);
+      try {
+        migrations[v]();
+        localStorage.setItem(DB_SCHEMA_VERSION_KEY, v.toString());
+        console.log(`Migration to version ${v} complete`);
+      } catch (error) {
+        console.error(`Migration to version ${v} failed:`, error);
+        throw error;
+      }
     }
-    
-    // Check if student_applications table exists
-    const tableCheck = db.exec("SELECT name FROM sqlite_master WHERE type='table' AND name='student_applications'");
-    if (!tableCheck[0]?.values.length) {
-      console.log('Creating student_applications table...');
-      db.run(`
-        CREATE TABLE IF NOT EXISTS student_applications (
-          id TEXT PRIMARY KEY,
-          student_email TEXT NOT NULL,
-          university_id TEXT NOT NULL,
-          tracking_code TEXT,
-          application_status TEXT DEFAULT 'pending',
-          priority INTEGER DEFAULT 1,
-          is_primary BOOLEAN DEFAULT 0,
-          notes TEXT,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (university_id) REFERENCES universities(id),
-          FOREIGN KEY (tracking_code) REFERENCES tracking_codes(code)
-        )
-      `);
-    }
-    
-    console.log('Schema migration complete');
-    saveDatabase();
-  } catch (error) {
-    console.error('Schema migration failed:', error);
+  }
+  
+  // Run legacy non-versioned migrations
+  await runLegacyMigrations();
+  
+  saveDatabase();
+}
+
+// Legacy migrations for backwards compatibility (tables that might not exist yet)
+async function runLegacyMigrations(): Promise<void> {
+  // Check if student_applications table exists
+  const tableCheck = db.exec("SELECT name FROM sqlite_master WHERE type='table' AND name='student_applications'");
+  if (!tableCheck[0]?.values?.length) {
+    console.log('Creating student_applications table...');
+    db.run(`
+      CREATE TABLE IF NOT EXISTS student_applications (
+        id TEXT PRIMARY KEY,
+        student_email TEXT NOT NULL,
+        university_id TEXT NOT NULL,
+        tracking_code TEXT,
+        application_status TEXT DEFAULT 'pending',
+        priority INTEGER DEFAULT 1,
+        is_primary BOOLEAN DEFAULT 0,
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (university_id) REFERENCES universities(id),
+        FOREIGN KEY (tracking_code) REFERENCES tracking_codes(code)
+      )
+    `);
+  }
+  
+  // Check users table columns
+  const tableInfo = db.exec("PRAGMA table_info(users)");
+  const columns = tableInfo[0]?.values?.map((row: any[]) => row[1]) || [];
+  
+  if (!columns.includes('phone')) {
+    console.log('Adding phone column to users table...');
+    db.run('ALTER TABLE users ADD COLUMN phone TEXT');
+  }
+  
+  if (!columns.includes('tracking_code')) {
+    console.log('Adding tracking_code column to users table...');
+    db.run('ALTER TABLE users ADD COLUMN tracking_code TEXT');
   }
 }
 
@@ -1059,7 +1141,25 @@ export async function resetDatabase(): Promise<void> {
     db = null;
   }
   localStorage.removeItem(DB_STORAGE_KEY);
+  localStorage.removeItem(DB_SCHEMA_VERSION_KEY);
+  initPromise = null;
+  initError = null;
   await initDatabase();
+}
+
+// Nuclear option: Clear everything and start fresh
+export async function forceResetDatabase(): Promise<void> {
+  console.warn('FORCE RESETTING DATABASE - ALL DATA WILL BE LOST');
+  if (db) {
+    db.close();
+    db = null;
+  }
+  localStorage.removeItem(DB_STORAGE_KEY);
+  localStorage.removeItem(DB_SCHEMA_VERSION_KEY);
+  initPromise = null;
+  initError = null;
+  await initDatabase();
+  console.log('Database force reset complete');
 }
 
 // Export database to a downloadable SQLite file

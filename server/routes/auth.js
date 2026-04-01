@@ -93,18 +93,22 @@ router.post('/login', async (req, res) => {
     // Database-specific query
     let rows;
     if (DB_TYPE === 'mysql') {
+      console.log('[DEBUG] MySQL login query for:', email);
       const result = await pool.query(
-        'SELECT * FROM users WHERE email = ? AND is_active != false',
+        'SELECT * FROM users WHERE email = ? AND (is_active = 1 OR is_active IS NULL)',
         [email]
       );
+      console.log('[DEBUG] MySQL result:', result);
       rows = result.rows;
     } else {
       const result = await pool.query(
-        'SELECT * FROM users WHERE email = $1 AND is_active != false',
+        'SELECT * FROM users WHERE email = $1 AND is_active = true',
         [email]
       );
       rows = result.rows;
     }
+    
+    console.log('[DEBUG] Found user:', rows[0] ? 'YES' : 'NO');
     
     if (!rows[0] || !await bcrypt.compare(password, rows[0].password)) {
       return res.status(401).json({ error: 'Invalid credentials' });
@@ -129,8 +133,10 @@ router.post('/login', async (req, res) => {
     logger.info('User logged in', { userId: user.id, email });
     res.json({ user, token });
   } catch (e) {
+    console.error('[DEBUG] Login error:', e);
+    console.error('[DEBUG] Error stack:', e.stack);
     logger.error('Login failed', { error: e.message, email });
-    res.status(500).json({ error: 'Login failed' });
+    res.status(500).json({ error: 'Login failed: ' + e.message });
   }
 });
 

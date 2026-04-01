@@ -26,6 +26,8 @@ const AdminFeedback = lazy(() => import('./pages/AdminFeedback'));
 const AdminUsers = lazy(() => import('./pages/AdminUsers'));
 const AdminAnalyticsDashboard = lazy(() => import('./pages/AdminAnalyticsDashboard'));
 const AdminRegistrations = lazy(() => import('./pages/AdminRegistrations'));
+const AdminRoles = lazy(() => import('./pages/AdminRoles'));
+const AdminMaintenance = lazy(() => import('./pages/AdminMaintenance'));
 const StudentMonitoring = lazy(() => import('./pages/StudentMonitoring'));
 const UniversityDetailAdmin = lazy(() => import('./pages/UniversityDetailAdmin'));
 const MyCosts = lazy(() => import('./pages/MyCosts'));
@@ -180,6 +182,14 @@ export const router = createHashRouter([
           {
             path: 'users',
             Component: withSuspense(AdminUsers)
+          },
+          {
+            path: 'roles',
+            Component: withSuspense(AdminRoles)
+          },
+          {
+            path: 'maintenance',
+            Component: withSuspense(AdminMaintenance)
           }
         ]
       }

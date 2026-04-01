@@ -12,42 +12,43 @@ export const ROLE_DEFINITIONS = {
   },
   admin_manager: {
     permissions: [
-      'university:view',
-      'student:view', 'student:edit', 'student:progress',
-      'application:view', 'application:manage',
-      'payment:view',
-      'analytics:view',
+      'view:university',
+      'view:student', 'edit:student',
+      'view:application', 'manage:application',
+      'view:payment',
+      'view:analytics',
+      'view:student_progress', 'manage:student_progress',
     ],
   },
   content_editor: {
     permissions: [
-      'university:view', 'university:create', 'university:edit',
-      'student:view',
-      'application:view',
+      'view:university', 'create:university', 'edit:university',
+      'view:student',
+      'view:application',
     ],
   },
   finance_admin: {
     permissions: [
-      'university:view',
-      'student:view',
-      'application:view',
-      'payment:view', 'payment:create', 'payment:approve',
-      'analytics:view',
+      'view:university',
+      'view:student',
+      'view:application',
+      'view:payment', 'create:payment', 'approve:payment',
+      'view:analytics',
     ],
   },
   viewer: {
     permissions: [
-      'university:view',
-      'student:view',
-      'application:view',
-      'payment:view',
-      'analytics:view',
+      'view:university',
+      'view:student',
+      'view:application',
+      'view:payment',
+      'view:analytics',
     ],
   },
   student: {
     permissions: [
-      'university:view',
-      'application:create', 'application:view',
+      'view:university',
+      'create:application', 'view:application',
     ],
   },
 };

@@ -6,7 +6,7 @@
 import express from 'express';
 import { getPool } from '../dbAdapter.js';
 import { logger } from '../logger.js';
-import { ConnectionPoolMonitor } from '../poolMonitor.js';
+import { redisClient } from '../cache.js';
 
 const router = express.Router();
 
@@ -27,7 +27,25 @@ router.get('/health', async (req, res) => {
     },
     services: {
       supabase: !!process.env.SUPABASE_URL,
-      redis: false,
+      redis: {
+        connected: false
+      },
+    },
+    alerts: {
+      telegram: {
+        configured: !!process.env.ALERT_TELEGRAM_BOT_TOKEN && !!process.env.ALERT_TELEGRAM_CHAT_ID
+      },
+      email: {
+        configured:
+          !!process.env.ALERT_EMAIL_TO &&
+          !!process.env.ALERT_EMAIL_FROM &&
+          !!process.env.SMTP_HOST
+      },
+      throttleMinutes: {
+        global: parseInt(process.env.ALERT_THROTTLE_MINUTES || '30', 10),
+        telegram: parseInt(process.env.ALERT_THROTTLE_TELEGRAM_MINUTES || '0', 10),
+        email: parseInt(process.env.ALERT_THROTTLE_EMAIL_MINUTES || '0', 10)
+      }
     },
     environment: process.env.NODE_ENV || 'development'
   };
@@ -40,6 +58,20 @@ router.get('/health', async (req, res) => {
     health.status = 'degraded';
     health.database.error = err.message;
     logger.error('Health check: Database connection failed', err);
+  }
+
+  try {
+    if (redisClient?.isOpen) {
+      const pong = await redisClient.ping();
+      health.services.redis.connected = pong === 'PONG';
+    } else {
+      health.services.redis.connected = false;
+    }
+  } catch (err) {
+    health.services.redis.connected = false;
+    health.services.redis.error = err.message;
+    health.status = 'degraded';
+    logger.error('Health check: Redis ping failed', err);
   }
   
   const statusCode = health.status === 'ok' ? 200 : 503;

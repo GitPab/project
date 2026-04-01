@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Mail, UserPlus, Copy, CheckCircle, Clock, RefreshCw, Shield, X } from 'lucide-react';
 import { toast } from 'sonner';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { getApiUrl } from '../services/portDetector';
 
 interface InvitedUser {
   id: string;
@@ -44,7 +43,8 @@ export default function AdminInvite() {
   const fetchInvitedUsers = async () => {
     try {
       const token = localStorage.getItem('auth_token');
-      const res = await fetch(`${API_URL}/api/admin/invited-users`, {
+      const API_URL = await getApiUrl();
+      const res = await fetch(`${API_URL}/admin/invited-users`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (!res.ok) throw new Error('Failed to fetch invited users');
@@ -65,7 +65,8 @@ export default function AdminInvite() {
     setLoading(true);
     try {
       const token = localStorage.getItem('auth_token');
-      const res = await fetch(`${API_URL}/api/admin/invite`, {
+      const API_URL = await getApiUrl();
+      const res = await fetch(`${API_URL}/admin/invite`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -102,7 +103,8 @@ export default function AdminInvite() {
   const resendInvite = async (userId: string) => {
     try {
       const token = localStorage.getItem('auth_token');
-      const res = await fetch(`${API_URL}/api/admin/resend-invite`, {
+      const API_URL = await getApiUrl();
+      const res = await fetch(`${API_URL}/admin/resend-invite`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -1,9 +1,23 @@
 ﻿import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
+import { getApiUrl, resetServerPort } from '../services/portDetector';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+let cachedApiUrl: string | null = null;
+
+// Clear cache on page load to ensure fresh port detection
+localStorage.removeItem('sacma_server_port');
+cachedApiUrl = null;
+console.log('[AuthContext] Cleared port cache on load');
+
+async function getDynamicApiUrl(): Promise<string> {
+  if (!cachedApiUrl) {
+    cachedApiUrl = await getApiUrl();
+  }
+  return cachedApiUrl;
+}
 
 // Helper for API calls
 async function apiCall(endpoint: string, options: RequestInit = {}) {
+  const API_URL = await getDynamicApiUrl();
   const url = `${API_URL}${endpoint}`;
   
   const headers: Record<string, string> = {
@@ -11,20 +25,41 @@ async function apiCall(endpoint: string, options: RequestInit = {}) {
     ...((options.headers as Record<string, string>) || {})
   };
   
-  const response = await fetch(url, {
-    ...options,
-    headers
-  });
-  
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-    throw new Error(error.error || `HTTP ${response.status}`);
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers
+    });
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(error.error || `HTTP ${response.status}`);
+    }
+    
+    return response.json();
+  } catch (error: any) {
+    // If connection fails, reset cache and try to redetect port
+    if (error.message?.includes('fetch') || error.message?.includes('Failed')) {
+      console.log('[AuthContext] Connection failed, redetecting server port...');
+      resetServerPort();
+      cachedApiUrl = null;
+      // Try once more with fresh detection
+      const newUrl = await getDynamicApiUrl();
+      if (newUrl !== API_URL) {
+        console.log('[AuthContext] Retrying with new port:', newUrl);
+        const response = await fetch(`${newUrl}${endpoint}`, { ...options, headers });
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+          throw new Error(error.error || `HTTP ${response.status}`);
+        }
+        return response.json();
+      }
+    }
+    throw error;
   }
-  
-  return response.json();
 }
 
-export type UserRole = 'student' | 'admin';
+export type UserRole = 'student' | 'admin' | 'super_admin' | 'admin_manager' | 'content_editor' | 'finance_admin' | 'viewer';
 
 export interface AuthUser {
   id: string;
@@ -66,6 +101,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
   const [isLoading, setIsLoading] = useState(false);
 
+  const notifyAuthChanged = () => {
+    window.dispatchEvent(new Event('auth-changed'));
+  };
+
   const login = useCallback(async (email: string, password: string): Promise<void> => {
     setIsLoading(true);
     try {
@@ -74,11 +113,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({ email, password })
       });
       
-      if (!response.success) {
+      // Accept both { success, user, token } and { user, token } response shapes
+      if (response.success === false) {
         throw new Error(response.error || 'Đăng nhập thất bại');
       }
       
       const { user: authUser, token: authToken } = response;
+      if (!authUser || !authToken) {
+        throw new Error(response.error || 'Đăng nhập thất bại');
+      }
       
       // Persist to localStorage
       localStorage.setItem('auth_user', JSON.stringify(authUser));
@@ -86,6 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       setUser(authUser);
       setToken(authToken);
+      notifyAuthChanged();
     } catch (error: any) {
       throw new Error(error.message || 'Email hoặc mật khẩu không đúng');
     } finally {
@@ -100,6 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     setUser(null);
     setToken(null);
+    notifyAuthChanged();
     window.location.href = '/';
   }, []);
 
@@ -111,11 +156,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify(userData)
       });
       
-      if (!response.success) {
+      // Accept both { success, user, token } and { user, token } response shapes
+      if (response.success === false) {
         throw new Error(response.error || 'Đăng ký thất bại');
       }
       
       const { user: authUser, token: authToken } = response;
+      if (!authUser || !authToken) {
+        throw new Error(response.error || 'Đăng ký thất bại');
+      }
       
       // Persist to localStorage
       localStorage.setItem('auth_user', JSON.stringify(authUser));
@@ -123,6 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       setUser(authUser);
       setToken(authToken);
+      notifyAuthChanged();
     } catch (error: any) {
       throw new Error(error.message || 'Đăng ký thất bại');
     } finally {
@@ -130,11 +180,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const adminRoles: UserRole[] = ['admin', 'super_admin', 'admin_manager', 'content_editor', 'finance_admin', 'viewer'];
+
   const value: AuthContextType = {
     user,
     token,
     isAuthenticated: !!user,
-    isAdmin: user?.role === 'admin',
+    isAdmin: !!user?.role && adminRoles.includes(user.role),
     isStudent: user?.role === 'student',
     login,
     logout,

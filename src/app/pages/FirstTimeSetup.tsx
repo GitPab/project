@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { Eye, EyeOff, Lock, CheckCircle, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { getApiUrl } from '../services/portDetector';
 
 export default function FirstTimeSetup() {
   const navigate = useNavigate();
@@ -32,7 +31,8 @@ export default function FirstTimeSetup() {
 
   const verifyToken = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/auth/verify-setup-token`, {
+      const API_URL = await getApiUrl();
+      const res = await fetch(`${API_URL}/auth/verify-setup-token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, email })
@@ -68,7 +68,8 @@ export default function FirstTimeSetup() {
     setLoading(true);
 
     try {
-      const res = await fetch(`${API_URL}/api/auth/set-password`, {
+      const API_URL = await getApiUrl();
+      const res = await fetch(`${API_URL}/auth/set-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, email, password })

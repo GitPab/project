@@ -9,6 +9,7 @@ import ImportUniversitiesModal from '../components/ImportUniversitiesModal';
 import DatabaseExportPanel from '../components/DatabaseExportPanel';
 import { toast } from 'sonner';
 import { getAllUniversities } from '../services/universityService';
+import api from '../services/api';
 // Note: User/audit data will come from API in future
 // import { getAllUsers, getAuditLogs } from '../services/sqliteDatabase';
 
@@ -52,6 +53,10 @@ export default function AdminDashboard() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [activeStudents, setActiveStudents] = React.useState(0);
   const [recentActivity, setRecentActivity] = React.useState<any[]>([]);
+  const [healthStatus, setHealthStatus] = React.useState<any | null>(null);
+  const [healthError, setHealthError] = React.useState<string | null>(null);
+  const [healthLoading, setHealthLoading] = React.useState(false);
+  const [lastHealthCheck, setLastHealthCheck] = React.useState<string | null>(null);
   
   const stats = useMemo(() => {
     const baseStats = fetchDashboardStats(universities);
@@ -61,17 +66,33 @@ export default function AdminDashboard() {
   // Reload universities from API on mount
   useEffect(() => {
     const reloadUniversities = async () => {
+      // Avoid heavy reload if we already have data from context/API
+      if (universities.length > 0) {
+        setIsLoading(false);
+        return;
+      }
+
       try {
         const dbUniversities = await getAllUniversities();
         
         if (dbUniversities.length > 0) {
-          const parsedUniversities = dbUniversities.map((u: any) => ({
-            ...u,
-            koreanData: typeof u.korean_data === 'string' 
-              ? JSON.parse(u.korean_data) 
-              : u.koreanData || u.korean_data || {}
-          }));
-          setUniversities(() => parsedUniversities);
+          const process = () => {
+            const parsedUniversities = dbUniversities.map((u: any) => ({
+              ...u,
+              koreanData: typeof u.korean_data === 'string' 
+                ? JSON.parse(u.korean_data) 
+                : u.koreanData || u.korean_data || {}
+            }));
+            setUniversities(() => parsedUniversities);
+            setIsLoading(false);
+          };
+
+          if ('requestIdleCallback' in window) {
+            (window as any).requestIdleCallback(process);
+          } else {
+            setTimeout(process, 0);
+          }
+          return;
         }
         
         // Note: User counts and audit logs will come from API in future
@@ -86,7 +107,36 @@ export default function AdminDashboard() {
     };
 
     reloadUniversities();
-  }, [setUniversities]);
+  }, [setUniversities, universities.length]);
+
+  useEffect(() => {
+    let isMounted = true;
+    let intervalId: number | null = null;
+
+    const fetchHealth = async () => {
+      setHealthLoading(true);
+      try {
+        const response = await api.get('/health');
+        if (!isMounted) return;
+        setHealthStatus(response.data);
+        setHealthError(null);
+        setLastHealthCheck(new Date().toLocaleString());
+      } catch (error: any) {
+        if (!isMounted) return;
+        setHealthError(error?.message || 'Health check failed');
+      } finally {
+        if (isMounted) setHealthLoading(false);
+      }
+    };
+
+    fetchHealth();
+    intervalId = window.setInterval(fetchHealth, 30000);
+
+    return () => {
+      isMounted = false;
+      if (intervalId) window.clearInterval(intervalId);
+    };
+  }, []);
 
   const palette = {
     pageBg: '#FBF7F2',
@@ -239,6 +289,77 @@ export default function AdminDashboard() {
           </button>
         </div>
       )}
+
+      <div style={{ marginTop: 18, ...cardStyle }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <span style={{ fontWeight: 600, color: palette.text }}>System Health</span>
+          <button
+            onClick={async () => {
+              try {
+                setHealthLoading(true);
+                const response = await api.get('/health');
+                setHealthStatus(response.data);
+                setHealthError(null);
+                setLastHealthCheck(new Date().toLocaleString());
+              } catch (error: any) {
+                setHealthError(error?.message || 'Health check failed');
+              } finally {
+                setHealthLoading(false);
+              }
+            }}
+            style={{
+              padding: '6px 10px',
+              borderRadius: 8,
+              border: `1px solid ${palette.border}`,
+              background: '#fff',
+              cursor: 'pointer',
+              fontSize: 12,
+              fontWeight: 600,
+              color: palette.text
+            }}
+          >
+            {healthLoading ? 'Checking...' : 'Refresh'}
+          </button>
+        </div>
+
+        {healthError && (
+          <div style={{ fontSize: 12, color: '#B91C1C', marginBottom: 8 }}>
+            {healthError}
+          </div>
+        )}
+
+        {healthStatus ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
+            <div style={{ fontSize: 12, color: palette.textMuted }}>
+              <div style={{ fontWeight: 600, color: palette.text }}>API</div>
+              <div>Status: {healthStatus.status}</div>
+              <div>Env: {healthStatus.environment}</div>
+            </div>
+            <div style={{ fontSize: 12, color: palette.textMuted }}>
+              <div style={{ fontWeight: 600, color: palette.text }}>Database</div>
+              <div>Type: {healthStatus.database?.type}</div>
+              <div>Connected: {healthStatus.database?.connected ? 'yes' : 'no'}</div>
+            </div>
+            <div style={{ fontSize: 12, color: palette.textMuted }}>
+              <div style={{ fontWeight: 600, color: palette.text }}>Redis</div>
+              <div>Connected: {healthStatus.services?.redis?.connected ? 'yes' : 'no'}</div>
+              {healthStatus.services?.redis?.error && (
+                <div style={{ color: '#B91C1C' }}>Error: {healthStatus.services.redis.error}</div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div style={{ fontSize: 12, color: palette.textMuted }}>
+            Health data not available.
+          </div>
+        )}
+
+        {lastHealthCheck && (
+          <div style={{ marginTop: 8, fontSize: 11, color: palette.textMuted }}>
+            Last check: {lastHealthCheck}
+          </div>
+        )}
+      </div>
 
       <DatabaseExportPanel />
 

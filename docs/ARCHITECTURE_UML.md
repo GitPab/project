@@ -151,6 +151,7 @@ graph LR
 
     subgraph "Middleware Stack"
         B[CORS Middleware]
+        B1[Multi-Origin Support]
         C[JSON Parser]
         D[Authentication Middleware]
         E[RBAC Middleware]
@@ -166,11 +167,13 @@ graph LR
 
     subgraph "Database Access"
         K[pg Pool]
+        K1[app.locals.pool]
         L[SQL Queries]
     end
 
     A --> B
-    A --> C
+    B --> B1
+    B --> C
     B --> D
     C --> D
     D --> E
@@ -187,6 +190,7 @@ graph LR
     I --> K
     J --> K
     
+    K --> K1
     K --> L
 ```
 
@@ -486,6 +490,9 @@ graph TB
         A[localhost:5173 - Vite Dev]
         B[localhost:3001 - Node Dev]
         C[Local PostgreSQL or Supabase]
+        D1[npm run dev:full]
+        D2[Auto-start Script]
+        D3[Port 3001 Killer]
     end
 
     subgraph "Production Environment"
@@ -499,6 +506,11 @@ graph TB
         H[Vercel Edge Network]
     end
 
+    D1 --> D2
+    D2 --> D3
+    D3 --> B
+    D2 --> A
+    
     A -->|git push| D
     B -->|git push| E
     C -.->|migrate| F
@@ -511,6 +523,7 @@ graph TB
     style D fill:#00C853,stroke:#00C853,color:#fff
     style E fill:#00BFA5,stroke:#00BFA5,color:#fff
     style F fill:#2979FF,stroke:#2979FF,color:#fff
+    style D1 fill:#FF9800,stroke:#FF9800,color:#fff
 ```
 
 ## 11. File Structure
@@ -559,7 +572,7 @@ project/
 |--------|----------|------------|-------------|
 | POST | /api/login | Public | User authentication |
 | POST | /api/logout | Public | User logout |
-| GET | /api/universities | university:view | List all universities |
+| GET | /api/universities | Public (no auth) | List all universities |
 | POST | /api/universities | university:create | Create university |
 | PUT | /api/universities/:id | university:edit | Update university |
 | DELETE | /api/universities/:id | university:delete | Delete university |

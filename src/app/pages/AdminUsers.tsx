@@ -24,7 +24,7 @@ export default function AdminUsers() {
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
   const [togglingUser, setTogglingUser] = useState<string | null>(null);
 
-  const canManageUsers = hasPermission('manage_users');
+  const canManageUsers = hasPermission('USER_MANAGE');
 
   useEffect(() => {
     fetchUsers();
@@ -33,8 +33,9 @@ export default function AdminUsers() {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/api/users');
-      setUsers(response.data);
+      const response = await api.get('/students');
+      const rows = response.data?.data || response.data || [];
+      setUsers(rows.map((row: User) => ({ ...row, role: row.role || 'student' })));
     } catch (error) {
       toast.error('Không thể tải danh sách người dùng');
     } finally {
@@ -50,7 +51,7 @@ export default function AdminUsers() {
 
     setTogglingUser(userId);
     try {
-      const response = await api.patch(`/api/users/${userId}/toggle-active`);
+      const response = await api.patch(`/students/${userId}/toggle-active`);
       
       const result = response.data;
       
@@ -247,7 +248,7 @@ export default function AdminUsers() {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <PermissionGuard permission="manage_users">
+                    <PermissionGuard permission="USER_MANAGE">
                       <button
                         onClick={() => toggleUserStatus(user.id)}
                         disabled={togglingUser === user.id}

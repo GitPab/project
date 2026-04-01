@@ -22,7 +22,7 @@ interface UniversityRowProps {
   palette: any;
 }
 
-function UniversityRow({ university, onEdit, onQuickInfo, onDelete, onRestore, palette }: UniversityRowProps) {
+const UniversityRow = React.memo(function UniversityRow({ university, onEdit, onQuickInfo, onDelete, onRestore, palette }: UniversityRowProps) {
   const navigate = useNavigate();
   const isDeleted = university.is_active === false;
   
@@ -160,6 +160,9 @@ function UniversityRow({ university, onEdit, onQuickInfo, onDelete, onRestore, p
               <img 
                 src={university?.koreanData?.listLogo || university?.thumbnail} 
                 alt={university.name}
+                loading="lazy"
+                decoding="async"
+                fetchpriority="low"
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 onError={(e) => {
                   (e.currentTarget as HTMLImageElement).style.display = 'none';
@@ -399,7 +402,7 @@ function UniversityRow({ university, onEdit, onQuickInfo, onDelete, onRestore, p
       </div>
     </div>
   );
-}
+});
 
 interface UniversitiesListEnhancedProps {
   onUniversitySelect?: (university: University) => void;
@@ -411,9 +414,6 @@ export default function UniversitiesListEnhancedRedesigned() {
   const { hasPermission } = usePermission();
   const navigate = useNavigate();
 
-  // Debug logging
-  console.log('UniversitiesListEnhancedRedesigned - isAdmin:', isAdmin, 'user:', user);
-
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTier, setActiveTier] = useState<string>('all');
@@ -424,7 +424,7 @@ export default function UniversitiesListEnhancedRedesigned() {
   const [quickInfoUniversity, setQuickInfoUniversity] = useState<University | null>(null);
   const [showDeleted, setShowDeleted] = useState(false);
 
-  const palette = {
+  const palette = useMemo(() => ({
     pageBg: '#FBF7F2',
     cardBg: '#FFFFFF',
     border: '#E7DFD6',
@@ -436,7 +436,7 @@ export default function UniversitiesListEnhancedRedesigned() {
     chipBg: '#FFFFFF',
     chipActiveBg: '#F1F6FF',
     chipActiveBorder: '#2C6DB4'
-  };
+  }), []);
 
   const getCheapestKTXSafe = (university: University): number | null => {
     const commonFees = university?.koreanData?.commonFeesVND ?? [];

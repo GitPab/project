@@ -1,0 +1,75 @@
+{
+  "exportedAt": "2026-03-31T20:40:09.004Z",
+  "from": "PostgreSQL",
+  "data": {
+    "users": [
+      {
+        "id": "be137260-30b7-47e0-8f1c-975fc454cf19",
+        "name": "Test User",
+        "email": "test@example.com",
+        "phone": null,
+        "password": "$2a$12$1h/xzGvIF06V9Jo0j4SxSud0kZTcpv.VMC6q2TQfrz2WpgbCoXTz.",
+        "role": "admin",
+        "is_first_login": false,
+        "setup_token": null,
+        "setup_token_expiry": null,
+        "invited_by": null,
+        "is_active": true,
+        "last_login": "2026-03-30T22:02:12.000Z",
+        "created_at": "2026-03-30T21:59:28.000Z",
+        "updated_at": "2026-03-30T22:02:12.000Z"
+      },
+      {
+        "id": "446aeaab-7e56-4a44-befe-514e3e023163",
+        "name": "Sync Admin",
+        "email": "syncadmin@sacma.com",
+        "phone": null,
+        "password": "$2a$12$eWQzQ70jZav7U3Owl1siD.mUOOPL4qwNGyiEjXzX0GvLK4lQjdofa",
+        "role": "admin",
+        "is_first_login": false,
+        "setup_token": null,
+        "setup_token_expiry": null,
+        "invited_by": null,
+        "is_active": true,
+        "last_login": "2026-03-31T01:41:43.000Z",
+        "created_at": "2026-03-31T01:26:28.000Z",
+        "updated_at": "2026-03-31T01:41:43.000Z"
+      },
+      {
+        "id": "f02c7b68-0edd-4428-962a-d038b23d3461",
+        "name": "Student",
+        "email": "student@example.com",
+        "phone": null,
+        "password": "$2a$12$Vc2Jldz96c3cV1a2i4SCuu6vceJ.mlCcCu/9nhFdH5aD0p/c8ho.y",
+        "role": "student",
+        "is_first_login": false,
+        "setup_token": null,
+        "setup_token_expiry": null,
+        "invited_by": null,
+        "is_active": true,
+        "last_login": "2026-03-31T20:19:11.666Z",
+        "created_at": "2026-03-31T20:17:19.935Z",
+        "updated_at": "2026-03-31T20:17:19.935Z"
+      },
+      {
+        "id": "f1a59a89-0b59-417b-b4d3-4db8da89c821",
+        "name": "Administrator",
+        "email": "admin@duhoccost.vn",
+        "phone": null,
+        "password": "$2a$12$g28ZsZIdxpgsHjtbIGqzMOHz/uJw6eWlmJCGlo/nZ/pkYqtde4kQW",
+        "role": "admin",
+        "is_first_login": false,
+        "setup_token": null,
+        "setup_token_expiry": null,
+        "invited_by": null,
+        "is_active": true,
+        "last_login": "2026-03-31T20:27:20.135Z",
+        "created_at": "2026-03-31T19:50:55.133Z",
+        "updated_at": "2026-03-31T19:50:55.133Z"
+      }
+    ],
+    "universities": [],
+    "registrations": [],
+    "audit_logs": []
+  }
+}

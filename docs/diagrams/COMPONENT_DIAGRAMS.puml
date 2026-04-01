@@ -279,6 +279,7 @@ package "Server Core" {
 
 package "Middleware Pipeline" {
     [CORS Handler] as CORS
+    [Multi-Origin Config] as MultiOrigin
     [JSON Parser] as JSONParser
     [Static Files] as Static
     [Error Handler] as ErrorHandler
@@ -327,6 +328,8 @@ Server --> Express
 Server --> Config
 
 Express --> CORS : 1st
+CORS --> MultiOrigin
+MultiOrigin --> JSONParser : 2nd
 Express --> JSONParser : 2nd
 Express --> Static : 3rd
 Express --> AuthMiddleware : 4th

@@ -744,6 +744,27 @@ export async function initializeMySQLDatabase() {
     await createIndexIfNotExists('idx_user_sessions_user', 'user_sessions', 'user_id');
     await createIndexIfNotExists('idx_saved_filters_user', 'saved_filters', 'user_id');
     
+    // Seed default admin user if no users exist
+    try {
+      const [userCount] = await pool.execute('SELECT COUNT(*) as count FROM users');
+      if (userCount[0].count === 0) {
+        const bcrypt = await import('bcryptjs');
+        const { v4: uuidv4 } = await import('uuid');
+        const adminId = uuidv4();
+        const adminHash = await bcrypt.hash('admin123', 12);
+        
+        await pool.execute(
+          'INSERT INTO users (id, name, email, password, role, is_active) VALUES (?, ?, ?, ?, ?, ?)',
+          [adminId, 'Administrator', 'admin@duhoccost.vn', adminHash, 'admin', true]
+        );
+        
+        logger.info('Default admin user created', { email: 'admin@duhoccost.vn', password: 'admin123' });
+        console.log('\n✅ Default admin created: admin@duhoccost.vn / admin123\n');
+      }
+    } catch (seedError) {
+      logger.warn('Could not seed admin user', { error: seedError.message });
+    }
+    
     logger.info('MySQL database initialized');
   } catch (error) {
     logger.error('Failed to initialize MySQL database', { error: error.message });

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { MessageSquare, Star, CheckCircle, XCircle, ThumbsUp, ThumbsDown, Filter } from 'lucide-react';
 import { UniversityRating, ServiceFeedback } from '../../types';
+import { FeatureAPI } from '../services/featureApi';
 
 const AdminFeedback: React.FC = () => {
   const { universityRatings, serviceFeedback, approveRating, resolveFeedback } = useApp();
@@ -9,11 +10,64 @@ const AdminFeedback: React.FC = () => {
   const [feedback, setFeedback] = useState<ServiceFeedback[]>([]);
   const [activeTab, setActiveTab] = useState<'ratings' | 'feedback'>('ratings');
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved'>('all');
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const mapRating = (row: any): UniversityRating => ({
+    id: row.id,
+    universityId: row.university_id ?? row.universityId,
+    studentEmail: row.student_email ?? row.studentEmail ?? row.student_id ?? '',
+    studentApplicationId: row.registration_id ?? row.studentApplicationId,
+    overallRating: row.overall_rating ?? row.overallRating,
+    teachingQuality: row.teaching_quality ?? row.teachingQuality,
+    facilities: row.facilities ?? row.facilities,
+    supportServices: row.support_services ?? row.supportServices,
+    valueForMoney: row.value_for_money ?? row.valueForMoney,
+    reviewTitle: row.review_title ?? row.reviewTitle,
+    reviewText: row.review_text ?? row.reviewText,
+    isApproved: row.is_approved ?? row.isApproved ?? false,
+    approvedBy: row.approved_by ?? row.approvedBy,
+    approvedAt: row.approved_at ?? row.approvedAt,
+    createdAt: row.created_at ?? row.createdAt
+  });
+
+  const mapFeedback = (row: any): ServiceFeedback => ({
+    id: row.id,
+    studentEmail: row.student_email ?? row.studentEmail ?? row.student_id ?? '',
+    feedbackType: row.feedback_type ?? row.feedbackType ?? 'general',
+    rating: row.rating ?? row.rating,
+    feedbackText: row.feedback_text ?? row.feedbackText,
+    isResolved: row.is_resolved ?? row.isResolved ?? false,
+    resolvedBy: row.resolved_by ?? row.resolvedBy,
+    resolvedAt: row.resolved_at ?? row.resolvedAt,
+    resolutionNotes: row.resolution_notes ?? row.resolutionNotes,
+    createdAt: row.created_at ?? row.createdAt
+  });
+
+  const loadFromApi = async () => {
+    setIsLoading(true);
+    try {
+      const [ratingsRes, feedbackRes] = await Promise.all([
+        FeatureAPI.UniversityRatings.getAll(),
+        FeatureAPI.ServiceFeedback.getAll()
+      ]);
+      const apiRatings = (ratingsRes?.ratings || []).map(mapRating);
+      const apiFeedback = (feedbackRes?.feedback || []).map(mapFeedback);
+      setRatings(apiRatings);
+      setFeedback(apiFeedback);
+      setLoadError(null);
+    } catch (err: any) {
+      setLoadError(err?.message || 'Failed to load feedback');
+      setRatings(universityRatings);
+      setFeedback(serviceFeedback);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    setRatings(universityRatings);
-    setFeedback(serviceFeedback);
-  }, [universityRatings, serviceFeedback]);
+    loadFromApi();
+  }, []);
 
   const filteredRatings = filter === 'all' ? ratings :
     filter === 'pending' ? ratings.filter(r => !r.isApproved) :
@@ -73,8 +127,18 @@ const AdminFeedback: React.FC = () => {
               <option value="approved">Đã duyệt</option>
             </select>
           </div>
+          {loadError && (
+            <div className="mb-4 rounded border border-yellow-200 bg-yellow-50 px-3 py-2 text-sm text-yellow-800">
+              {loadError} - showing cached data.
+            </div>
+          )}
           <div className="space-y-4">
-            {filteredRatings.length === 0 ? (
+            {isLoading ? (
+              <div className="bg-white rounded-lg shadow p-8 text-center">
+                <Star className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                <p className="text-gray-500">Loading data...</p>
+              </div>
+            ) : filteredRatings.length === 0 ? (
               <div className="bg-white rounded-lg shadow p-8 text-center">
                 <Star className="w-12 h-12 mx-auto mb-2 text-gray-300" />
                 <p className="text-gray-500">Chưa có đánh giá nào</p>
@@ -104,7 +168,15 @@ const AdminFeedback: React.FC = () => {
                     <div className="flex gap-1">
                       {!rating.isApproved && (
                         <button
-                          onClick={() => approveRating(rating.id, 'admin')}
+                          onClick={async () => {
+                            try {
+                              await FeatureAPI.UniversityRatings.approve(rating.id);
+                              await loadFromApi();
+                            } catch {
+                              approveRating(rating.id, 'admin');
+                              setRatings((prev) => prev.map((r) => r.id === rating.id ? { ...r, isApproved: true } : r));
+                            }
+                          }}
                           className="p-2 text-green-600 hover:bg-green-50 rounded"
                           title="Duyệt"
                         >
@@ -122,7 +194,17 @@ const AdminFeedback: React.FC = () => {
 
       {activeTab === 'feedback' && (
         <div className="space-y-4">
-          {feedback.length === 0 ? (
+          {loadError && (
+            <div className="rounded border border-yellow-200 bg-yellow-50 px-3 py-2 text-sm text-yellow-800">
+              {loadError} - showing cached data.
+            </div>
+          )}
+          {isLoading ? (
+            <div className="bg-white rounded-lg shadow p-8 text-center">
+              <MessageSquare className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+              <p className="text-gray-500">Loading data...</p>
+            </div>
+          ) : feedback.length === 0 ? (
             <div className="bg-white rounded-lg shadow p-8 text-center">
               <MessageSquare className="w-12 h-12 mx-auto mb-2 text-gray-300" />
               <p className="text-gray-500">Chưa có phản hồi nào</p>
@@ -159,7 +241,12 @@ const AdminFeedback: React.FC = () => {
                         onClick={() => {
                           const notes = prompt('Nhập ghi chú giải quyết:');
                           if (notes !== null) {
-                            resolveFeedback(item.id, 'admin', notes);
+                            FeatureAPI.ServiceFeedback.resolve(item.id, notes)
+                              .then(loadFromApi)
+                              .catch(() => {
+                                resolveFeedback(item.id, 'admin', notes);
+                                setFeedback((prev) => prev.map((f) => f.id === item.id ? { ...f, isResolved: true, resolutionNotes: notes || f.resolutionNotes } : f));
+                              });
                           }
                         }}
                         className="p-2 text-green-600 hover:bg-green-50 rounded"
@@ -180,3 +267,8 @@ const AdminFeedback: React.FC = () => {
 };
 
 export default AdminFeedback;
+
+
+
+
+

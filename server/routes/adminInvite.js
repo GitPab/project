@@ -3,9 +3,11 @@
 // Create users without registration, first-time password setup
 // ============================================
 
-const express = require('express');
-const bcrypt = require('bcrypt');
-const { v4: uuidv4 } = require('uuid');
+import express from 'express';
+import bcrypt from 'bcryptjs';
+import { v4 as uuidv4 } from 'uuid';
+import jwt from 'jsonwebtoken';
+
 const router = express.Router();
 
 // ============================================
@@ -18,7 +20,6 @@ const authenticateToken = (req, res, next) => {
   if (!token) return res.status(401).json({ error: 'Access denied' });
   
   try {
-    const jwt = require('jsonwebtoken');
     const user = jwt.verify(token, process.env.JWT_SECRET);
     req.user = user;
     next();
@@ -208,7 +209,6 @@ router.post('/auth/set-password', async (req, res) => {
     );
     
     // Generate JWT token for immediate login
-    const jwt = require('jsonwebtoken');
     const authToken = jwt.sign(
       { id: user.id, email: user.email, role: user.role, name: user.name },
       process.env.JWT_SECRET,
@@ -301,7 +301,7 @@ function generateSetupToken() {
 // DATABASE MIGRATION - Add required columns
 // ============================================
 
-const INVITE_SYSTEM_MIGRATION = `
+export const INVITE_SYSTEM_MIGRATION = `
 -- Add invite system columns to users table
 ALTER TABLE users 
 ADD COLUMN IF NOT EXISTS is_first_login BOOLEAN DEFAULT false,
@@ -320,9 +320,5 @@ CHECK (role IN ('student', 'admin', 'super_admin', 'admin_manager', 'content_edi
 CREATE INDEX IF NOT EXISTS idx_users_setup_token ON users(setup_token) WHERE is_first_login = true;
 `;
 
-module.exports = {
-  router,
-  INVITE_SYSTEM_MIGRATION,
-  authenticateToken,
-  requireInvitePermission
-};
+export default router;
+export { authenticateToken, requireInvitePermission };

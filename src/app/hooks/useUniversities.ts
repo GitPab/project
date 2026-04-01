@@ -17,7 +17,7 @@ export function useUniversities(includeInactive = false) {
   return useQuery({
     queryKey: universityKeys.list({ includeInactive }),
     queryFn: async () => {
-      const response = await api.get('/api/universities', {
+      const response = await api.get('/universities', {
         params: { includeInactive }
       });
       return response.data.data || response.data;
@@ -31,7 +31,7 @@ export function useUniversitiesPaginated(page = 1, limit = 20, search = '', incl
   return useQuery({
     queryKey: universityKeys.list({ page, limit, search, includeInactive }),
     queryFn: async () => {
-      const response = await api.get('/api/universities', {
+      const response = await api.get('/universities', {
         params: { page, limit, search, includeInactive }
       });
       return response.data;
@@ -45,7 +45,7 @@ export function useUniversity(id: string) {
   return useQuery({
     queryKey: universityKeys.detail(id),
     queryFn: async () => {
-      const response = await api.get(`/api/universities/${id}`);
+      const response = await api.get(`/universities/${id}`);
       return response.data;
     },
     enabled: !!id, // Only run if id is provided
@@ -58,7 +58,7 @@ export function useCreateUniversity() {
   
   return useMutation({
     mutationFn: async (data: Partial<UniversityRecord>) => {
-      const response = await api.post('/api/universities', data);
+      const response = await api.post('/universities', data);
       return response.data;
     },
     onSuccess: () => {
@@ -78,7 +78,7 @@ export function useUpdateUniversity() {
   
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<UniversityRecord> }) => {
-      const response = await api.put(`/api/universities/${id}`, data);
+      const response = await api.put(`/universities/${id}`, data);
       return response.data;
     },
     onSuccess: (_, variables) => {
@@ -99,7 +99,7 @@ export function useSoftDeleteUniversity() {
   
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await api.delete(`/api/universities/${id}`);
+      const response = await api.delete(`/universities/${id}`);
       return response.data;
     },
     onSuccess: () => {
@@ -118,7 +118,7 @@ export function useRestoreUniversity() {
   
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await api.patch(`/api/universities/${id}/restore`);
+      const response = await api.patch(`/universities/${id}/restore`);
       return response.data;
     },
     onSuccess: () => {
@@ -137,7 +137,7 @@ export function useOptimisticUpdateUniversity() {
   
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<UniversityRecord> }) => {
-      const response = await api.put(`/api/universities/${id}`, data);
+      const response = await api.put(`/universities/${id}`, data);
       return response.data;
     },
     onMutate: async ({ id, data }) => {

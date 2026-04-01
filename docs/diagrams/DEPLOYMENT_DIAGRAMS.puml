@@ -1,11 +1,20 @@
 @startuml Deployment_Development
 
+skinparam backgroundColor #FEFEFE
+skinparam componentStyle rectangle
+
 title Deployment Diagram - Development Environment
 
 node "Developer Machine" as DevMachine {
     component "Browser\n(Chrome/Firefox/Edge)" as Browser {
         [React DevTools]
         [Network Inspector]
+    }
+    
+    node "Auto-Start Script" as AutoStart {
+        [npm run dev:full] as DevFull
+        [Port 3001 Killer] as PortKiller
+        [Process Manager] as ProcMgr
     }
     
     node "Frontend Development" as FrontendDev {
@@ -34,15 +43,23 @@ node "External Services" as External {
     cloud "Email SMTP" as SMTP
 }
 
+' Connections
 Browser --> Port5173 : HTTP
 Port5173 --> Vite
 Vite --> ReactSrc
 Vite --> HMR
 HMR --> Browser : Live reload
 
+' Auto-start workflow
+DevFull --> PortKiller : 1. Kill old processes
+PortKiller --> Port3001 : Check/Clear
+DevFull --> ProcMgr : 2. Start backend
+ProcMgr --> Port3001 --> Express
+Express --> Node
+DevFull --> Vite : 3. Start frontend
+
 ReactSrc --> Port3001 : API calls
 Port3001 --> Express
-Express --> Node
 Express --> LocalDB : SQL
 Express --> External : HTTP
 

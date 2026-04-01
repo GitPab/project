@@ -18,32 +18,37 @@ export class DatabaseOptimizer {
     const pool = await getPool();
     const DB_TYPE = process.env.DB_TYPE || 'postgresql';
     
-    if (DB_TYPE === 'mysql') {
-      const [tables] = await pool.execute(`
-        SELECT 
-          table_name,
-          table_rows,
-          data_length,
-          index_length,
-          (data_length + index_length) as total_size
-        FROM information_schema.tables
-        WHERE table_schema = DATABASE()
-        AND table_type = 'BASE TABLE'
-      `);
-      return tables;
-    } else {
-      const { rows } = await pool.query(`
-        SELECT 
-          schemaname,
-          tablename,
-          n_tup_ins as inserts,
-          n_tup_upd as updates,
-          n_tup_del as deletes,
-          n_live_tup as live_tuples
-        FROM pg_stat_user_tables
-        ORDER BY n_live_tup DESC
-      `);
-      return rows;
+    try {
+      if (DB_TYPE === 'mysql') {
+        const [tables] = await pool.execute(`
+          SELECT 
+            table_name,
+            table_rows,
+            data_length,
+            index_length,
+            (data_length + index_length) as total_size
+          FROM information_schema.tables
+          WHERE table_schema = DATABASE()
+          AND table_type = 'BASE TABLE'
+        `);
+        return tables;
+      } else {
+        const { rows } = await pool.query(`
+          SELECT 
+            schemaname,
+            relname as tablename,
+            n_tup_ins as inserts,
+            n_tup_upd as updates,
+            n_tup_del as deletes,
+            n_live_tup as live_tuples
+          FROM pg_stat_user_tables
+          ORDER BY n_live_tup DESC
+        `);
+        return rows;
+      }
+    } catch (err) {
+      logger.warn('Failed to load table stats', { error: err.message });
+      return [];
     }
   }
 
@@ -55,7 +60,8 @@ export class DatabaseOptimizer {
     const DB_TYPE = process.env.DB_TYPE || 'postgresql';
     const recommendations = [];
 
-    if (DB_TYPE === 'mysql') {
+    try {
+      if (DB_TYPE === 'mysql') {
       // Check for columns without indexes that are used in WHERE
       const [missingIndexes] = await pool.execute(`
         SELECT 
@@ -101,36 +107,42 @@ export class DatabaseOptimizer {
           });
         }
       }
-    } else {
+      } else {
       // PostgreSQL missing index detection
       const { rows } = await pool.query(`
         SELECT
-          schemaname,
-          tablename,
-          attname as column_name,
-          n_tup_read,
-          n_tup_fetch
-        FROM pg_stats
-        JOIN pg_stat_user_tables ON pg_stats.tablename = pg_stat_user_tables.tablename
-        WHERE schemaname = 'public'
-        AND n_tup_read > 1000
+          s.schemaname,
+          s.tablename,
+          s.attname as column_name,
+          t.seq_tup_read,
+          t.idx_tup_fetch
+        FROM pg_stats s
+        JOIN pg_stat_user_tables t
+          ON s.tablename = t.relname
+         AND s.schemaname = t.schemaname
+        WHERE s.schemaname = 'public'
+        AND t.seq_tup_read > 1000
         AND NOT EXISTS (
-          SELECT 1 FROM pg_indexes 
-          WHERE tablename = pg_stats.tablename
-          AND indexdef LIKE '%' || pg_stats.attname || '%'
+          SELECT 1 FROM pg_indexes i
+          WHERE i.tablename = s.tablename
+          AND i.indexdef ILIKE '%' || s.attname || '%'
         )
       `);
 
-      for (const row of rows) {
+        for (const row of rows) {
         recommendations.push({
           type: 'CREATE_INDEX',
           priority: 'MEDIUM',
           table: row.tablename,
           column: row.column_name,
-          reason: `High read ratio: ${row.n_tup_read} reads`,
+          reason: `High sequential reads: ${row.seq_tup_read} reads`,
           sql: `CREATE INDEX IF NOT EXISTS idx_${row.tablename}_${row.column_name} ON ${row.tablename}(${row.column_name});`
         });
+        }
       }
+    } catch (err) {
+      logger.warn('Missing index analysis failed', { error: err.message });
+      return [];
     }
 
     return recommendations;

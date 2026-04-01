@@ -1,31 +1,62 @@
 ﻿import React from 'react';
-import { Outlet, NavLink, useNavigate, Navigate } from 'react-router';
+import { Outlet, NavLink, useNavigate, Navigate, useLocation } from 'react-router';
 import { useAuth } from '../context/AuthContext';
-import { ROLE_DEFINITIONS, type Role } from '../constants/rbac';
+import { usePermission } from './PermissionGuard';
+import api from '../services/api';
 import { LayoutDashboard, School, Users, LogOut, Menu, X, Shield, UserCircle, Lock, Edit3, TrendingUp, ChevronsLeft, ChevronsRight, BarChart3, ClipboardList, Mail, Workflow, Settings, Database, GraduationCap, Calendar, MessageSquare, ShieldCheck } from 'lucide-react';
 
 export default function Layout() {
   const { logout, user, isAdmin } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
+  const contentRef = React.useRef<HTMLDivElement | null>(null);
+  const [healthStatus, setHealthStatus] = React.useState<'ok' | 'degraded' | 'unknown'>('unknown');
+  const [healthTooltip, setHealthTooltip] = React.useState('Health: unknown');
 
   // Helper to check if user has permission for a feature
-  const hasPermission = (requiredPermission: string): boolean => {
-    if (!user?.role) return false;
-    const role = user.role as Role;
-    const roleDef = ROLE_DEFINITIONS[role];
-    if (!roleDef) return false;
-    // super_admin has all permissions
-    if (roleDef.permissions.includes('*')) return true;
-    return roleDef.permissions.includes(requiredPermission);
-  };
+  const { hasPermission } = usePermission();
 
   const handleLogout = () => { 
     logout(); 
     navigate('/login'); 
   };
   if (!user) return <Navigate to='/login' replace />;
+
+  // Reset scroll on route change to avoid blank space after navigation
+  React.useEffect(() => {
+    contentRef.current?.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+  }, [location.pathname, location.hash]);
+
+  React.useEffect(() => {
+    let isMounted = true;
+    let intervalId: number | null = null;
+
+    const fetchHealth = async () => {
+      try {
+        const response = await api.get('/health');
+        const status = response?.data?.status || 'unknown';
+        if (!isMounted) return;
+        setHealthStatus(status === 'ok' ? 'ok' : 'degraded');
+        setHealthTooltip(`Health: ${status}`);
+      } catch (error: any) {
+        if (!isMounted) return;
+        setHealthStatus('degraded');
+        setHealthTooltip('Health: error');
+      }
+    };
+
+    if (isAdmin) {
+      fetchHealth();
+      intervalId = window.setInterval(fetchHealth, 30000);
+    }
+
+    return () => {
+      isMounted = false;
+      if (intervalId) window.clearInterval(intervalId);
+    };
+  }, [isAdmin]);
 
   // Admin menu items with required permissions
   const adminMenuItems = [
@@ -42,6 +73,7 @@ export default function Layout() {
     { path: '/admin/templates',     icon: Mail,            label: 'Mẫu Email',       permission: 'manage:settings' },
     { path: '/admin/workflow',      icon: Workflow,        label: 'Tự động hóa',     permission: 'manage:settings' },
     { path: '/admin/bulk',         icon: Database,        label: 'Thao tác hàng loạt', permission: 'university:create' },
+    { path: '/admin/maintenance',  icon: Database,        label: 'Bảo trì',          permission: 'view:database' },
     { path: '/admin/roles',        icon: Shield,          label: 'Phân quyền',      permission: 'manage:user' },
     { path: '/admin/settings',      icon: Settings,        label: 'Cài đặt',         permission: 'manage:settings' },
   ];
@@ -82,6 +114,27 @@ export default function Layout() {
                 </p>
               </div>
             </div>
+            {isAdmin && (
+              <div title={healthTooltip} style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: '50%',
+                  background: healthStatus === 'ok' ? '#10B981' : healthStatus === 'degraded' ? '#F59E0B' : '#9CA3AF'
+                }} />
+                <span style={{ fontSize: 12, color: '#6B7280' }}>Health status</span>
+              </div>
+            )}
+          </div>
+        )}
+        {sidebarCollapsed && isAdmin && (
+          <div title={healthTooltip} style={{ display: 'flex', justifyContent: 'center', padding: '10px 0' }}>
+            <span style={{
+              width: 10,
+              height: 10,
+              borderRadius: '50%',
+              background: healthStatus === 'ok' ? '#10B981' : healthStatus === 'degraded' ? '#F59E0B' : '#9CA3AF'
+            }} />
           </div>
         )}
 
@@ -138,8 +191,19 @@ export default function Layout() {
       )}
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col overflow-auto">
+      <div ref={contentRef} className="flex-1 flex flex-col overflow-auto">
         <header className="hidden md:flex h-16 bg-white border-b border-slate-200 items-center justify-end px-6 shadow-sm gap-3 shrink-0">
+          {isAdmin && (
+            <div title={healthTooltip} style={{ display: 'flex', alignItems: 'center', gap: 6, marginRight: 8 }}>
+              <span style={{
+                width: 10,
+                height: 10,
+                borderRadius: '50%',
+                background: healthStatus === 'ok' ? '#10B981' : healthStatus === 'degraded' ? '#F59E0B' : '#9CA3AF'
+              }} />
+              <span style={{ fontSize: 12, color: '#6B7280' }}>Health</span>
+            </div>
+          )}
           <div className={`flex items-center gap-3 px-4 py-2 ${isAdmin ? 'bg-blue-600' : 'bg-emerald-600'} text-white rounded-lg text-sm font-medium`}>
             {isAdmin ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
             <div className="flex flex-col leading-tight">
@@ -152,6 +216,17 @@ export default function Layout() {
         <header className="md:hidden h-16 bg-white border-b border-slate-200 flex items-center px-4 shadow-sm shrink-0">
           <button onClick={() => setSidebarOpen(true)} className="text-slate-700"><Menu className="w-6 h-6" /></button>
           <h1 className="ml-4 text-xl font-bold text-primary flex-1">Du Học Cost</h1>
+          {isAdmin && (
+            <div title={healthTooltip} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{
+                width: 10,
+                height: 10,
+                borderRadius: '50%',
+                background: healthStatus === 'ok' ? '#10B981' : healthStatus === 'degraded' ? '#F59E0B' : '#9CA3AF'
+              }} />
+              <span style={{ fontSize: 11, color: '#6B7280' }}>Health</span>
+            </div>
+          )}
           <div className="flex items-center gap-2">
           </div>
         </header>

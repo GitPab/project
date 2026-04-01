@@ -429,6 +429,55 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [workflowRules, setWorkflowRules] = useState<WorkflowRule[]>([]);
   const [userPreferences, setUserPreferences] = useState<UserPreferences | null>(null);
   const [userSessions, setUserSessions] = useState<UserSession[]>([]);
+
+  // Sync user state with AuthContext localStorage
+  useEffect(() => {
+    const syncFromAuthStorage = () => {
+      const stored = localStorage.getItem('auth_user');
+      if (!stored) {
+        setUser((prev) => (prev ? null : prev));
+        return;
+      }
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed?.email) {
+          setUser((prev) => {
+            const next = {
+              email: parsed.email,
+              role: parsed.role || prev?.role || 'student',
+              name: parsed.name || prev?.name || parsed.email.split('@')[0],
+              phone: parsed.phone || prev?.phone,
+              displayName: parsed.displayName || prev?.displayName,
+              trackingCode: parsed.trackingCode || prev?.trackingCode
+            };
+            if (
+              prev &&
+              prev.email === next.email &&
+              prev.role === next.role &&
+              prev.name === next.name &&
+              prev.phone === next.phone &&
+              prev.displayName === next.displayName &&
+              prev.trackingCode === next.trackingCode
+            ) {
+              return prev;
+            }
+            return next;
+          });
+        }
+      } catch {
+        // ignore invalid storage
+      }
+    };
+
+    syncFromAuthStorage();
+    const handler = () => syncFromAuthStorage();
+    window.addEventListener('auth-changed', handler);
+    window.addEventListener('storage', handler);
+    return () => {
+      window.removeEventListener('auth-changed', handler);
+      window.removeEventListener('storage', handler);
+    };
+  }, []);
   const [bulkOperations, setBulkOperations] = useState<BulkOperation[]>([]);
   const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
   const [dbInitialized, setDbInitialized] = useState(false);

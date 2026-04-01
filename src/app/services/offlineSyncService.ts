@@ -8,8 +8,22 @@
  */
 
 import { initDatabase, runQuery, runExec, saveDatabase } from './sqliteDatabase';
+import { getApiUrl, resetServerPort } from './portDetector';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+let cachedApiUrl: string | null = null;
+let lastApiUrlCheck = 0;
+
+async function getDynamicApiUrl(): Promise<string> {
+  const now = Date.now();
+  // Cache for 30 seconds
+  if (cachedApiUrl && (now - lastApiUrlCheck) < 30000) {
+    return cachedApiUrl;
+  }
+  
+  cachedApiUrl = await getApiUrl();
+  lastApiUrlCheck = now;
+  return cachedApiUrl;
+}
 
 interface PendingSyncItem {
   id: string;
@@ -36,6 +50,7 @@ export async function apiCallWithOfflineFallback(
   options: RequestInit = {},
   offlineFallback?: () => Promise<any>
 ): Promise<any> {
+  const API_URL = await getDynamicApiUrl();
   const url = `${API_URL}${endpoint}`;
   const token = getToken();
 
@@ -61,7 +76,14 @@ export async function apiCallWithOfflineFallback(
     }
 
     return response.json();
-  } catch (apiError) {
+  } catch (apiError: any) {
+    // If connection refused, reset port cache to force redetection
+    if (apiError.message?.includes('fetch') || apiError.message?.includes('NetworkError')) {
+      console.log('[OfflineSync] Connection failed, will retry with port detection');
+      resetServerPort();
+      cachedApiUrl = null;
+    }
+    
     // API failed - check if we should use offline fallback
     if (!isOnline() && offlineFallback) {
       console.log(`[OfflineSync] API failed, using offline fallback for ${endpoint}`);
@@ -159,12 +181,14 @@ export async function processPendingSyncs(): Promise<{
     return { processed: 0, failed: 0, remaining: 0 };
   }
 
+  const API_URL = await getDynamicApiUrl();
   const pending = await getPendingSyncs();
   let processed = 0;
   let failed = 0;
 
   for (const item of pending) {
     try {
+      const API_URL = await getDynamicApiUrl();
       const url = `${API_URL}${item.endpoint}`;
       const token = getToken();
       

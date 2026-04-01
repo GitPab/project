@@ -22,16 +22,30 @@ export interface UniversityRecord {
 
 export async function getAllUniversities(includeInactive = false): Promise<UniversityRecord[]> {
   await initDatabase();
-  let whereClause = '';
-  if (!includeInactive) {
-    whereClause = 'WHERE is_active IS NULL OR is_active = 1';
+  try {
+    let whereClause = '';
+    if (!includeInactive) {
+      whereClause = 'WHERE is_active IS NULL OR is_active = 1';
+    }
+    const results = runQuery(`SELECT * FROM universities ${whereClause} ORDER BY name`);
+    return results.map(row => ({
+      ...row,
+      korean_data: row.korean_data ? JSON.parse(row.korean_data) : undefined,
+      is_active: row.is_active === null ? true : row.is_active === 1
+    }));
+  } catch (error: any) {
+    // If is_active column is missing, try without the filter
+    if (error.message?.includes('no such column: is_active')) {
+      console.warn('is_active column missing, querying without filter...');
+      const results = runQuery('SELECT * FROM universities ORDER BY name');
+      return results.map(row => ({
+        ...row,
+        korean_data: row.korean_data ? JSON.parse(row.korean_data) : undefined,
+        is_active: true // Default to active if column doesn't exist
+      }));
+    }
+    throw error;
   }
-  const results = runQuery(`SELECT * FROM universities ${whereClause} ORDER BY name`);
-  return results.map(row => ({
-    ...row,
-    korean_data: row.korean_data ? JSON.parse(row.korean_data) : undefined,
-    is_active: row.is_active === null ? true : row.is_active === 1
-  }));
 }
 
 export interface PaginationParams {

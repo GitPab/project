@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../context/AuthContext';
 import { Mail, Lock, ArrowLeft, GraduationCap } from 'lucide-react';
+import { getApiUrl } from '../services/portDetector';
 
 export default function Login() {
   const [form, setForm] = useState({ email: '', password: '' });
@@ -16,8 +17,9 @@ export default function Login() {
     const checkApi = async () => {
       setApiStatus('loading');
       try {
-        // Simple health check - try to connect to API
-        const response = await fetch(import.meta.env.VITE_API_URL || 'http://localhost:3001/api/health');
+        // Dynamic health check
+        const apiUrl = await getApiUrl();
+        const response = await fetch(`${apiUrl}/health`);
         if (response.ok) {
           setApiStatus('ready');
         } else {
@@ -25,7 +27,6 @@ export default function Login() {
         }
       } catch (err) {
         console.warn('API connection failed, continuing anyway:', err);
-        // Don't block login if API check fails
         setApiStatus('ready');
       }
     };

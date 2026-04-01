@@ -2,9 +2,34 @@
 
 ## 🚀 Getting Started
 
+### Quick Start (One Command)
+```bash
+npm run dev:full
+```
+This starts both backend (port 3001) and frontend (port 5173) automatically.
+
+### Manual Start (Separate Terminals)
+```bash
+# Terminal 1 - Backend
+cd server
+npm start
+
+# Terminal 2 - Frontend (from project root)
+npm run dev
+```
+
 ### Login Credentials
-- **Admin**: `admin@example.com` / any password
-- **Student**: `student@example.com` / any password
+- **Admin**: `admin@duhoccost.vn` / `admin123`
+- **Student**: Register via Student Onboarding
+
+### Environment Setup
+Create `server/.env`:
+```env
+DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@localhost:5432/sacma
+PORT=3001
+FRONTEND_URL=http://localhost:5173
+# OR for multiple origins: FRONTEND_URLS=http://localhost:5173,http://127.0.0.1:5173
+```
 
 ## 📋 Testing the Demo
 

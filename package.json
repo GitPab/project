@@ -6,12 +6,21 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:full": "node scripts/start-dev.js",
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint .",
     "format": "prettier . --write",
-    "test": "node --loader ts-node/esm tests/validation.test.ts || node -r esbuild-register tests/validation.test.ts || node tests/validation.test.ts"
+    "test": "node --loader ts-node/esm tests/validation.test.ts || node -r esbuild-register tests/validation.test.ts || node tests/validation.test.ts",
+    "migrate": "node server/migrate.js",
+    "migrate:check": "node scripts/check-migrations.mjs",
+    "smoke": "node scripts/smoke.mjs",
+    "backup": "node scripts/backup.mjs",
+    "health:watch": "node scripts/health-watch.mjs",
+    "logs:rotate": "node scripts/log-rotate.mjs",
+    "audit:purge": "node scripts/purge-audit.mjs",
+    "maintenance:daily": "node scripts/backup.mjs && node scripts/log-rotate.mjs && node scripts/purge-audit.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

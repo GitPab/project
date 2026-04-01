@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import AdminInvite from '../components/AdminInvite';
 import { Shield, Plus, Trash2, Edit2, Save, X, UserPlus, CheckSquare, Square, Loader2, AlertCircle, Users } from 'lucide-react';
 import { Role, UserRole } from '../../types';
+import { PERMISSIONS } from '../constants/rbac';
 
 const AdminRoles: React.FC = () => {
   const { roles, userRoles, createRole, updateRole, deleteRole, assignUserRole, getUserRoles } = useApp();
@@ -20,83 +21,96 @@ const AdminRoles: React.FC = () => {
     description: '',
     permissions: [] as string[]
   });
+  const [legacyPermissions, setLegacyPermissions] = useState<string[]>([]);
   const [assignForm, setAssignForm] = useState({
     userEmail: '',
     roleId: ''
   });
 
-  const availablePermissions = [
-    // Universities
-    { key: 'view_universities', label: 'Xem danh sách trường', category: 'Trường học' },
-    { key: 'create_universities', label: 'Thêm trường mới', category: 'Trường học' },
-    { key: 'edit_universities', label: 'Sửa thông tin trường', category: 'Trường học' },
-    { key: 'delete_universities', label: 'Xóa trường', category: 'Trường học' },
-    { key: 'configure_fees', label: 'Cấu hình chi phí', category: 'Trường học' },
-    { key: 'import_universities', label: 'Import danh sách trường', category: 'Trường học' },
-    
-    // Students
-    { key: 'view_students', label: 'Xem học viên', category: 'Học viên' },
-    { key: 'manage_students', label: 'Quản lý học viên', category: 'Học viên' },
-    { key: 'edit_student_status', label: 'Sửa trạng thái học viên', category: 'Học viên' },
-    { key: 'view_student_progress', label: 'Xem tiến độ học viên', category: 'Học viên' },
-    
-    // Applications
-    { key: 'view_applications', label: 'Xem đơn đăng ký', category: 'Đơn đăng ký' },
-    { key: 'approve_applications', label: 'Duyệt đơn', category: 'Đơn đăng ký' },
-    { key: 'reject_applications', label: 'Từ chối đơn', category: 'Đơn đăng ký' },
-    
-    // Payments
-    { key: 'view_payments', label: 'Xem thanh toán', category: 'Thanh toán' },
-    { key: 'manage_payments', label: 'Quản lý thanh toán', category: 'Thanh toán' },
-    { key: 'confirm_payments', label: 'Xác nhận thanh toán', category: 'Thanh toán' },
-    { key: 'create_invoices', label: 'Tạo hóa đơn', category: 'Thanh toán' },
-    
-    // Documents
-    { key: 'view_documents', label: 'Xem tài liệu', category: 'Tài liệu' },
-    { key: 'verify_documents', label: 'Xác minh tài liệu', category: 'Tài liệu' },
-    { key: 'upload_documents', label: 'Upload tài liệu', category: 'Tài liệu' },
-    { key: 'delete_documents', label: 'Xóa tài liệu', category: 'Tài liệu' },
-    
-    // Analytics & Reports
-    { key: 'view_analytics', label: 'Xem thống kê', category: 'Báo cáo' },
-    { key: 'view_dashboard', label: 'Xem dashboard', category: 'Báo cáo' },
-    { key: 'export_data', label: 'Xuất dữ liệu (Export)', category: 'Báo cáo' },
-    { key: 'export_reports', label: 'Xuất báo cáo', category: 'Báo cáo' },
-    
-    // User Management
-    { key: 'view_users', label: 'Xem người dùng', category: 'Người dùng' },
-    { key: 'manage_users', label: 'Quản lý người dùng', category: 'Người dùng' },
-    { key: 'manage_roles', label: 'Phân quyền (RBAC)', category: 'Người dùng' },
-    { key: 'assign_roles', label: 'Gán vai trò', category: 'Người dùng' },
-    
-    // Settings
-    { key: 'view_settings', label: 'Xem cài đặt', category: 'Cài đặt' },
-    { key: 'manage_settings', label: 'Quản lý cài đặt', category: 'Cài đặt' },
-    { key: 'manage_email_templates', label: 'Quản lý mẫu email', category: 'Cài đặt' },
-    { key: 'manage_workflows', label: 'Quản lý workflow', category: 'Cài đặt' },
-    
-    // Scholarships
-    { key: 'view_scholarships', label: 'Xem học bổng', category: 'Học bổng' },
-    { key: 'manage_scholarships', label: 'Quản lý học bổng', category: 'Học bổng' },
-    
-    // Visa
-    { key: 'view_visa', label: 'Xem theo dõi visa', category: 'Visa' },
-    { key: 'manage_visa', label: 'Quản lý visa', category: 'Visa' },
-    
-    // Appointments
-    { key: 'view_appointments', label: 'Xem lịch hẹn', category: 'Lịch hẹn' },
-    { key: 'manage_appointments', label: 'Quản lý lịch hẹn', category: 'Lịch hẹn' },
-    
-    // Notifications
-    { key: 'send_notifications', label: 'Gửi thông báo', category: 'Thông báo' },
-    { key: 'manage_notifications', label: 'Quản lý thông báo', category: 'Thông báo' },
-    
-    // System
-    { key: 'sync_database', label: 'Sync dữ liệu', category: 'Hệ thống' },
-    { key: 'backup_database', label: 'Backup/Restore', category: 'Hệ thống' },
-    { key: 'view_audit_logs', label: 'Xem nhật ký hệ thống', category: 'Hệ thống' },
-    { key: 'system_admin', label: 'Quản trị viên hệ thống', category: 'Hệ thống' }
-  ];
+  const LEGACY_PERMISSION_MAP: Record<string, string> = {
+    view_universities: 'UNIVERSITY_VIEW',
+    create_universities: 'UNIVERSITY_CREATE',
+    edit_universities: 'UNIVERSITY_EDIT',
+    delete_universities: 'UNIVERSITY_DELETE',
+    view_students: 'STUDENT_VIEW',
+    manage_students: 'STUDENT_EDIT',
+    edit_student_status: 'STUDENT_EDIT',
+    view_student_progress: 'STUDENT_PROGRESS',
+    view_applications: 'APPLICATION_VIEW',
+    approve_applications: 'APPLICATION_MANAGE',
+    reject_applications: 'APPLICATION_MANAGE',
+    view_payments: 'PAYMENT_VIEW',
+    manage_payments: 'PAYMENT_CREATE',
+    confirm_payments: 'PAYMENT_APPROVE',
+    create_invoices: 'PAYMENT_CREATE',
+    view_analytics: 'ANALYTICS_VIEW',
+    view_dashboard: 'ANALYTICS_VIEW',
+    export_data: 'UNIVERSITY_EXPORT',
+    export_reports: 'ANALYTICS_VIEW',
+    view_users: 'USER_MANAGE',
+    manage_users: 'USER_MANAGE',
+    manage_roles: 'ROLE_MANAGE',
+    assign_roles: 'ROLE_MANAGE',
+    view_settings: 'SETTINGS_MANAGE',
+    manage_settings: 'SETTINGS_MANAGE',
+    manage_email_templates: 'SETTINGS_MANAGE',
+    manage_workflows: 'SETTINGS_MANAGE',
+    view_scholarships: 'UNIVERSITY_VIEW',
+    manage_scholarships: 'UNIVERSITY_EDIT',
+    view_visa: 'STUDENT_VIEW',
+    manage_visa: 'STUDENT_EDIT',
+    view_appointments: 'STUDENT_VIEW',
+    manage_appointments: 'STUDENT_EDIT',
+  };
+
+  const CATEGORY_LABELS: Record<string, string> = {
+    university: 'Trường học',
+    student: 'Học viên',
+    student_progress: 'Học viên',
+    application: 'Đơn đăng ký',
+    payment: 'Thanh toán',
+    analytics: 'Báo cáo',
+    user: 'Người dùng',
+    role: 'Người dùng',
+    settings: 'Cài đặt'
+  };
+
+  const availablePermissions = Object.entries(PERMISSIONS).map(([key, perm]) => ({
+    key,
+    label: perm.description,
+    category: CATEGORY_LABELS[perm.resource] || 'Khác'
+  }));
+
+  const categoryOrder = Array.from(new Set(availablePermissions.map((p) => p.category)));
+
+  const normalizePermissions = (permissions: string[]) => {
+    const normalized: string[] = [];
+    const legacy: string[] = [];
+    permissions.forEach((perm) => {
+      if (perm in PERMISSIONS) {
+        normalized.push(perm);
+        return;
+      }
+      if (LEGACY_PERMISSION_MAP[perm]) {
+        normalized.push(LEGACY_PERMISSION_MAP[perm]);
+        return;
+      }
+      legacy.push(perm);
+    });
+    return {
+      normalized: Array.from(new Set(normalized)),
+      legacy
+    };
+  };
+
+  const getPermissionLabel = (permKey: string) => {
+    if (permKey in PERMISSIONS) return PERMISSIONS[permKey as keyof typeof PERMISSIONS].description;
+    if (LEGACY_PERMISSION_MAP[permKey]) {
+      const mapped = LEGACY_PERMISSION_MAP[permKey] as keyof typeof PERMISSIONS;
+      return PERMISSIONS[mapped]?.description || permKey;
+    }
+    return permKey;
+  };
 
   useEffect(() => {
     setAllRoles(roles);
@@ -113,12 +127,14 @@ const AdminRoles: React.FC = () => {
   };
 
   const handleEditRole = (role: Role) => {
+    const { normalized, legacy } = normalizePermissions(role.permissions || []);
     setEditingRole(role);
     setRoleForm({
       name: role.name,
       description: role.description || '',
-      permissions: role.permissions || []
+      permissions: normalized
     });
+    setLegacyPermissions(legacy);
     setShowRoleModal(true);
   };
 
@@ -127,21 +143,23 @@ const AdminRoles: React.FC = () => {
     
     setIsSubmitting(true);
     try {
+      const permissionsToSave = Array.from(new Set([...roleForm.permissions, ...legacyPermissions]));
       if (editingRole) {
         await updateRole(editingRole.id, {
           name: roleForm.name,
           description: roleForm.description,
-          permissions: roleForm.permissions
+          permissions: permissionsToSave
         });
       } else {
         await createRole({
           ...roleForm,
-          permissions: roleForm.permissions
+          permissions: permissionsToSave
         });
       }
       setShowRoleModal(false);
       setEditingRole(null);
       setRoleForm({ name: '', description: '', permissions: [] });
+      setLegacyPermissions([]);
     } catch (error) {
       console.error('Failed to save role:', error);
     } finally {
@@ -281,9 +299,10 @@ const AdminRoles: React.FC = () => {
                     <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto">
                       {role.permissions?.slice(0, 8).map((permKey) => {
                         const perm = availablePermissions.find(p => p.key === permKey);
+                        const label = perm?.label || getPermissionLabel(permKey);
                         return (
-                          <span key={permKey} className="px-2 py-1 bg-blue-50 text-blue-700 text-xs rounded" title={perm?.label || permKey}>
-                            {perm?.label || permKey}
+                          <span key={permKey} className="px-2 py-1 bg-blue-50 text-blue-700 text-xs rounded" title={label}>
+                            {label}
                           </span>
                         );
                       }) || <span className="text-sm text-gray-400">Không có quyền</span>}
@@ -368,7 +387,7 @@ const AdminRoles: React.FC = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Quyền hạn</label>
                 <div className="max-h-80 overflow-y-auto space-y-4">
-                  {['Trường học', 'Học viên', 'Đơn đăng ký', 'Thanh toán', 'Tài liệu', 'Báo cáo', 'Người dùng', 'Cài đặt', 'Học bổng', 'Visa', 'Lịch hẹn', 'Thông báo', 'Hệ thống'].map((category) => {
+                  {categoryOrder.map((category) => {
                     const categoryPerms = availablePermissions.filter(p => p.category === category);
                     if (categoryPerms.length === 0) return null;
                     return (

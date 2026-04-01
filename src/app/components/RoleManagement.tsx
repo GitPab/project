@@ -3,8 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { ROLE_DEFINITIONS, hasPermission, getRoleLabel, type Role } from '../constants/rbac';
 import { Shield, Users, CheckCircle, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { getApiUrl } from '../services/portDetector';
 
 interface AdminUser {
   id: string;
@@ -32,7 +31,8 @@ export default function RoleManagement() {
   const fetchAdminUsers = async () => {
     try {
       const token = localStorage.getItem('auth_token');
-      const res = await fetch(`${API_URL}/api/admin/users`, {
+      const API_URL = await getApiUrl();
+      const res = await fetch(`${API_URL}/admin/users`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (!res.ok) throw new Error('Failed to fetch users');
@@ -48,7 +48,8 @@ export default function RoleManagement() {
   const updateUserRole = async (userId: string, role: Role) => {
     try {
       const token = localStorage.getItem('auth_token');
-      const res = await fetch(`${API_URL}/api/admin/users/${userId}/role`, {
+      const API_URL = await getApiUrl();
+      const res = await fetch(`${API_URL}/admin/users/${userId}/role`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

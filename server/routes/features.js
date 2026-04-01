@@ -5,6 +5,7 @@
 
 import express from 'express';
 import { getPool } from '../dbAdapter.js';
+import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../logger.js';
 import { logAudit } from '../utils/audit.js';
 import { requirePermission } from '../utils/rbac.js';
@@ -12,14 +13,38 @@ import { requirePermission } from '../utils/rbac.js';
 const router = express.Router();
 
 // Helper to get database pool
+const DB_TYPE = process.env.DB_TYPE || 'postgresql';
+
+function toPostgresPlaceholders(sql) {
+  let index = 0;
+  return sql.replace(/\?/g, () => `$${++index}`);
+}
+
 async function getDb() {
-  return await getPool();
+  const pool = await getPool();
+  if (DB_TYPE === 'mysql') return pool;
+
+  // PG compatibility layer for mysql-style execute + ? placeholders
+  return {
+    execute: async (sql, params = []) => {
+      let pgSql = toPostgresPlaceholders(sql);
+      const isInsert = /^\s*insert/i.test(pgSql);
+      if (isInsert && !/returning\s+/i.test(pgSql)) {
+        pgSql += ' RETURNING id';
+      }
+      const result = await pool.query(pgSql, params);
+      if (isInsert) {
+        return [{ insertId: result.rows[0]?.id || null }];
+      }
+      return [result.rows];
+    }
+  };
 }
 
 // ============================================
 // APPOINTMENTS (Lịch hẹn)
 // ============================================
-router.get('/appointments', requirePermission('view', 'students'), async (req, res) => {
+router.get('/appointments', requirePermission('view', 'student'), async (req, res) => {
   try {
     const db = await getDb();
     const { student_id, status, start_date, end_date } = req.query;
@@ -42,7 +67,7 @@ router.get('/appointments', requirePermission('view', 'students'), async (req, r
   }
 });
 
-router.post('/appointments', requirePermission('manage', 'students'), async (req, res) => {
+router.post('/appointments', requirePermission('edit', 'student'), async (req, res) => {
   try {
     const db = await getDb();
     const { student_id, admin_id, title, description, appointment_type, start_time, end_time, location, is_online, meeting_link } = req.body;
@@ -64,7 +89,7 @@ router.post('/appointments', requirePermission('manage', 'students'), async (req
 // ============================================
 // SCHOLARSHIPS (Học bổng)
 // ============================================
-router.get('/scholarships', requirePermission('view', 'universities'), async (req, res) => {
+router.get('/scholarships', requirePermission('view', 'university'), async (req, res) => {
   try {
     const db = await getDb();
     const { university_id, is_active } = req.query;
@@ -85,7 +110,7 @@ router.get('/scholarships', requirePermission('view', 'universities'), async (re
   }
 });
 
-router.post('/scholarships', requirePermission('manage', 'universities'), async (req, res) => {
+router.post('/scholarships', requirePermission('edit', 'university'), async (req, res) => {
   try {
     const db = await getDb();
     const { university_id, name, name_korean, description, amount_vnd, amount_krw, eligibility_criteria, application_deadline, requirements, max_recipients } = req.body;
@@ -107,7 +132,7 @@ router.post('/scholarships', requirePermission('manage', 'universities'), async 
 // ============================================
 // VISA APPLICATIONS (Theo dõi visa)
 // ============================================
-router.get('/visa-applications', requirePermission('view', 'students'), async (req, res) => {
+router.get('/visa-applications', requirePermission('view', 'student'), async (req, res) => {
   try {
     const db = await getDb();
     const { student_id, status } = req.query;
@@ -128,7 +153,7 @@ router.get('/visa-applications', requirePermission('view', 'students'), async (r
   }
 });
 
-router.post('/visa-applications', requirePermission('manage', 'students'), async (req, res) => {
+router.post('/visa-applications', requirePermission('edit', 'student'), async (req, res) => {
   try {
     const db = await getDb();
     const { student_id, registration_id, visa_type, embassy_location, appointment_date, appointment_time, notes } = req.body;
@@ -150,18 +175,23 @@ router.post('/visa-applications', requirePermission('manage', 'students'), async
 // ============================================
 // UNIVERSITY RATINGS (Đánh giá)
 // ============================================
-router.get('/university-ratings', requirePermission('view', 'universities'), async (req, res) => {
+router.get('/university-ratings', requirePermission('view', 'university'), async (req, res) => {
   try {
     const db = await getDb();
     const { university_id, is_approved } = req.query;
     
-    let sql = 'SELECT * FROM university_ratings WHERE 1=1';
+    let sql = `
+      SELECT ur.*, u.email AS student_email
+      FROM university_ratings ur
+      LEFT JOIN users u ON u.id = ur.student_id
+      WHERE 1=1
+    `;
     const params = [];
     
     if (university_id) { sql += ' AND university_id = ?'; params.push(university_id); }
     if (is_approved !== undefined) { sql += ' AND is_approved = ?'; params.push(is_approved === 'true'); }
     
-    sql += ' ORDER BY created_at DESC';
+    sql += ' ORDER BY ur.created_at DESC';
     
     const [rows] = await db.execute(sql, params);
     res.json({ success: true, ratings: rows });
@@ -171,22 +201,48 @@ router.get('/university-ratings', requirePermission('view', 'universities'), asy
   }
 });
 
-router.post('/university-ratings', requirePermission('create', 'reviews'), async (req, res) => {
+router.post('/university-ratings', async (req, res) => {
   try {
     const db = await getDb();
     const { university_id, registration_id, overall_rating, teaching_quality, facilities, support_services, value_for_money, review_title, review_text } = req.body;
     const student_id = req.user.id;
     
     const [result] = await db.execute(
-      `INSERT INTO university_ratings (university_id, student_id, registration_id, overall_rating, teaching_quality, facilities, support_services, value_for_money, review_title, review_text, is_approved) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, FALSE)`,
-      [university_id, student_id, registration_id, overall_rating, teaching_quality, facilities, support_services, value_for_money, review_title, review_text]
+      `INSERT INTO university_ratings (id, university_id, student_id, registration_id, overall_rating, teaching_quality, facilities, support_services, value_for_money, review_title, review_text, is_approved) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, FALSE)`,
+      [uuidv4(), university_id, student_id, registration_id, overall_rating, teaching_quality, facilities, support_services, value_for_money, review_title, review_text]
     );
     
     await logAudit(req, 'CREATE', 'university_ratings', result.insertId, null, req.body);
     res.json({ success: true, id: result.insertId, message: 'Rating submitted for approval' });
   } catch (error) {
     logger.error('Failed to create university rating', { error: error.message });
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+router.put('/university-ratings/:id/approve', requirePermission('edit', 'university'), async (req, res) => {
+  try {
+    const db = await getDb();
+    const { id } = req.params;
+    const approved_by = req.user.id;
+
+    const [existing] = await db.execute('SELECT id FROM university_ratings WHERE id = ?', [id]);
+    if (!existing || existing.length === 0) {
+      return res.status(404).json({ success: false, error: 'Rating not found' });
+    }
+
+    await db.execute(
+      `UPDATE university_ratings 
+       SET is_approved = TRUE, approved_by = ?, approved_at = CURRENT_TIMESTAMP 
+       WHERE id = ?`,
+      [approved_by, id]
+    );
+
+    await logAudit(req, 'APPROVE', 'university_ratings', id, null, { approved_by });
+    res.json({ success: true, message: 'Rating approved' });
+  } catch (error) {
+    logger.error('Failed to approve university rating', { error: error.message });
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -199,12 +255,17 @@ router.get('/service-feedback', requirePermission('view', 'analytics'), async (r
     const db = await getDb();
     const { is_resolved } = req.query;
     
-    let sql = 'SELECT * FROM service_feedback WHERE 1=1';
+    let sql = `
+      SELECT sf.*, u.email AS student_email
+      FROM service_feedback sf
+      LEFT JOIN users u ON u.id = sf.student_id
+      WHERE 1=1
+    `;
     const params = [];
     
     if (is_resolved !== undefined) { sql += ' AND is_resolved = ?'; params.push(is_resolved === 'true'); }
     
-    sql += ' ORDER BY created_at DESC';
+    sql += ' ORDER BY sf.created_at DESC';
     
     const [rows] = await db.execute(sql, params);
     res.json({ success: true, feedback: rows });
@@ -218,17 +279,62 @@ router.post('/service-feedback', async (req, res) => {
   try {
     const db = await getDb();
     const { feedback_type, rating, feedback_text } = req.body;
-    const student_id = req.user?.id || null;
+    let student_id = req.user?.id || null;
+
+    // Validate input early to avoid DB errors
+    if (rating !== undefined && rating !== null) {
+      const numericRating = Number(rating);
+      if (!Number.isFinite(numericRating) || numericRating < 1 || numericRating > 5) {
+        return res.status(400).json({ success: false, error: 'Rating must be between 1 and 5' });
+      }
+    }
+
+    // If token payload doesn't include id, attempt lookup by email
+    if (!student_id && req.user?.email) {
+      const [userRows] = await db.execute('SELECT id FROM users WHERE email = ?', [req.user.email]);
+      student_id = userRows?.[0]?.id || null;
+    }
+
+    if (!student_id) {
+      return res.status(401).json({ success: false, error: 'Invalid user session' });
+    }
     
     const [result] = await db.execute(
-      `INSERT INTO service_feedback (student_id, feedback_type, rating, feedback_text, is_resolved) 
-       VALUES (?, ?, ?, ?, FALSE)`,
-      [student_id, feedback_type, rating, feedback_text]
+      `INSERT INTO service_feedback (id, student_id, feedback_type, rating, feedback_text, is_resolved) 
+       VALUES (?, ?, ?, ?, ?, FALSE)`,
+      [uuidv4(), student_id, feedback_type, rating, feedback_text]
     );
     
     res.json({ success: true, id: result.insertId, message: 'Feedback submitted' });
   } catch (error) {
-    logger.error('Failed to create service feedback', { error: error.message });
+    logger.error('Failed to create service feedback', { error: error.message, stack: error.stack });
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+router.put('/service-feedback/:id/resolve', requirePermission('manage', 'analytics'), async (req, res) => {
+  try {
+    const db = await getDb();
+    const { id } = req.params;
+    const { resolution_notes } = req.body || {};
+    const resolved_by = req.user.id;
+
+    const [existing] = await db.execute('SELECT id FROM service_feedback WHERE id = ?', [id]);
+    if (!existing || existing.length === 0) {
+      return res.status(404).json({ success: false, error: 'Feedback not found' });
+    }
+
+    await db.execute(
+      `UPDATE service_feedback 
+       SET is_resolved = TRUE, resolved_by = ?, resolved_at = CURRENT_TIMESTAMP, resolution_notes = ? 
+       WHERE id = ?`,
+      [resolved_by, resolution_notes || null, id]
+    );
+
+    await logAudit(req, 'RESOLVE', 'service_feedback', id, null, { resolved_by, resolution_notes });
+    res.json({ success: true, message: 'Feedback resolved' });
+  } catch (error) {
+    logger.error('Failed to resolve service feedback', { error: error.message });
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -365,7 +471,7 @@ router.post('/bulk-operations', requirePermission('manage', 'database'), async (
 // ============================================
 // STUDENT PROGRESS (Tiến độ 8 bước)
 // ============================================
-router.get('/student-progress', requirePermission('view', 'students'), async (req, res) => {
+router.get('/student-progress', requirePermission('view', 'student_progress'), async (req, res) => {
   try {
     const db = await getDb();
     const { student_id, university_id } = req.query;
@@ -386,7 +492,7 @@ router.get('/student-progress', requirePermission('view', 'students'), async (re
   }
 });
 
-router.post('/student-progress', requirePermission('manage', 'students'), async (req, res) => {
+router.post('/student-progress', requirePermission('manage', 'student_progress'), async (req, res) => {
   try {
     const db = await getDb();
     const { student_id, university_id, stage_id, stage_name, status, notes } = req.body;
@@ -407,7 +513,7 @@ router.post('/student-progress', requirePermission('manage', 'students'), async 
 // ============================================
 // STUDENT APPLICATIONS (Đăng ký đa trường)
 // ============================================
-router.get('/student-applications', requirePermission('view', 'students'), async (req, res) => {
+router.get('/student-applications', requirePermission('view', 'application'), async (req, res) => {
   try {
     const db = await getDb();
     const { student_id, university_id, status } = req.query;
@@ -429,7 +535,7 @@ router.get('/student-applications', requirePermission('view', 'students'), async
   }
 });
 
-router.post('/student-applications', requirePermission('manage', 'students'), async (req, res) => {
+router.post('/student-applications', requirePermission('manage', 'application'), async (req, res) => {
   try {
     const db = await getDb();
     const { student_id, university_id, tracking_code, priority, is_primary, notes } = req.body;
@@ -450,7 +556,7 @@ router.post('/student-applications', requirePermission('manage', 'students'), as
 // ============================================
 // SCHEDULED REMINDERS (Nhắc nhở tự động)
 // ============================================
-router.get('/scheduled-reminders', requirePermission('view', 'students'), async (req, res) => {
+router.get('/scheduled-reminders', requirePermission('view', 'student'), async (req, res) => {
   try {
     const db = await getDb();
     const { user_id, is_sent } = req.query;
@@ -471,7 +577,7 @@ router.get('/scheduled-reminders', requirePermission('view', 'students'), async 
   }
 });
 
-router.post('/scheduled-reminders', requirePermission('manage', 'students'), async (req, res) => {
+router.post('/scheduled-reminders', requirePermission('edit', 'student'), async (req, res) => {
   try {
     const db = await getDb();
     const { user_id, title, message, reminder_type, scheduled_date, is_recurring, recurrence_pattern } = req.body;

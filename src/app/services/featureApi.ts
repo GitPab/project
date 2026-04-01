@@ -101,7 +101,10 @@ export const UniversityRatingsAPI = {
     value_for_money?: number;
     review_title?: string;
     review_text?: string;
-  }) => OfflineFeatureAPI.create('/features/university-ratings', data)
+  }) => OfflineFeatureAPI.create('/features/university-ratings', data),
+
+  approve: (id: string) =>
+    OfflineFeatureAPI.update(`/features/university-ratings/${id}/approve`, {})
 };
 
 // ============================================
@@ -115,7 +118,10 @@ export const ServiceFeedbackAPI = {
     feedback_type?: string;
     rating: number;
     feedback_text: string;
-  }) => OfflineFeatureAPI.create('/features/service-feedback', data)
+  }) => OfflineFeatureAPI.create('/features/service-feedback', data),
+
+  resolve: (id: string, resolution_notes?: string) =>
+    OfflineFeatureAPI.update(`/features/service-feedback/${id}/resolve`, { resolution_notes })
 };
 
 // ============================================

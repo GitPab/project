@@ -9,6 +9,9 @@ import rateLimit from 'express-rate-limit';
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
 
+// Load environment variables
+dotenv.config();
+
 // Database adapter
 import { db, getPool } from './dbAdapter.js';
 import { initializeMySQLDatabase } from './mysqlAdapter.js';
@@ -28,6 +31,7 @@ import databaseRoutes from './routes/database.js';
 import uploadRoutes from './routes/uploads.js';
 import healthRoutes from './routes/health.js';
 import featureRoutes from './routes/features.js';
+import adminInviteRoutes from './routes/adminInvite.js';
 
 // Load environment variables
 dotenv.config();
@@ -38,6 +42,18 @@ dotenv.config();
 process.env.PORT = process.env.PORT || '3001';
 process.env.FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+
+const parseAllowedOrigins = (value) =>
+  value
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean);
+
+// Allow multiple frontend origins in dev via FRONTEND_URLS
+const allowedOrigins = process.env.FRONTEND_URLS
+  ? parseAllowedOrigins(process.env.FRONTEND_URLS)
+  : [process.env.FRONTEND_URL];
+const isProd = process.env.NODE_ENV === 'production';
 
 const DB_TYPE = process.env.DB_TYPE || 'postgresql';
 if (DB_TYPE === 'postgresql' && !process.env.DATABASE_URL) {
@@ -53,6 +69,23 @@ const PORT = process.env.PORT || 3001;
 // Swagger documentation
 setupSwagger(app);
 
+// CORS (run before any response-producing middleware)
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow non-browser or same-origin requests
+    if (!origin) return callback(null, true);
+    // In development, allow all origins to avoid CORS friction
+    if (!isProd) return callback(null, true);
+    if (!allowedOrigins.length) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error(`CORS blocked for origin: ${origin}`));
+  },
+  credentials: true
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
+
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -60,20 +93,20 @@ const limiter = rateLimit({
   message: { error: 'Too many requests, please try again later' },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => req.method === 'OPTIONS' || req.path.startsWith('/api/health')
 });
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
   message: { error: 'Too many auth attempts, please try again later' },
+  skip: (req) => req.method === 'OPTIONS'
 });
 
-app.use(limiter);
+if (isProd) {
+  app.use(limiter);
+}
 app.use(requestLogger);
-app.use(cors({
-  origin: process.env.FRONTEND_URL || '*',
-  credentials: true
-}));
 app.use(express.json({ limit: '10mb' }));
 
 // ============================================
@@ -103,6 +136,11 @@ app.use((req, res, next) => {
     '/api/docs.json'
   ];
   
+  // Allow public read-only access to universities
+  if (req.method === 'GET' && req.path.startsWith('/api/universities')) {
+    return next();
+  }
+  
   if (publicPaths.some(path => req.path.startsWith(path))) {
     return next();
   }
@@ -110,13 +148,16 @@ app.use((req, res, next) => {
   authenticateToken(req, res, next);
 });
 
-// Apply stricter rate limit to auth routes
-app.use('/api/auth', authLimiter);
+// Apply stricter rate limit to auth routes (production only)
+if (isProd) {
+  app.use('/api/auth', authLimiter);
+}
 
 // ============================================
 // ROUTES
 // ============================================
 app.use('/api/auth', authRoutes);
+app.use('/api', adminInviteRoutes);
 app.use('/api/universities', universityRoutes);
 app.use('/api/students', studentRoutes);
 app.use('/api/registrations', registrationRoutes);
@@ -124,6 +165,22 @@ app.use('/api/admin/db', databaseRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api', healthRoutes);
 app.use('/api/features', featureRoutes);
+
+// TEMP: Reset admin password endpoint
+app.post('/api/reset-admin', async (req, res) => {
+  try {
+    const pool = await getPool();
+    const bcrypt = await import('bcryptjs');
+    const hash = await bcrypt.hash('admin123', 12);
+    await pool.query(
+      "UPDATE users SET password = $1 WHERE email = 'admin@duhoccost.vn'",
+      [hash]
+    );
+    res.json({ message: 'Admin password reset to: admin123' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 // ============================================
 // DATABASE INITIALIZATION
@@ -755,6 +812,7 @@ let poolMonitor = null;
 
 async function startServer() {
   pool = await getPool();
+  app.locals.pool = pool;
   
   if (DB_TYPE === 'postgresql') {
     poolMonitor = new ConnectionPoolMonitor(pool);
@@ -762,21 +820,79 @@ async function startServer() {
   }
   
   await initializeDatabase();
+  
+  // Seed default admin user for PostgreSQL if no users exist
+  if (DB_TYPE === 'postgresql') {
+    try {
+      console.log('[DEBUG] Checking if admin user needs to be seeded...');
+      const { rows } = await pool.query('SELECT COUNT(*) as count FROM users');
+      console.log('[DEBUG] User count:', rows[0].count);
+      if (parseInt(rows[0].count) === 0) {
+        console.log('[DEBUG] Creating admin user...');
+        const bcrypt = await import('bcryptjs');
+        const { v4: uuidv4 } = await import('uuid');
+        const adminId = uuidv4();
+        const adminHash = await bcrypt.hash('admin123', 12);
+        
+        await pool.query(
+          'INSERT INTO users (id, name, email, password, role, is_active) VALUES ($1, $2, $3, $4, $5, $6)',
+          [adminId, 'Administrator', 'admin@duhoccost.vn', adminHash, 'admin', true]
+        );
+        
+        logger.info('Default admin user created', { email: 'admin@duhoccost.vn', password: 'admin123' });
+        console.log('\n✅ Default admin created: admin@duhoccost.vn / admin123\n');
+      } else {
+        console.log('[DEBUG] Users already exist, skipping admin seed');
+      }
+    } catch (seedError) {
+      console.error('[DEBUG] Admin seed error:', seedError.message);
+      logger.warn('Could not seed admin user', { error: seedError.message });
+    }
+  }
+  
   await connectRedis();
   
-  app.listen(PORT, () => {
-    logger.info('Server started', { 
-      port: PORT, 
-      url: `http://localhost:${PORT}/api`,
-      database: { type: DB_TYPE, status: 'connected' },
-      swagger: `http://localhost:${PORT}/api/docs`
-    });
-    console.log(`\n🚀 Server running at http://localhost:${PORT}/api`);
-    console.log(`📚 API Docs at http://localhost:${PORT}/api/docs\n`);
-    
-    // Start automatic sync if enabled
-    autoSyncManager.start();
-  });
+  // Try to start server on available port
+  const tryPort = async (port) => {
+    try {
+      const server = app.listen(port, () => {
+        const actualPort = port;
+        logger.info('Server started', { 
+          port: actualPort, 
+          url: `http://localhost:${actualPort}/api`,
+          database: { type: DB_TYPE, status: 'connected' },
+          swagger: `http://localhost:${actualPort}/api/docs`
+        });
+        console.log(`\n🚀 Server running at http://localhost:${actualPort}/api`);
+        console.log(`📚 API Docs at http://localhost:${actualPort}/api/docs\n`);
+        
+        // Save the actual port for frontend to use
+        console.log(`\n⚠️  Update your frontend .env: VITE_API_URL=http://localhost:${actualPort}/api\n`);
+        
+        // Start automatic sync if enabled
+        autoSyncManager.start();
+      });
+      
+      server.on('error', (err) => {
+        if (err.code === 'EADDRINUSE') {
+          console.log(`⚠️  Port ${port} in use, trying ${port + 1}...`);
+          tryPort(port + 1);
+        } else {
+          throw err;
+        }
+      });
+      
+    } catch (err) {
+      if (err.code === 'EADDRINUSE') {
+        console.log(`⚠️  Port ${port} in use, trying ${port + 1}...`);
+        tryPort(port + 1);
+      } else {
+        throw err;
+      }
+    }
+  };
+  
+  await tryPort(parseInt(PORT));
 }
 
 startServer().catch(err => {

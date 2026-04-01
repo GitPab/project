@@ -2,7 +2,7 @@
 // RBAC (Role-Based Access Control) Configuration
 // ============================================
 
-export type Role = 'super_admin' | 'admin' | 'admin_manager' | 'content_editor' | 'finance_admin' | 'viewer';
+export type Role = 'super_admin' | 'admin' | 'admin_manager' | 'content_editor' | 'finance_admin' | 'viewer' | 'student';
 
 export interface Permission {
   action: string;
@@ -17,6 +17,7 @@ export const PERMISSIONS = {
   UNIVERSITY_CREATE: { action: 'create', resource: 'university', description: 'Thêm trường mới' },
   UNIVERSITY_EDIT: { action: 'edit', resource: 'university', description: 'Chỉnh sửa trường' },
   UNIVERSITY_DELETE: { action: 'delete', resource: 'university', description: 'Xóa trường' },
+  UNIVERSITY_EXPORT: { action: 'export', resource: 'university', description: 'Xuất dữ liệu trường' },
   
   // Student management
   STUDENT_VIEW: { action: 'view', resource: 'student', description: 'Xem danh sách học sinh' },
@@ -34,6 +35,11 @@ export const PERMISSIONS = {
   
   // Reports & Analytics
   ANALYTICS_VIEW: { action: 'view', resource: 'analytics', description: 'Xem báo cáo' },
+  ANALYTICS_MANAGE: { action: 'manage', resource: 'analytics', description: 'Manage analytics and feedback' },
+
+  // Database & maintenance
+  DATABASE_VIEW: { action: 'view', resource: 'database', description: 'View database operations' },
+  DATABASE_MANAGE: { action: 'manage', resource: 'database', description: 'Manage database operations' },
   
   // User management (Super admin only)
   USER_MANAGE: { action: 'manage', resource: 'user', description: 'Quản lý người dùng' },
@@ -95,6 +101,14 @@ export const ROLE_DEFINITIONS: Record<Role, { label: string; description: string
       'APPLICATION_VIEW',
       'PAYMENT_VIEW',
       'ANALYTICS_VIEW',
+    ],
+  },
+  student: {
+    label: 'Học viên',
+    description: 'Quyền cơ bản cho học viên',
+    permissions: [
+      'UNIVERSITY_VIEW',
+      'APPLICATION_VIEW',
     ],
   },
 };

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { Star, MessageSquare, Send, CheckCircle, AlertCircle, Building2, HeadphonesIcon } from 'lucide-react';
 import { toast } from 'sonner';
@@ -8,6 +9,7 @@ import type { StudentApplication } from '@/types/university';
 
 export default function StudentFeedback() {
   const { user, studentApplications, universities } = useApp();
+  const { user: authUser } = useAuth();
   const { language } = useLanguage();
   const [activeTab, setActiveTab] = useState<'university' | 'service'>('university');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -31,8 +33,10 @@ export default function StudentFeedback() {
     feedbackText: ''
   });
 
+  const currentUser = authUser ?? user;
+
   const myApplications = studentApplications.filter(
-    app => app.studentEmail === user?.email
+    app => app.studentEmail === currentUser?.email
   );
 
   const t = {
@@ -60,6 +64,7 @@ export default function StudentFeedback() {
       submitting: 'Đang gửi...',
       successUniversity: 'Đánh giá trường đã được gửi!',
       successService: 'Phản hồi dịch vụ đã được gửi!',
+      loginRequired: 'Please log in to submit feedback',
       error: 'Có lỗi xảy ra, vui lòng thử lại',
       noApplications: 'Bạn chưa có đơn đăng ký nào để đánh giá'
     },
@@ -87,6 +92,7 @@ export default function StudentFeedback() {
       submitting: 'Submitting...',
       successUniversity: 'University rating submitted!',
       successService: 'Service feedback submitted!',
+      loginRequired: 'Please log in to submit feedback',
       error: 'An error occurred, please try again',
       noApplications: 'You have no applications to review'
     }
@@ -94,7 +100,10 @@ export default function StudentFeedback() {
 
   const handleUniversitySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedUniversity || !user?.email) return;
+    if (!selectedUniversity || !currentUser?.email) {
+      toast.error(t.loginRequired);
+      return;
+    }
     
     setIsSubmitting(true);
     try {
@@ -123,7 +132,10 @@ export default function StudentFeedback() {
 
   const handleServiceSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user?.email) return;
+    if (!currentUser?.email) {
+      toast.error(t.loginRequired);
+      return;
+    }
     
     setIsSubmitting(true);
     try {
@@ -364,3 +376,6 @@ export default function StudentFeedback() {
     </div>
   );
 }
+
+
+

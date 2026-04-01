@@ -1,13 +1,13 @@
 import { University } from '../../types';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { getApiUrl } from './portDetector';
 
 // ============================================
 // UNIVERSITY API - PostgreSQL Backend
 // ============================================
 
 export const fetchUniversitiesFromAPI = async (): Promise<University[]> => {
-  const response = await fetch(`${API_URL}/api/universities`);
+  const API_URL = await getApiUrl();
+  const response = await fetch(`${API_URL}/universities`);
   if (!response.ok) {
     throw new Error('Failed to fetch universities');
   }
@@ -15,7 +15,8 @@ export const fetchUniversitiesFromAPI = async (): Promise<University[]> => {
 };
 
 export const fetchUniversityByIdFromAPI = async (id: string): Promise<University | null> => {
-  const response = await fetch(`${API_URL}/api/universities/${id}`);
+  const API_URL = await getApiUrl();
+  const response = await fetch(`${API_URL}/universities/${id}`);
   if (!response.ok) {
     if (response.status === 404) return null;
     throw new Error('Failed to fetch university');
@@ -24,7 +25,8 @@ export const fetchUniversityByIdFromAPI = async (id: string): Promise<University
 };
 
 export const createUniversityInAPI = async (data: Partial<University>): Promise<University> => {
-  const response = await fetch(`${API_URL}/api/universities`, {
+  const API_URL = await getApiUrl();
+  const response = await fetch(`${API_URL}/universities`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -36,7 +38,8 @@ export const createUniversityInAPI = async (data: Partial<University>): Promise<
 };
 
 export const updateUniversityInAPI = async (id: string, data: Partial<University>): Promise<University> => {
-  const response = await fetch(`${API_URL}/api/universities/${id}`, {
+  const API_URL = await getApiUrl();
+  const response = await fetch(`${API_URL}/universities/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -48,7 +51,8 @@ export const updateUniversityInAPI = async (id: string, data: Partial<University
 };
 
 export const deleteUniversityFromAPI = async (id: string): Promise<void> => {
-  const response = await fetch(`${API_URL}/api/universities/${id}`, {
+  const API_URL = await getApiUrl();
+  const response = await fetch(`${API_URL}/universities/${id}`, {
     method: 'DELETE',
   });
   if (!response.ok) {
@@ -61,7 +65,8 @@ export const deleteUniversityFromAPI = async (id: string): Promise<void> => {
 // ============================================
 
 export const bulkCreateUniversitiesInAPI = async (universities: Partial<University>[]): Promise<University[]> => {
-  const response = await fetch(`${API_URL}/api/universities/bulk`, {
+  const API_URL = await getApiUrl();
+  const response = await fetch(`${API_URL}/universities/bulk`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ universities }),

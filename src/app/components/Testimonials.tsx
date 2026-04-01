@@ -61,8 +61,13 @@ export default function Testimonials({ className = '' }: TestimonialsProps) {
   useEffect(() => {
     const loadTestimonials = async () => {
       try {
+        // If not logged in, skip API and use static data to avoid 401 spam
+        if (!localStorage.getItem('auth_token')) {
+          setTestimonials(staticTestimonials);
+          return;
+        }
         // Try to load from API first
-        const response = await FeatureAPI.ServiceFeedback.getAll({ is_resolved: false });
+        const response = await FeatureAPI.ServiceFeedback.getAll({ is_resolved: true });
         const feedback = response.feedback || [];
         
         // Filter approved feedback with ratings >= 4

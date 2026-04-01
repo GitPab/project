@@ -55,7 +55,7 @@ export default function BulkOperationsPanel({
     setIsDeleting(true);
     try {
       const promises = selectedIds.map(id => 
-        api.delete(`/api/universities/${id}`)
+        api.delete(`/universities/${id}`)
       );
       await Promise.all(promises);
       toast.success(`Đã xóa ${selectedIds.length} trường`);
@@ -72,7 +72,7 @@ export default function BulkOperationsPanel({
     setIsRestoring(true);
     try {
       const promises = selectedIds.map(id => 
-        api.patch(`/api/universities/${id}/restore`)
+        api.patch(`/universities/${id}/restore`)
       );
       await Promise.all(promises);
       toast.success(`Đã khôi phục ${selectedIds.length} trường`);

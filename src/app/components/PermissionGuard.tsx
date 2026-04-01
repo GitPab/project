@@ -3,8 +3,46 @@
 // ============================================
 
 import { useAuth } from '../context/AuthContext';
-import { ROLE_DEFINITIONS, type Role } from '../constants/rbac';
+import { ROLE_DEFINITIONS, PERMISSIONS, type Role } from '../constants/rbac';
 import { Navigate } from 'react-router';
+
+const ACTION_ALIASES: Record<string, string> = {
+  update: 'edit'
+};
+
+const normalizeAction = (action: string) => ACTION_ALIASES[action] || action;
+
+const resolvePermissionKey = (requiredPermission: string): string | null => {
+  if (!requiredPermission) return null;
+  if (requiredPermission === '*') return '*';
+
+  // Direct key match (e.g. "UNIVERSITY_CREATE")
+  if (requiredPermission in PERMISSIONS) {
+    return requiredPermission;
+  }
+
+  // Match by action/resource (supports "resource:action" or "action:resource")
+  const parts = requiredPermission.split(':');
+  if (parts.length === 2) {
+    const [p1, p2] = parts.map(p => p.trim());
+
+    const action1 = normalizeAction(p2);
+    const resource1 = p1;
+    const match1 = Object.entries(PERMISSIONS).find(([, perm]) =>
+      perm.action === action1 && perm.resource === resource1
+    );
+    if (match1) return match1[0];
+
+    const action2 = normalizeAction(p1);
+    const resource2 = p2;
+    const match2 = Object.entries(PERMISSIONS).find(([, perm]) =>
+      perm.action === action2 && perm.resource === resource2
+    );
+    if (match2) return match2[0];
+  }
+
+  return null;
+};
 
 // Hook to check permissions
 export function usePermission() {
@@ -16,7 +54,9 @@ export function usePermission() {
     const roleDef = ROLE_DEFINITIONS[role];
     if (!roleDef) return false;
     if (roleDef.permissions.includes('*')) return true;
-    return roleDef.permissions.includes(requiredPermission);
+    const key = resolvePermissionKey(requiredPermission);
+    if (!key) return false;
+    return roleDef.permissions.includes(key);
   };
 
   const hasAnyPermission = (permissions: string[]): boolean => {

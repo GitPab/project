@@ -9,11 +9,21 @@
 
 import React, { useState, useEffect } from 'react';
 import { getPendingSyncs, processPendingSyncs, isOnline } from '../services/offlineSyncService';
+import { findServerPort, getApiUrl, resetServerPort } from '../services/portDetector';
 import { Database, Cloud, HardDrive, RefreshCw, CloudOff, CheckCircle, AlertTriangle } from 'lucide-react';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+// Dynamic API URL - will auto-detect server port
+let dynamicApiUrl: string | null = null;
+
+async function getDynamicApiUrl(): Promise<string> {
+  if (!dynamicApiUrl) {
+    dynamicApiUrl = await getApiUrl();
+  }
+  return dynamicApiUrl;
+}
 
 async function apiCall(endpoint: string, options: RequestInit = {}) {
+  const API_URL = await getDynamicApiUrl();
   const url = `${API_URL}${endpoint}`;
   const token = localStorage.getItem('auth_token') || '';
   
@@ -52,6 +62,12 @@ export default function DatabaseManager() {
     top3Count: number;
     lastBackup?: string;
   } | null>(null);
+  const [serverOnline, setServerOnline] = useState<boolean | null>(null);
+  const [backupStats, setBackupStats] = useState<{
+    count: number;
+    totalSizeMB: number;
+    newest?: string;
+  } | null>(null);
   
   // Offline sync stats
   const [offlineStats, setOfflineStats] = useState<{
@@ -75,17 +91,46 @@ export default function DatabaseManager() {
 
   // Load all stats
   const loadStats = async () => {
-    try {
-      // Server stats
-      const response = await apiCall('/database/stats');
-      if (response.success) {
-        setServerStats(response.stats);
+    if (document.visibilityState !== 'visible') return;
+    // Check server health and detect port
+    const port = await findServerPort();
+    setServerOnline(!!port);
+    
+    if (port) {
+      console.log(`[DatabaseManager] Server detected on port: ${port}`);
+      try {
+        const API_URL = await getDynamicApiUrl();
+        const response = await fetch(`${API_URL}/admin/db/stats`, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}` }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success) {
+            setServerStats(data.stats);
+          }
+        }
+        const backupsResp = await fetch(`${API_URL}/admin/db/list-backups`, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}` }
+        });
+        if (backupsResp.ok) {
+          const backupsData = await backupsResp.json();
+          if (backupsData.success) {
+            const backups = backupsData.backups || [];
+            const totalSize = backups.reduce((acc: number, b: any) => acc + (b.size || 0), 0);
+            const newest = backups[0]?.created || null;
+            setBackupStats({
+              count: backups.length,
+              totalSizeMB: Math.round((totalSize / (1024 * 1024)) * 10) / 10,
+              newest: newest ? new Date(newest).toLocaleString() : undefined
+            });
+          }
+        }
+      } catch (err: any) {
+        console.log('Server stats not available:', err);
       }
-    } catch (err: any) {
-      console.log('Server stats not available:', err);
     }
     
-    // Offline queue stats
+    // Offline queue stats (always works)
     try {
       const pending = await getPendingSyncs();
       setOfflineStats({
@@ -99,8 +144,8 @@ export default function DatabaseManager() {
 
   useEffect(() => {
     loadStats();
-    // Refresh every 10 seconds
-    const interval = setInterval(loadStats, 10000);
+    // Refresh every 60 seconds to reduce UI jank
+    const interval = setInterval(loadStats, 60000);
     return () => clearInterval(interval);
   }, []);
 
@@ -110,7 +155,7 @@ export default function DatabaseManager() {
       setError(null);
       setSyncStatus('Creating server backup...');
       
-      const response = await apiCall('/database/backup', { method: 'POST' });
+      const response = await apiCall('/admin/db/backup', { method: 'POST' });
       
       if (response.success) {
         setSyncStatus(`✅ Backup created: ${response.filename || 'server-backup.sql'}`);
@@ -122,6 +167,9 @@ export default function DatabaseManager() {
       console.error('Backup failed:', error);
       setError(error.message);
       setSyncStatus(null);
+      // Reset port on error
+      resetServerPort();
+      dynamicApiUrl = null;
     }
   };
 
@@ -131,7 +179,7 @@ export default function DatabaseManager() {
       setError(null);
       setSyncStatus('Syncing MySQL ↔ PostgreSQL...');
       
-      const response = await apiCall('/database/sync', { method: 'POST' });
+      const response = await apiCall('/admin/db/sync', { method: 'POST' });
       
       if (response.success) {
         setSyncStatus(`✅ Server sync complete! ${response.message || ''}`);
@@ -143,6 +191,8 @@ export default function DatabaseManager() {
       console.error('Server sync failed:', error);
       setError(error.message);
       setSyncStatus(null);
+      resetServerPort();
+      dynamicApiUrl = null;
     }
   };
 
@@ -180,11 +230,21 @@ export default function DatabaseManager() {
   // View data
   const handleViewData = async () => {
     try {
-      const response = await apiCall('/universities?limit=10');
-      console.table(response.universities || response);
-      alert(`Found ${(response.universities || response).length} universities. Check console!`);
+      const API_URL = await getDynamicApiUrl();
+      const response = await fetch(`${API_URL}/universities?limit=10`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        console.table(data.universities || data);
+        alert(`Found ${(data.universities || data).length} universities. Check console!`);
+      } else {
+        throw new Error('Failed to fetch data');
+      }
     } catch (error: any) {
       setError(error.message);
+      resetServerPort();
+      dynamicApiUrl = null;
     }
   };
 
@@ -241,7 +301,15 @@ export default function DatabaseManager() {
             </span>
           </div>
           
-          {serverStats ? (
+          {serverOnline === false ? (
+            <div style={{ fontSize: '14px', color: '#999', textAlign: 'center', padding: '20px 0' }}>
+              <CloudOff size={32} color="#ccc" style={{ marginBottom: '10px' }} />
+              <div>Server offline</div>
+              <div style={{ fontSize: '12px', marginTop: '5px' }}>
+                Run: npm run server
+              </div>
+            </div>
+          ) : serverStats ? (
             <div style={{ fontSize: '14px', color: '#666' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                 <span>Universities:</span>
@@ -261,6 +329,14 @@ export default function DatabaseManager() {
               {serverStats.lastBackup && (
                 <div style={{ fontSize: '11px', color: '#999' }}>
                   Last backup: {new Date(serverStats.lastBackup).toLocaleString()}
+                </div>
+              )}
+              {backupStats && (
+                <div style={{ fontSize: '11px', color: '#999', marginTop: '6px' }}>
+                  Backups: {backupStats.count} â€¢ Total: {backupStats.totalSizeMB} MB
+                  {backupStats.newest && (
+                    <div>Newest: {backupStats.newest}</div>
+                  )}
                 </div>
               )}
             </div>

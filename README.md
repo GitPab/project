@@ -36,8 +36,15 @@ cd project
 
 # Install dependencies
 npm install
+cd server && npm install && cd ..
 
-# Run development server
+# Run both frontend and backend together
+npm run dev:full
+
+# Or run separately:
+# Terminal 1: Backend
+cd server && npm start
+# Terminal 2: Frontend
 npm run dev
 
 # Build for production
@@ -49,6 +56,20 @@ Create `.env.local`:
 ```env
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key
+VITE_API_URL=http://localhost:3001/api
+```
+
+### Backend Environment (server/.env)
+```env
+# Multiple frontend origins (comma-separated) for CORS support
+FRONTEND_URL=http://localhost:5173
+
+# OR multiple origins (comma-separated)
+FRONTEND_URLS=http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173
+
+# Database
+DATABASE_URL=postgresql://postgres:password@localhost:5432/sacma
+PORT=3001
 ```
 
 ### Development Workflow

@@ -4,7 +4,7 @@
 
 export interface User {
   email: string;
-  role: 'admin' | 'student';
+  role: 'admin' | 'student' | 'super_admin' | 'admin_manager' | 'content_editor' | 'finance_admin' | 'viewer';
   name: string;
   // Student-specific fields (optional, set after onboarding)
   displayName?: string;  // Full name to display (e.g., "Nguyễn Văn A")
