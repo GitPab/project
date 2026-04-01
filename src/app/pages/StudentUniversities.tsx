@@ -1,49 +1,24 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { useAuth } from '../context/AuthContext';
-import { usePermission, PermissionGuard } from './PermissionGuard';
-import { toast } from 'sonner';
-import { Search, Plus, Trash2, RefreshCw, Eye, EyeOff } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { getMaxScholarship } from '../../utils/universityPerks';
-import UniversityForm from './UniversityForm';
-import EditUniversityModal from './EditUniversityModal';
-import QuickInfoModal from './QuickInfoModal';
-import ImportUniversitiesModal from './ImportUniversitiesModal';
+import { Search } from 'lucide-react';
 import type { University } from '../context/AppContext';
-import { getAllUniversities, softDeleteUniversity, restoreUniversity } from '../services/universityService';
 
-interface UniversityRowProps {
-  university: University;
-  onEdit?: (uni: University) => void;
-  onQuickInfo?: (uni: University) => void;
-  onDelete?: (uni: University) => void;
-  onRestore?: (uni: University) => void;
-  palette: any;
-}
-
-const UniversityRow = React.memo(function UniversityRow({ university, onEdit, onQuickInfo, onDelete, onRestore, palette }: UniversityRowProps) {
+// Read-only Student version matching Admin layout
+const StudentUniversityRow = React.memo(function StudentUniversityRow({ university, palette }: { university: University; palette: any }) {
   const navigate = useNavigate();
-  const isDeleted = university.is_active === false;
   
   const formatKRW = (amount?: number | null) => Number(amount ?? 0).toLocaleString('vi-VN');
-  const formatVND = (amount?: number | null) => Number(amount ?? 0).toLocaleString('vi-VN');
   
-  // Support both data formats: camelCase (visaSystemsDetail) and snake_case (visa_systems)
   const visaSystemsDetail = university?.koreanData?.visaSystemsDetail || {};
   const visaSystems = (university as any)?.visa_systems || {};
   
-  // Helper to get data from either format
   const getVisaSystem = (key: string) => {
-    // Try camelCase first
     const detail = visaSystemsDetail[key];
     if (detail?.available) return detail;
-    
-    // Fall back to snake_case
     const system = visaSystems[key];
     if (!system?.available) return null;
-    
-    // Convert snake_case to camelCase
     return {
       available: system.available,
       invoiceKRWPerYear: system.invoice_krw,
@@ -63,41 +38,30 @@ const UniversityRow = React.memo(function UniversityRow({ university, onEdit, on
   const d41Data = getVisaSystem('D4-1');
   const hasD41 = d41Data?.available;
   
-  // Calculate Tổng (Total) for D4-1 system
   const calculateTotal = () => {
-    // Fixed VND fees (common across all systems)
     const commonFees = university?.koreanData?.commonFeesVND || [];
     const hocTieng = commonFees.find((f: any) => f.id === 'hoc_tieng')?.amount || 13000000;
     const phiTuVan = commonFees.find((f: any) => f.id === 'phi_tu_van')?.amount || 39000000;
     const phiTrungTam = commonFees.find((f: any) => f.id === 'phi_trung_tam')?.amount || 11000000;
     const veMayBay = commonFees.find((f: any) => f.id === 've_may_bay')?.amount || 8000000;
-    
-    // Total VND (base fixed costs)
     const totalVND = hocTieng + phiTuVan + phiTrungTam + veMayBay;
     
-    // KRW costs from D4-1
     if (hasD41 && d41Data) {
       const applyFee = d41Data.applyFeeKRW || 0;
       const enrollmentFee = d41Data.enrollmentFeeKRW || 0;
       const invoice = d41Data.invoiceKRWPerYear || 0;
-      
-      // Get cheapest KTX option
       const ktxOptions = d41Data.ktxOptions || [];
       const cheapestKTX = ktxOptions.length > 0 
         ? Math.min(...ktxOptions.map((k: any) => k.priceKRWPerKy || 0))
         : 0;
-      
       const totalKRW = applyFee + enrollmentFee + invoice + cheapestKTX;
-      
       return { totalVND, totalKRW, hasData: true, tuitionOnly: invoice };
     }
-    
     return { totalVND, totalKRW: 0, hasData: false, tuitionOnly: 0 };
   };
   
   const { totalVND, totalKRW, hasData, tuitionOnly } = calculateTotal();
   
-  // Get all available visas from both sources
   const getAvailableVisas = () => {
     const visas: string[] = [];
     Object.entries(visaSystemsDetail).forEach(([key, data]: [string, any]) => {
@@ -110,14 +74,11 @@ const UniversityRow = React.memo(function UniversityRow({ university, onEdit, on
   };
   
   const availableVisas = getAvailableVisas();
-  
   const scholarships = d41Data?.scholarships || [];
   const bestScholarship = scholarships.reduce((max: any, s: any) => 
     (s?.discountPct || 0) > (max?.discountPct || 0) ? s : max, null
   );
-  
-  const ktxOptions = d41Data?.ktxOptions || [];
-  const bestKtx = ktxOptions[0];
+  const bestKtx = (d41Data?.ktxOptions || [])[0];
   
   return (
     <div
@@ -125,13 +86,12 @@ const UniversityRow = React.memo(function UniversityRow({ university, onEdit, on
         display: 'flex',
         alignItems: 'center',
         padding: '14px 16px',
-        background: isDeleted ? '#f5f5f5' : palette.cardBg,
-        border: `1px solid ${isDeleted ? '#ddd' : palette.border}`,
+        background: palette.cardBg,
+        border: `1px solid ${palette.border}`,
         borderRadius: 10,
-        cursor: isDeleted ? 'default' : 'pointer',
-        opacity: isDeleted ? 0.7 : 1,
+        cursor: 'pointer',
       }}
-      onClick={() => !isDeleted && navigate(`/admin/university/${university.id}`)}
+      onClick={() => navigate(`/student/university/${university.id}`)}
       onMouseEnter={(e) => {
         e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)';
       }}
@@ -161,8 +121,6 @@ const UniversityRow = React.memo(function UniversityRow({ university, onEdit, on
                 src={university?.koreanData?.listLogo || university?.thumbnail} 
                 alt={university.name}
                 loading="lazy"
-                decoding="async"
-                fetchPriority="low"
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 onError={(e) => {
                   (e.currentTarget as HTMLImageElement).style.display = 'none';
@@ -197,7 +155,6 @@ const UniversityRow = React.memo(function UniversityRow({ university, onEdit, on
               {(university as any).region || 'Hàn Quốc'}
             </p>
             
-            {/* Visa Tags */}
             <div style={{ display: 'flex', gap: 4, marginTop: 6, flexWrap: 'wrap' }}>
               {availableVisas.slice(0, 4).map((visa) => (
                 <span key={visa} style={{
@@ -216,22 +173,17 @@ const UniversityRow = React.memo(function UniversityRow({ university, onEdit, on
         </div>
       </div>
 
-      {/* Column 2: Show both Tuition and Total Cost */}
+      {/* Column 2: Tuition and Total Cost */}
       <div style={{ width: 180, flexShrink: 0, textAlign: 'right' }}>
         {hasData ? (
           <>
-            {/* Tuition Only */}
             <div style={{ fontSize: 14, fontWeight: 700, color: '#1976D2' }}>
               {formatKRW(tuitionOnly)} KRW
             </div>
             <div style={{ fontSize: 10, color: '#666', marginBottom: 4 }}>
               D4-1 · mỗi kỳ
             </div>
-            
-            {/* Divider */}
             <div style={{ borderTop: '1px dashed #ddd', margin: '6px 0' }} />
-            
-            {/* Total Cost */}
             <div style={{ fontSize: 11, fontWeight: 600, color: palette.text }}>
               +{formatKRW(totalKRW)} KRW
             </div>
@@ -306,123 +258,24 @@ const UniversityRow = React.memo(function UniversityRow({ university, onEdit, on
         )}
       </div>
 
-      {/* Column 5: Actions */}
+      {/* Column 5: View link (read-only) */}
       <div style={{ flex: 1, textAlign: 'right' }}>
-        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-          {isDeleted ? (
-            onRestore && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onRestore(university);
-                }}
-                style={{
-                  padding: '6px 12px',
-                  borderRadius: 6,
-                  border: '1px solid #22c55e',
-                  background: '#dcfce7',
-                  color: '#15803d',
-                  fontSize: 12,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 4,
-                }}
-              >
-                <RefreshCw size={14} />
-                Khôi phục
-              </button>
-            )
-          ) : (
-            <>
-              {onQuickInfo && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onQuickInfo(university);
-                  }}
-                  style={{
-                    padding: '6px 12px',
-                    borderRadius: 6,
-                    border: `1px solid ${palette.border}`,
-                    background: '#fff',
-                    color: palette.text,
-                    fontSize: 12,
-                    cursor: 'pointer',
-                  }}
-                >
-                  TT
-                </button>
-              )}
-              {onEdit && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onEdit(university);
-                  }}
-                  style={{
-                    padding: '6px 12px',
-                    borderRadius: 6,
-                    border: `1px solid ${palette.accent}`,
-                    background: palette.accent,
-                    color: '#fff',
-                    fontSize: 12,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Sửa
-                </button>
-              )}
-              {onDelete && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDelete(university);
-                  }}
-                  style={{
-                    padding: '6px 12px',
-                    borderRadius: 6,
-                    border: '1px solid #ef4444',
-                    background: '#fee2e2',
-                    color: '#dc2626',
-                    fontSize: 12,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 4,
-                  }}
-                >
-                  <Trash2 size={14} />
-                  Xóa
-                </button>
-              )}
-            </>
-          )}
-        </div>
+        <span style={{ fontSize: 12, color: palette.accent, fontWeight: 500 }}>
+          Xem chi tiết →
+        </span>
       </div>
     </div>
   );
 });
 
-interface UniversitiesListEnhancedProps {
-  onUniversitySelect?: (university: University) => void;
-}
-
-export default function UniversitiesListEnhancedRedesigned() {
-  const { universities, setUniversities, updateUniversity, addUniversities } = useApp();
-  const { isAdmin, user } = useAuth();
-  const { hasPermission } = usePermission();
+export default function StudentUniversities() {
+  const { universities } = useApp();
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTier, setActiveTier] = useState<string>('all');
   const [activePerk, setActivePerk] = useState<string>('all');
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showImportModal, setShowImportModal] = useState(false);
-  const [editingUniversity, setEditingUniversity] = useState<University | null>(null);
-  const [quickInfoUniversity, setQuickInfoUniversity] = useState<University | null>(null);
-  const [showDeleted, setShowDeleted] = useState(false);
 
   const palette = useMemo(() => ({
     pageBg: '#FBF7F2',
@@ -444,9 +297,7 @@ export default function UniversitiesListEnhancedRedesigned() {
       const name = String(fee.name ?? '').toLowerCase();
       return name.includes('ktx') || name.includes('ký túc xá') || name.includes('ki tuc xa');
     });
-
     if (ktxFees.length === 0) return null;
-
     const amounts = ktxFees.map(fee => fee.amount ?? 0).filter(a => a > 0);
     return amounts.length ? Math.min(...amounts) : null;
   };
@@ -459,7 +310,6 @@ export default function UniversitiesListEnhancedRedesigned() {
         return isFinite(g) && g > 0 ? g : null;
       })
       .filter(g => g !== null);
-
     return gpas.length ? Math.min(...gpas) : null;
   };
 
@@ -476,9 +326,9 @@ export default function UniversitiesListEnhancedRedesigned() {
     { key: 'hb100', label: 'HB 100%', match: (u: University) => getMaxScholarshipSafe(u) === 100 },
     { key: 'hb50', label: 'HB 50%+', match: (u: University) => getMaxScholarshipSafe(u) >= 50 },
     { key: 'gpa65', label: 'GPA ≤ 6.5', match: (u: University) => {
-    const minGpa = getMinGPASafe(u);
-    return minGpa !== null && minGpa <= 6.5;
-  }},
+      const minGpa = getMinGPASafe(u);
+      return minGpa !== null && minGpa <= 6.5;
+    }},
     { key: 'ktx', label: 'Có KTX', match: (u: University) => getCheapestKTXSafe(u) !== null },
     { key: 'vl', label: 'Việc làm', match: (u: University) => !!u.koreanData?.jobOpportunities || !!(u?.koreanData?.workOpportunity) }
   ];
@@ -487,10 +337,7 @@ export default function UniversitiesListEnhancedRedesigned() {
     const safeUniversities = (universities ?? []).filter(u => u && u.id && u.name && u.koreanData);
 
     return safeUniversities.filter(university => {
-      // Filter by active status
-      if (!showDeleted && university.is_active === false) return false;
-      if (showDeleted && university.is_active !== false) return false;
-
+      if (university.is_active === false) return false;
       if (!university.koreanData?.isKoreanUniversity) return false;
 
       if (activeTier !== 'all') {
@@ -515,7 +362,7 @@ export default function UniversitiesListEnhancedRedesigned() {
 
       return true;
     });
-  }, [universities, activeTier, activePerk, searchTerm, showDeleted]);
+  }, [universities, activeTier, activePerk, searchTerm]);
 
   const sortedUniversities = useMemo(() => {
     return [...filteredUniversities].sort((a, b) => a.name.localeCompare(b.name));
@@ -543,125 +390,19 @@ export default function UniversitiesListEnhancedRedesigned() {
     { key: '3', label: 'Top 3', count: tierCounts['3'] }
   ];
 
-  // NOTE: Removed SQLite reload - now uses live context data from AppContext
-  // Admin updates via QuickInfoModal update the context directly
-  useEffect(() => {
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    setLoading(false);
-  }, [filteredUniversities]);
-
-  const canEdit = hasPermission('university:update');
-  const canQuickInfo = hasPermission('university:quickInfo');
-
-  const handleEdit = (uni: University) => {
-    setEditingUniversity(uni);
-  };
-
-  const handleDelete = async (uni: University) => {
-    if (!confirm('Bạn có chắc muốn xóa trường này?')) return;
-    try {
-      await softDeleteUniversity(uni.id);
-      // Update local state
-      const updated = universities.map(u => 
-        u.id === uni.id ? { ...u, is_active: false } : u
-      );
-      setUniversities(() => updated);
-      toast.success('Đã xóa trường');
-    } catch (error) {
-      toast.error('Không thể xóa trường');
-    }
-  };
-
-  const handleRestore = async (uni: University) => {
-    try {
-      await restoreUniversity(uni.id);
-      // Update local state
-      const updated = universities.map(u => 
-        u.id === uni.id ? { ...u, is_active: true } : u
-      );
-      setUniversities(() => updated);
-      toast.success('Đã khôi phục trường');
-    } catch (error) {
-      toast.error('Không thể khôi phục trường');
-    }
-  };
-
   return (
     <div style={{ padding: '24px 28px 32px', background: 'linear-gradient(180deg, #FBF7F2 0%, #F4EEE7 100%)', minHeight: '100%' }}>
+      {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginBottom: 18, flexWrap: 'wrap' }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 600, color: palette.text, marginBottom: 6 }}>Danh sách trường</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 600, color: palette.text, marginBottom: 6 }}>Danh sách trường đại học</h1>
           <p style={{ fontSize: 13, color: palette.textMuted }}>
             {filteredUniversities.length} trường · Lọc theo ưu đãi
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <PermissionGuard permission="university:create">
-              <button
-                onClick={() => setShowDeleted(!showDeleted)}
-                style={{
-                  padding: '8px 14px',
-                  borderRadius: 10,
-                  border: `1px solid ${showDeleted ? '#ef4444' : '#e2e8f0'}`,
-                  background: showDeleted ? '#fee2e2' : '#fff',
-                  color: showDeleted ? '#dc2626' : '#374151',
-                  cursor: 'pointer',
-                  fontSize: 13,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6
-                }}
-              >
-                {showDeleted ? <EyeOff size={16} /> : <Eye size={16} />}
-                {showDeleted ? 'Ẩn đã xóa' : 'Hiện đã xóa'}
-              </button>
-            </PermissionGuard>
-            <PermissionGuard permission="university:create">
-              <button
-                onClick={() => setShowImportModal(true)}
-                style={{
-                  padding: '8px 14px',
-                  borderRadius: 10,
-                  border: '1px solid #e2e8f0',
-                  background: '#fff',
-                  cursor: 'pointer',
-                  fontSize: 13,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6
-                }}
-              >
-                Import CSV
-              </button>
-            </PermissionGuard>
-            <PermissionGuard permission="university:create">
-              <button
-                onClick={() => setShowAddModal(true)}
-                style={{
-                  padding: '8px 14px',
-                  borderRadius: 10,
-                  border: 'none',
-                  background: palette.accent,
-                  color: '#fff',
-                  cursor: 'pointer',
-                  fontSize: 13,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6
-                }}
-              >
-                <Plus size={16} />
-                Thêm trường
-              </button>
-            </PermissionGuard>
-          </div>
-        </div>
       </div>
 
+      {/* Search and Filters */}
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
         <div style={{ flex: '1 1 260px', minWidth: 240 }}>
           <div style={{ position: 'relative' }}>
@@ -715,6 +456,7 @@ export default function UniversitiesListEnhancedRedesigned() {
         </div>
       </div>
 
+      {/* Tier Filters */}
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 14 }}>
         <span style={{ fontSize: 12, fontWeight: 600, color: palette.textMuted }}>Visa</span>
         <div style={{
@@ -764,6 +506,7 @@ export default function UniversitiesListEnhancedRedesigned() {
         </div>
       </div>
 
+      {/* Table Header */}
       {!loading && filteredUniversities.length > 0 && (
         <div style={{
           display: 'flex',
@@ -782,10 +525,11 @@ export default function UniversitiesListEnhancedRedesigned() {
           <span style={{ width: 180, textAlign: 'right' }}>Tổng chi phí (D4-1)</span>
           <span style={{ width: 180, paddingLeft: 20 }}>Ưu đãi nổi bật</span>
           <span style={{ width: 160, paddingLeft: 20 }}>Học bổng tốt nhất</span>
-          <span style={{ flex: 1, textAlign: 'right' }}>Thao tác</span>
+          <span style={{ flex: 1, textAlign: 'right' }}></span>
         </div>
       )}
 
+      {/* University List */}
       {loading ? (
         <div style={{ textAlign: 'center', padding: 40, color: palette.textMuted, fontSize: 14 }}>Đang tải...</div>
       ) : filteredUniversities.length === 0 ? (
@@ -793,13 +537,9 @@ export default function UniversitiesListEnhancedRedesigned() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {sortedUniversities.map((university) => (
-            <UniversityRow
+            <StudentUniversityRow
               key={university.id}
               university={university}
-              onEdit={isAdmin ? (uni) => setEditingUniversity(uni) : undefined}
-              onQuickInfo={isAdmin ? (uni) => setQuickInfoUniversity(uni) : undefined}
-              onDelete={isAdmin ? handleDelete : undefined}
-              onRestore={isAdmin ? handleRestore : undefined}
               palette={palette}
             />
           ))}
@@ -824,87 +564,6 @@ export default function UniversitiesListEnhancedRedesigned() {
         <span>Việc làm = Khu vực có việc làm thêm</span>
         <span>GPA = Điều kiện xét tuyển</span>
       </div>
-
-      {showAddModal && (
-        <UniversityForm
-          onClose={() => setShowAddModal(false)}
-          onSave={(data) => {
-            // Cast data to access form fields
-            const formData = data as any;
-            // Create complete university object
-            const newUniversity: University = {
-              id: `uni-${Date.now()}`,
-              name: formData.name || '',
-              koreanName: formData.koreanName,
-              country: formData.country || 'South Korea',
-              countryCode: '🇰🇷',
-              region: formData.region,
-              ranking: formData.ranking,
-              top_tier: formData.topTier,
-              description: formData.overview,
-              systems: [] as any[],
-              majors: formData.majors || [],
-              overview: formData.overview,
-              galleryImages: formData.galleryImages,
-              generalTuition: formData.generalTuition,
-              visaFee: formData.visaFee,
-              accommodationFee: formData.accommodationFee,
-              insuranceFee: formData.insuranceFee,
-              additionalFees: formData.additionalFees,
-              koreanData: {
-                isKoreanUniversity: true,
-                topTier: formData.topTier || 'Top2',
-                address: formData.region,
-                koreanRanking: formData.ranking,
-                majors: formData.majors || [],
-                jobOpportunities: formData.partTimeInfo,
-                workOpportunity: formData.partTimeInfo,
-                supportPolicies: formData.supportPolicies || [],
-                refundPolicy: formData.refundPolicy,
-                admissionsType: formData.admissionsType
-              } as any
-            };
-            addUniversities([newUniversity]);
-            toast.success('Thêm trường thành công!');
-            setShowAddModal(false);
-          }}
-        />
-      )}
-
-      {showImportModal && (
-        <ImportUniversitiesModal
-          isOpen={showImportModal}
-          onClose={() => setShowImportModal(false)}
-          onImport={(newUniversities) => {
-            addUniversities(newUniversities);
-            toast.success('Import trường thành công!');
-            setShowImportModal(false);
-          }}
-        />
-      )}
-
-      {editingUniversity && (
-        <EditUniversityModal
-          university={editingUniversity}
-          onClose={() => setEditingUniversity(null)}
-          onSave={async (data) => {
-            await updateUniversity(editingUniversity.id, data);
-            toast.success('Cập nhật trường thành công!');
-            setEditingUniversity(null);
-          }}
-        />
-      )}
-
-      {isAdmin && quickInfoUniversity && (
-        <QuickInfoModal
-          university={quickInfoUniversity}
-          onClose={() => setQuickInfoUniversity(null)}
-          onSaved={(payload) => {
-            updateUniversity(quickInfoUniversity.id, payload);
-            toast.success('Đã lưu thông tin hiển thị!');
-          }}
-        />
-      )}
     </div>
   );
 }

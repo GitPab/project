@@ -76,6 +76,84 @@ router.post('/register', async (req, res) => {
 });
 
 /**
+ * POST /api/auth/admin-login
+ * Admin login endpoint (simplified for new flow)
+ */
+router.post('/admin-login', async (req, res) => {
+  const { email, password } = req.body;
+  
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password required' });
+  }
+  
+  const pool = await getPool();
+  const DB_TYPE = process.env.DB_TYPE || 'postgresql';
+  
+  try {
+    let rows;
+    if (DB_TYPE === 'mysql') {
+      const result = await pool.query(
+        'SELECT * FROM users WHERE email = ? AND role IN ("admin", "super_admin")',
+        [email]
+      );
+      rows = result.rows || result[0] ? [result[0]] : [];
+    } else {
+      const result = await pool.query(
+        'SELECT * FROM users WHERE email = $1 AND role IN ($2, $3)',
+        [email, 'admin', 'super_admin']
+      );
+      rows = result.rows;
+    }
+    
+    if (!rows || rows.length === 0) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    
+    const user = rows[0];
+    const valid = await bcrypt.compare(password, user.password);
+    
+    if (!valid) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    
+    // Update last login
+    if (DB_TYPE === 'mysql') {
+      await pool.query(
+        'UPDATE users SET last_login = NOW() WHERE id = ?',
+        [user.id]
+      );
+    } else {
+      await pool.query(
+        'UPDATE users SET last_login = NOW() WHERE id = $1',
+        [user.id]
+      );
+    }
+    
+    // Generate token
+    const token = jwt.sign(
+      { id: user.id, email: user.email, role: user.role, name: user.name },
+      process.env.JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+    
+    logger.info('Admin login successful', { userId: user.id, email: user.email });
+    
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      }
+    });
+  } catch (e) {
+    logger.error('Admin login failed', { error: e.message, email });
+    res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+/**
  * POST /api/auth/login
  * Authenticate user and return JWT
  */

@@ -130,13 +130,13 @@ export default function EditUniversityModal({
       // Image fields
       heroImage: university?.heroImage || '',
       thumbnail: university?.thumbnail || '',
-      logo: university?.koreanData?.logo || '',
+      logo: (university as any)?.koreanData?.logo || (university as any)?.logo || '',
       listLogo: university?.koreanData?.listLogo || '',
       // Missing fields from Detail.txt
       supportPolicies: university?.koreanData?.supportPolicies || [],
       refundPolicy: university?.koreanData?.refundPolicy || '',
       admissionsType: university?.koreanData?.admissionsType || '',
-      partTimeInfo: university?.koreanData?.partTimeInfo || '',
+      partTimeInfo: (university as any)?.koreanData?.partTimeInfo || '',
       majors: (university?.koreanData?.majors || []).join('\n'), // Chuyên ngành as textarea
     }),
     [university?.id] // Only recompute when university ID changes
@@ -276,11 +276,11 @@ export default function EditUniversityModal({
       };
 
       if (isKorean) {
-        payload.fixedCosts = (values.fixedCosts || []).map(c => ({
+        (payload as any).fixedCosts = (values.fixedCosts || []).map(c => ({
           ...c,
           currency: c.currency as Currency | undefined,
         }));
-        payload.optionalAddons = (values.optionalAddons || []).map(addon => ({
+        (payload as any).optionalAddons = (values.optionalAddons || []).map(addon => ({
           id: addon.id,
           name: addon.name,
           nameVi: addon.name,

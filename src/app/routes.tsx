@@ -1,19 +1,27 @@
-import { lazy, Suspense } from 'react';
-import { createHashRouter, Navigate, Outlet } from 'react-router';
-import { useAuth } from './context/AuthContext';
-import Layout from './components/Layout';
-import Register from './pages/Register';
-import Login from './pages/Login';
-import FirstTimeSetup from './pages/FirstTimeSetup';
-import UniversityInfo from './pages/UniversityInfo';
-import UniversityDetailRedesigned from './pages/UniversityDetailRedesigned';
-import PublicOnboarding from './pages/PublicOnboarding';
-import StudentHome from './pages/StudentHome';
-import StudentUniversityList from './components/StudentUniversityList';
-import RouteError from './components/RouteError';
+import { lazy, Suspense, useState, useEffect } from 'react';
+import { createHashRouter, Navigate, Outlet, useNavigate } from 'react-router';
 
-// Lazy load admin pages for code splitting
+// Eager imports for critical pages
+import PublicOnboarding from './pages/PublicOnboarding';
+import AdminLoginSimple from './pages/AdminLoginSimple';
+import TrackingLookupSimple from './pages/TrackingLookupSimple';
+import FirstTimeSetup from './pages/FirstTimeSetup';
+import Layout from './components/Layout';
+import UniversityInfo from './pages/UniversityInfo';
+
+// Lazy imports for other pages
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const UniversitiesListEnhancedRedesigned = lazy(() => import('./components/UniversitiesListEnhancedRedesigned'));
+const UniversityDetailRedesigned = lazy(() => import('./pages/UniversityDetailRedesigned'));
+const UniversityDetailAdmin = lazy(() => import('./pages/UniversityDetailAdmin'));
+const StudentMonitoring = lazy(() => import('./pages/StudentMonitoring'));
+const AdminRegistrations = lazy(() => import('./pages/AdminRegistrations'));
+const StudentUniversities = lazy(() => import('./pages/StudentUniversities'));
+const StudentDashboard = lazy(() => import('./pages/StudentDashboard'));
+const StudentFeedbackPage = lazy(() => import('./pages/StudentFeedback'));
+const ProgressTracker = lazy(() => import('./pages/ProgressTracker'));
+const StudentHome = lazy(() => import('./pages/StudentHome'));
+const StudentOnboarding = lazy(() => import('./pages/StudentOnboarding')); 
 const AdminAuditTrail = lazy(() => import('./pages/AdminAuditTrail'));
 const AdminEmailTemplates = lazy(() => import('./pages/AdminEmailTemplates'));
 const AdminWorkflow = lazy(() => import('./pages/AdminWorkflow'));
@@ -25,18 +33,10 @@ const AdminCalendar = lazy(() => import('./pages/AdminCalendar'));
 const AdminFeedback = lazy(() => import('./pages/AdminFeedback'));
 const AdminUsers = lazy(() => import('./pages/AdminUsers'));
 const AdminAnalyticsDashboard = lazy(() => import('./pages/AdminAnalyticsDashboard'));
-const AdminRegistrations = lazy(() => import('./pages/AdminRegistrations'));
 const AdminRoles = lazy(() => import('./pages/AdminRoles'));
 const AdminMaintenance = lazy(() => import('./pages/AdminMaintenance'));
-const StudentMonitoring = lazy(() => import('./pages/StudentMonitoring'));
-const UniversityDetailAdmin = lazy(() => import('./pages/UniversityDetailAdmin'));
-const MyCosts = lazy(() => import('./pages/MyCosts'));
-const ProgressTracker = lazy(() => import('./pages/ProgressTracker'));
-const StudentOnboarding = lazy(() => import('./pages/StudentOnboarding'));
-const StudentTracking = lazy(() => import('./pages/StudentTracking'));
-const StudentLookup = lazy(() => import('./pages/StudentLookup'));
-const StudentFeedback = lazy(() => import('./pages/StudentFeedback'));
-const UniversitiesListEnhancedRedesigned = lazy(() => import('./components/UniversitiesListEnhancedRedesigned'));
+const AdminMediaLibrary = lazy(() => import('./pages/AdminMediaLibrary'));
+const AdminExchangeRates = lazy(() => import('./pages/AdminExchangeRates'));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -51,17 +51,42 @@ const withSuspense = (Component: React.ComponentType) => () => (
     <Component />
   </Suspense>
 );
-function AdminProtected() {
-  const { isAuthenticated, isAdmin } = useAuth();
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
-  if (!isAdmin) return <Navigate to="/403" replace />;
-  return <Outlet />;
-}
 
-// Protected route wrapper for students
-function StudentProtected() {
-  const { isAuthenticated } = useAuth();
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
+// Route error component
+function RouteError() {
+  const navigate = useNavigate();
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="text-center">
+        <h1 className="text-4xl font-bold text-red-600 mb-4">Lỗi</h1>
+        <p className="text-gray-600 mb-4">Không thể tải trang</p>
+        <button 
+          onClick={() => navigate('/')}
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+        >
+          Về trang chủ
+        </button>
+      </div>
+    </div>
+  );
+}
+// Simple admin check using state to prevent multiple redirects
+function AdminProtected() {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  
+  useEffect(() => {
+    const token = localStorage.getItem('adminToken') || localStorage.getItem('auth_token');
+    if (!token) {
+      window.location.href = '/#/admin-login';
+    } else {
+      setIsAuthenticated(true);
+    }
+  }, []);
+  
+  if (isAuthenticated === null) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
+  
   return <Outlet />;
 }
 
@@ -82,30 +107,60 @@ export const router = createHashRouter([
     errorElement: <RouteError />
   },
   {
-    path: '/login',
-    Component: Login,
+    path: '/admin-login',
+    Component: AdminLoginSimple,
     errorElement: <RouteError />
   },
   {
-    path: '/register',
-    Component: Register,
-    errorElement: <RouteError />
+    path: '/login',
+    Component: () => <Navigate to="/admin-login" replace />
   },
   {
     path: '/first-time-setup',
     Component: FirstTimeSetup,
     errorElement: <RouteError />
   },
+  // Student routes with Layout (same structure as admin)
   {
-    path: '/student/lookup',
-    Component: withSuspense(StudentLookup),
-    errorElement: <RouteError />
+    path: '/student',
+    Component: Layout,
+    errorElement: <RouteError />,
+    children: [
+      {
+        index: true,
+        Component: () => <Navigate to="/student/dashboard" replace />
+      },
+      {
+        path: 'dashboard',
+        Component: withSuspense(StudentDashboard)
+      },
+      {
+        path: 'home',
+        Component: withSuspense(StudentHome)
+      },
+      {
+        path: 'universities',
+        Component: withSuspense(StudentUniversities)
+      },
+      {
+        path: 'my-costs',
+        Component: withSuspense(StudentOnboarding)
+      },
+      {
+        path: 'my-progress',
+        Component: withSuspense(ProgressTracker)
+      },
+      {
+        path: 'feedback',
+        Component: withSuspense(StudentFeedbackPage)
+      },
+      {
+        path: 'university/:id',
+        Component: UniversityDetailRedesigned
+      }
+    ]
   },
-  {
-    path: '/student/tracking/:code',
-    Component: withSuspense(StudentTracking),
-    errorElement: <RouteError />
-  },
+  // Admin routes
   {
     path: '/admin',
     Component: AdminProtected,
@@ -114,6 +169,7 @@ export const router = createHashRouter([
       {
         path: '',
         Component: Layout,
+        errorElement: <RouteError />,
         children: [
           {
             index: true,
@@ -190,51 +246,14 @@ export const router = createHashRouter([
           {
             path: 'maintenance',
             Component: withSuspense(AdminMaintenance)
-          }
-        ]
-      }
-    ]
-  },
-  {
-    path: '/student',
-    Component: StudentProtected,
-    errorElement: <RouteError />,
-    children: [
-      {
-        path: '',
-        Component: Layout,
-        children: [
-          {
-            index: true,
-            Component: () => <Navigate to="/student/home" replace />
           },
           {
-            path: 'home',
-            Component: StudentHome
+            path: 'media',
+            Component: withSuspense(AdminMediaLibrary)
           },
           {
-            path: 'universities',
-            Component: StudentUniversityList
-          },
-          {
-            path: 'university/:id',
-            Component: UniversityDetailRedesigned
-          },
-          {
-            path: 'my-costs',
-            Component: withSuspense(MyCosts)
-          },
-          {
-            path: 'my-progress',
-            Component: withSuspense(ProgressTracker)
-          },
-          {
-            path: 'onboarding',
-            Component: withSuspense(StudentOnboarding)
-          },
-          {
-            path: 'feedback',
-            Component: withSuspense(StudentFeedback)
+            path: 'exchange-rates',
+            Component: withSuspense(AdminExchangeRates)
           }
         ]
       }

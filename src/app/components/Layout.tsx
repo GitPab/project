@@ -2,13 +2,18 @@
 import { Outlet, NavLink, useNavigate, Navigate, useLocation } from 'react-router';
 import { useAuth } from '../context/AuthContext';
 import { usePermission } from './PermissionGuard';
+import { useRealtimeUpdates } from '../hooks/useRealtimeUpdates';
 import api from '../services/api';
-import { LayoutDashboard, School, Users, LogOut, Menu, X, Shield, UserCircle, Lock, Edit3, TrendingUp, ChevronsLeft, ChevronsRight, BarChart3, ClipboardList, Mail, Workflow, Settings, Database, GraduationCap, Calendar, MessageSquare, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, School, Users, LogOut, Menu, X, Shield, UserCircle, Lock, Edit3, TrendingUp, ChevronsLeft, ChevronsRight, BarChart3, ClipboardList, Mail, Workflow, Settings, Database, GraduationCap, Calendar, MessageSquare, ShieldCheck, Bell, Wifi, WifiOff, UserCog, ImageIcon, DollarSign } from 'lucide-react';
 
 export default function Layout() {
-  const { logout, user, isAdmin } = useAuth();
+  const { logout, user, isAdmin: authIsAdmin } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  
+  // Force admin mode when on admin routes
+  const isAdmin = authIsAdmin || location.pathname.startsWith('/admin');
+  const { isConnected, stats } = useRealtimeUpdates();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
   const contentRef = React.useRef<HTMLDivElement | null>(null);
@@ -22,7 +27,8 @@ export default function Layout() {
     logout(); 
     navigate('/login'); 
   };
-  if (!user) return <Navigate to='/login' replace />;
+  // Note: Auth check moved to AdminProtected route guard
+  // if (!user) return <Navigate to='/login' replace />;
 
   // Reset scroll on route change to avoid blank space after navigation
   React.useEffect(() => {
@@ -58,23 +64,37 @@ export default function Layout() {
     };
   }, [isAdmin]);
 
-  // Admin menu items with required permissions
+  // Admin menu items with required permissions - organized by groups
   const adminMenuItems = [
+    // Dashboard & Analytics
     { path: '/admin/dashboard',     icon: LayoutDashboard, label: 'Trang chủ',        permission: 'university:view' },
     { path: '/admin/analytics',     icon: BarChart3,       label: 'Thống kê',        permission: 'analytics:view' },
+    
+    // University Management
     { path: '/admin/universities',  icon: School,          label: 'Danh sách trường', permission: 'university:view' },
+    { path: '/admin/scholarships',  icon: GraduationCap,   label: 'Học bổng',        permission: 'university:view' },
+    
+    // Student Management
     { path: '/admin/students',      icon: Users,           label: 'Theo dõi học viên',permission: 'student:view' },
     { path: '/admin/registrations', icon: Users,           label: 'Đăng ký',         permission: 'application:view' },
-    { path: '/admin/calendar',      icon: Calendar,        label: 'Lịch hẹn',        permission: 'student:view' },
-    { path: '/admin/scholarships',  icon: GraduationCap,   label: 'Học bổng',        permission: 'university:view' },
     { path: '/admin/visa',          icon: ShieldCheck,     label: 'Theo dõi Visa',   permission: 'student:view' },
+    { path: '/admin/calendar',      icon: Calendar,        label: 'Lịch hẹn',        permission: 'student:view' },
     { path: '/admin/feedback',      icon: MessageSquare,   label: 'Đánh giá',        permission: 'analytics:view' },
-    { path: '/admin/audit',        icon: ClipboardList,   label: 'Nhật ký',         permission: 'manage:user' },
+    
+    // Content & Media
+    { path: '/admin/media',        icon: ImageIcon,       label: 'Thư viện Media',   permission: 'manage:settings' },
     { path: '/admin/templates',     icon: Mail,            label: 'Mẫu Email',       permission: 'manage:settings' },
-    { path: '/admin/workflow',      icon: Workflow,        label: 'Tự động hóa',     permission: 'manage:settings' },
+    
+    // Operations
     { path: '/admin/bulk',         icon: Database,        label: 'Thao tác hàng loạt', permission: 'university:create' },
-    { path: '/admin/maintenance',  icon: Database,        label: 'Bảo trì',          permission: 'view:database' },
+    { path: '/admin/workflow',      icon: Workflow,        label: 'Tự động hóa',     permission: 'manage:settings' },
+    { path: '/admin/exchange-rates', icon: DollarSign,     label: 'Tỷ giá',          permission: 'manage:settings' },
+    
+    // System & Security
+    { path: '/admin/users',        icon: UserCog,         label: 'Quản lý Users',   permission: 'manage:user' },
     { path: '/admin/roles',        icon: Shield,          label: 'Phân quyền',      permission: 'manage:user' },
+    { path: '/admin/audit',        icon: ClipboardList,   label: 'Nhật ký',         permission: 'manage:user' },
+    { path: '/admin/maintenance',  icon: Database,        label: 'Bảo trì',          permission: 'view:database' },
     { path: '/admin/settings',      icon: Settings,        label: 'Cài đặt',         permission: 'manage:settings' },
   ];
 
@@ -82,10 +102,11 @@ export default function Layout() {
   const menuItems = isAdmin
     ? adminMenuItems
     : [
-        { path: '/student/home',         icon: LayoutDashboard, label: 'Trang chủ' },
+        { path: '/student/dashboard',    icon: LayoutDashboard, label: 'Dashboard' },
+        { path: '/student/home',        icon: LayoutDashboard, label: 'Trang chủ' },
         { path: '/student/universities', icon: School,          label: 'Danh sách trường' },
         { path: '/student/my-costs',     icon: Users,           label: 'Chi phí của tôi' },
-        { path: '/student/my-progress',  icon: TrendingUp,      label: 'Tiến trình' },
+        { path: '/student/my-progress', icon: TrendingUp,      label: 'Tiến trình' },
         { path: '/student/feedback',    icon: MessageSquare,   label: 'Đánh giá & Phản hồi' },
       ];
 
@@ -138,13 +159,20 @@ export default function Layout() {
           </div>
         )}
 
-        <nav className={`flex-1 ${sidebarCollapsed ? 'p-2' : 'p-4'} space-y-1`}>
-          {menuItems.map((item) => (
-            <NavLink key={item.path} to={item.path}
-              className={({ isActive }) => `flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-lg transition-colors ${isActive ? 'bg-[#003AB7] text-white' : 'text-slate-700 hover:bg-slate-100'}`}>
-              <item.icon className="w-5 h-5" />
-              {!sidebarCollapsed && <span className="font-medium">{item.label}</span>}
-            </NavLink>
+        <nav className={`flex-1 ${sidebarCollapsed ? 'p-2' : 'p-4'} space-y-1 overflow-y-auto`}>
+          {menuItems.map((item, index) => (
+            <React.Fragment key={item.path}>
+              {/* Add separator before specific groups */}
+              {!sidebarCollapsed && index === 2 && <div className="my-2 border-t border-slate-200" />}
+              {!sidebarCollapsed && index === 7 && <div className="my-2 border-t border-slate-200" />}
+              {!sidebarCollapsed && index === 12 && <div className="my-2 border-t border-slate-200" />}
+              {!sidebarCollapsed && index === 15 && <div className="my-2 border-t border-slate-200" />}
+              <NavLink to={item.path}
+                className={({ isActive }) => `flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-lg transition-colors ${isActive ? 'bg-[#003AB7] text-white' : 'text-slate-700 hover:bg-slate-100'}`}>
+                <item.icon className="w-5 h-5" />
+                {!sidebarCollapsed && <span className="font-medium">{item.label}</span>}
+              </NavLink>
+            </React.Fragment>
           ))}
         </nav>
 
@@ -171,13 +199,20 @@ export default function Layout() {
               <h1 className="text-xl font-bold text-primary">Du Học Cost</h1>
               <button onClick={() => setSidebarOpen(false)} className="text-slate-500 hover:text-slate-700"><X className="w-6 h-6" /></button>
             </div>
-            <nav className="flex-1 p-4 space-y-1">
-              {menuItems.map((item) => (
-                <NavLink key={item.path} to={item.path} onClick={() => setSidebarOpen(false)}
-                  className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive ? 'bg-primary text-white' : 'text-slate-700 hover:bg-slate-100'}`}>
-                  <item.icon className="w-5 h-5" />
-                  <span className="font-medium">{item.label}</span>
-                </NavLink>
+            <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+              {menuItems.map((item, index) => (
+                <React.Fragment key={item.path}>
+                  {/* Add separator before specific groups */}
+                  {index === 2 && <div className="my-2 border-t border-slate-200" />}
+                  {index === 7 && <div className="my-2 border-t border-slate-200" />}
+                  {index === 12 && <div className="my-2 border-t border-slate-200" />}
+                  {index === 15 && <div className="my-2 border-t border-slate-200" />}
+                  <NavLink to={item.path} onClick={() => setSidebarOpen(false)}
+                    className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive ? 'bg-primary text-white' : 'text-slate-700 hover:bg-slate-100'}`}>
+                    <item.icon className="w-5 h-5" />
+                    <span className="font-medium">{item.label}</span>
+                  </NavLink>
+                </React.Fragment>
               ))}
             </nav>
             <div className="p-4 border-t border-slate-200">
@@ -233,19 +268,58 @@ export default function Layout() {
 
         <main className="flex-1"><Outlet /></main>
 
+        {/* Mobile Bottom Navigation */}
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-2 py-1 flex justify-around items-center z-40">
+          {menuItems.slice(0, 5).map((item) => (
+            <NavLink key={item.path} to={item.path}
+              className={({ isActive }) => `flex flex-col items-center p-2 rounded-lg ${isActive ? 'text-blue-600' : 'text-slate-500'}`}>
+              <item.icon className="w-5 h-5" />
+              <span className="text-[10px] mt-0.5">{item.label.slice(0, 8)}</span>
+            </NavLink>
+          ))}
+        </nav>
+
         {/* Footer */}
-        <footer className="bg-white border-t border-slate-200 py-4 px-6 shrink-0">
+        <footer className="hidden md:block bg-white border-t border-slate-200 py-4 px-6 shrink-0">
           <div className="flex items-center justify-between">
             {/* Logo Left */}
             <div className="flex items-center gap-2">
               <img src="/img/tbt-logo.png" alt="TBT GROUP" className="h-8 w-auto" />
             </div>
             
+            {/* Center - Real-time Status */}
+            <div className="flex items-center gap-4 text-sm text-slate-600">
+              {isAdmin && (
+                <div className="flex items-center gap-2" title={isConnected ? 'Real-time updates active' : 'Real-time updates disconnected'}>
+                  {isConnected ? <Wifi className="w-4 h-4 text-green-500" /> : <WifiOff className="w-4 h-4 text-red-500" />}
+                  <span>{isConnected ? 'Live' : 'Offline'}</span>
+                </div>
+              )}
+              {isAdmin && stats.registrations > 0 && (
+                <div className="flex items-center gap-1">
+                  <Bell className="w-4 h-4 text-blue-500" />
+                  <span>{stats.registrations} registrations</span>
+                </div>
+              )}
+            </div>
+            
             {/* Copyright Right */}
             <div className="text-right text-xs text-slate-600">
               <p className="font-semibold">Bản quyền của Công Ty Cổ Phần Quốc Tế TBT GROUP</p>
               <p>Giấy chứng nhận Đăng ký Kinh doanh số 0110863947 do Sở Kế hoạch và Đầu tư Thành phố Hà Nội cấp ngày 24/01/2025</p>
-              <p>Giấy chứng nhận hoạt động đào tạo, bồi dưỡng do Sở Giáo Dục và Đào Tạo Thành Phố Hà Nội cấp ngày 21/04/2021</p>
+            </div>
+          </div>
+        </footer>
+
+        {/* Mobile Footer - Compact */}
+        <footer className="md:hidden bg-white border-t border-slate-200 py-2 px-4 mb-14">
+          <div className="flex items-center justify-between text-xs text-slate-600">
+            <div className="flex items-center gap-2">
+              <img src="/img/tbt-logo.png" alt="TBT" className="h-6 w-auto" />
+            </div>
+            <div className="flex items-center gap-2">
+              {isConnected ? <Wifi className="w-4 h-4 text-green-500" /> : <WifiOff className="w-4 h-4 text-red-500" />}
+              <span>{stats.registrations} regs</span>
             </div>
           </div>
         </footer>

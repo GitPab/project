@@ -1502,10 +1502,31 @@ export default function UniversityDetailAdmin() {
     );
   }
 
-  // Redirect non-admin users to student view
+  // Redirect non-admin users to student view - useEffect to avoid setState during render
+  useEffect(() => {
+    if (!isAdmin && id) {
+      navigate(`/university/${id}`, { replace: true });
+    }
+  }, [isAdmin, id, navigate]);
+
+  // Show loading while redirecting non-admin
   if (!isAdmin) {
-    navigate(`/university/${id}`);
-    return null;
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f8f9fa' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ 
+            width: 48, 
+            height: 48, 
+            border: '4px solid #e2e8f0', 
+            borderTop: '4px solid #2563eb', 
+            borderRadius: '50%', 
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto 16px'
+          }}></div>
+          <p style={{ color: '#64748b' }}>Đang chuyển hướng...</p>
+        </div>
+      </div>
+    );
   }
 
   return (

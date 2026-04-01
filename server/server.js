@@ -33,6 +33,12 @@ import healthRoutes from './routes/health.js';
 import featureRoutes from './routes/features.js';
 import adminInviteRoutes from './routes/adminInvite.js';
 
+// CommonJS routes (loaded via createRequire)
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const mediaRoutes = require('./routes/media.js');
+const exchangeRatesRoutes = require('./routes/exchangeRates.js');
+
 // Load environment variables
 dotenv.config();
 
@@ -133,7 +139,8 @@ app.use((req, res, next) => {
     '/api/health',
     '/api/test-db-connection',
     '/api/docs',
-    '/api/docs.json'
+    '/api/docs.json',
+    '/api/sse/registrations'
   ];
   
   // Allow public read-only access to universities
@@ -165,6 +172,9 @@ app.use('/api/admin/db', databaseRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api', healthRoutes);
 app.use('/api/features', featureRoutes);
+app.use('/api/public', publicRoutes);
+app.use('/api/media', mediaRoutes);
+app.use('/api/exchange-rates', exchangeRatesRoutes);
 
 // TEMP: Reset admin password endpoint
 app.post('/api/reset-admin', async (req, res) => {
@@ -181,6 +191,73 @@ app.post('/api/reset-admin', async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
+
+// ============================================
+// REAL-TIME UPDATES (Server-Sent Events)
+// ============================================
+const clients = new Map();
+
+// Handle OPTIONS preflight for SSE
+app.options('/api/sse/registrations', cors(corsOptions));
+
+app.get('/api/sse/registrations', async (req, res) => {
+  // EventSource doesn't support custom headers, read token from query string
+  const token = req.query.token || req.headers.authorization?.split(' ')[1];
+  if (!token) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  // Verify token
+  let user;
+  try {
+    user = jwt.verify(token, process.env.JWT_SECRET);
+  } catch (err) {
+    return res.status(403).json({ error: 'Invalid token' });
+  }
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+
+  const clientId = Date.now();
+  clients.set(clientId, res);
+
+  // Send initial connection message
+  res.write(`data: ${JSON.stringify({ type: 'connected', clientId })}\n\n`);
+
+  // Send current registration count
+  try {
+    const pool = await getPool();
+    const { rows } = await pool.query('SELECT COUNT(*) as count FROM registrations');
+    res.write(`data: ${JSON.stringify({ type: 'stats', registrations: parseInt(rows[0].count) })}\n\n`);
+  } catch (err) {
+    console.error('SSE stats error:', err);
+  }
+
+  // Heartbeat to keep connection alive
+  const heartbeat = setInterval(() => {
+    res.write(`:heartbeat\n\n`);
+  }, 30000);
+
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    clients.delete(clientId);
+    console.log(`SSE client ${clientId} disconnected`);
+  });
+});
+
+// Function to broadcast events to all connected clients
+export function broadcastEvent(eventType, data) {
+  const message = `data: ${JSON.stringify({ type: eventType, data, timestamp: new Date().toISOString() })}\n\n`;
+  clients.forEach((res, clientId) => {
+    try {
+      res.write(message);
+    } catch (err) {
+      console.error(`Failed to send to client ${clientId}:`, err);
+      clients.delete(clientId);
+    }
+  });
+}
 
 // ============================================
 // DATABASE INITIALIZATION
@@ -803,6 +880,7 @@ async function initializeDatabase() {
 }
 
 import autoSyncManager from './autoSync.js';
+import publicRoutes from './routes/public.js';
 
 // ============================================
 // SERVER STARTUP

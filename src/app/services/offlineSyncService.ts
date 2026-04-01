@@ -36,7 +36,7 @@ interface PendingSyncItem {
 
 // Helper to get auth token
 function getToken(): string {
-  return localStorage.getItem('auth_token') || '';
+  return localStorage.getItem('auth_token') || localStorage.getItem('adminToken') || '';
 }
 
 // Check if we're online

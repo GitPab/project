@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, Mail, Phone, MapPin, GraduationCap, Calendar, Award, FileText, TrendingUp, Clock, DollarSign, Target, X } from 'lucide-react';
+import { User, Mail, Phone, MapPin, GraduationCap, Calendar, Award, FileText, TrendingUp, Clock, DollarSign, Target, X, Home, School, Wallet, MessageSquare } from 'lucide-react';
 
 interface StudentInfoSidebarProps {
   className?: string;
@@ -19,6 +19,15 @@ interface StudentInfoSidebarProps {
   };
   onStudentUpdate?: (updatedStudent: any) => void;
 }
+
+// Navigation items for student portal
+const navItems = [
+  { path: '/#/student/home', icon: Home, label: 'Trang chủ' },
+  { path: '/#/student/universities', icon: School, label: 'Danh sách trường' },
+  { path: '/#/student/my-costs', icon: Wallet, label: 'Chi phí của tôi' },
+  { path: '/#/student/my-progress', icon: TrendingUp, label: 'Tiến trình' },
+  { path: '/#/student/feedback', icon: MessageSquare, label: 'Đánh giá' },
+];
 
 export default function StudentInfoSidebar({ className = '', student, onStudentUpdate }: StudentInfoSidebarProps) {
   const defaultStudent = {
@@ -84,6 +93,28 @@ export default function StudentInfoSidebar({ className = '', student, onStudentU
 
       {/* Content */}
       <div className="p-4 space-y-4">
+        {/* Navigation Menu */}
+        <div className="space-y-2">
+          <h4 className="font-bold text-[#003AB7] text-sm font-['Be_Vietnam_Pro'] flex items-center gap-2">
+            <Target className="w-4 h-4" />
+            Menu
+          </h4>
+          <nav className="space-y-1">
+            {navItems.map((item) => (
+              <a
+                key={item.path}
+                href={item.path}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-[#4D4D4D] hover:bg-[#F8F9FA] hover:text-[#003AB7] transition-colors font-['Be_Vietnam_Pro']"
+              >
+                <item.icon className="w-4 h-4" />
+                {item.label}
+              </a>
+            ))}
+          </nav>
+        </div>
+
+        <div className="border-t border-[#558EFF]/20"></div>
+
         {/* Status */}
         <div className="flex items-center gap-2">
           <span className={`text-xs font-bold px-3 py-1 rounded-full ${statusColors[studentData.status as keyof typeof statusColors] || statusColors.active} font-['Be_Vietnam_Pro']`}>

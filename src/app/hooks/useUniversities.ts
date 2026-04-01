@@ -17,9 +17,7 @@ export function useUniversities(includeInactive = false) {
   return useQuery({
     queryKey: universityKeys.list({ includeInactive }),
     queryFn: async () => {
-      const response = await api.get('/universities', {
-        params: { includeInactive }
-      });
+      const response = await api.get(`/universities?includeInactive=${includeInactive}`);
       return response.data.data || response.data;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -31,9 +29,7 @@ export function useUniversitiesPaginated(page = 1, limit = 20, search = '', incl
   return useQuery({
     queryKey: universityKeys.list({ page, limit, search, includeInactive }),
     queryFn: async () => {
-      const response = await api.get('/universities', {
-        params: { page, limit, search, includeInactive }
-      });
+      const response = await api.get(`/universities?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}&includeInactive=${includeInactive}`);
       return response.data;
     },
     placeholderData: (previousData) => previousData, // Keep previous data while fetching

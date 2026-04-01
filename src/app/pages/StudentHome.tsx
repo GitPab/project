@@ -3,15 +3,12 @@ import { useNavigate } from 'react-router';
 import { useApp } from '../context/AppContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useLanguage } from '../context/LanguageContext';
-import { MapPin, CheckCircle, Lock, Search, Star, UserPlus, GraduationCap, FileText, ArrowRight } from 'lucide-react';
+import { MapPin, CheckCircle, Lock, Search, Star, UserPlus, GraduationCap, ArrowRight } from 'lucide-react';
 import StudentInfoSidebar from '../components/StudentInfoSidebar';
-import { searchTrackingCodesByEmail, getTrackingCode } from '../services/trackingCodeService';
-// Note: Student progress and payments will come from API in future
-// import { getStudentProgress, getPayments } from '../services/sqliteDatabase';
+import { searchTrackingCodesByEmail } from '../services/trackingCodeService';
 import { toast } from 'sonner';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
 
 export default function StudentHome() {
   const { universities, registrations, user } = useApp();
@@ -20,38 +17,7 @@ export default function StudentHome() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = React.useState('');
   const [currentPage, setCurrentPage] = React.useState(1);
-  const [trackingCodeInput, setTrackingCodeInput] = React.useState('');
-  const [isLookingUp, setIsLookingUp] = React.useState(false);
   const itemsPerPage = 12;
-
-  // Handle tracking code lookup
-  const handleLookup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!trackingCodeInput.trim()) {
-      toast.error(language === 'vi' ? 'Vui lòng nhập mã theo dõi' : 'Please enter tracking code');
-      return;
-    }
-
-    setIsLookingUp(true);
-    try {
-      const data = await getTrackingCode(trackingCodeInput.trim());
-      if (data) {
-        // Redirect to Tracking page to see progress pipeline
-        navigate(`/student/tracking/${encodeURIComponent(trackingCodeInput.trim())}`);
-      } else {
-        toast.error(
-          language === 'vi' ? 'Mã theo dõi không tồn tại' : 
-          'Tracking code not found'
-        );
-      }
-    } catch (error) {
-      console.error('Lookup error:', error);
-      toast.error(language === 'vi' ? 'Lỗi khi tìm kiếm' : 'Error searching');
-    } finally {
-      setIsLookingUp(false);
-    }
-  };
 
   // Load student profile from tracking codes
   const [studentProfile, setStudentProfile] = React.useState({
@@ -102,9 +68,9 @@ export default function StudentHome() {
         const realRemaining = Math.max(0, initialCost - totalPaid);
         
         const updatedProfile = {
-          name: userCode.studentName || user?.name || 'Chưa có tên',
-          email: userCode.studentEmail || user?.email || 'Chưa có email',
-          phone: userCode.studentPhone || user?.phone || 'Chưa có SĐT',
+          name: userCode.studentName || 'Chưa có tên',  // Don't use user?.name
+          email: userCode.studentEmail || 'Chưa có email',
+          phone: userCode.studentPhone || 'Chưa có SĐT',
           university: userCode.desiredUniversityName || 'Chưa chọn trường',
           program: `Du học ${userCode.visaSystem || 'D4-1'}`,
           startDate: new Date(userCode.createdAt || Date.now()).toLocaleDateString('vi-VN', { month: '2-digit', year: 'numeric' }),
@@ -154,54 +120,6 @@ export default function StudentHome() {
     <div className="flex gap-6 min-h-full">
       {/* Main Content */}
       <div className="flex-1 space-y-6 p-6">
-        {/* Tra Cứu Hồ Sơ Card */}
-        <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-white">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <FileText className="w-5 h-5 text-blue-600" />
-              <CardTitle className="text-lg text-slate-800">
-                {language === 'vi' ? 'Tra Cứu Hồ Sơ' : 'Application Lookup'}
-              </CardTitle>
-            </div>
-            <CardDescription>
-              {language === 'vi' 
-                ? 'Nhập mã theo dõi để xem trạng thái hồ sơ và chi phí của bạn'
-                : 'Enter your tracking code to view application status and costs'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleLookup} className="flex gap-3">
-              <Input
-                type="text"
-                placeholder={language === 'vi' ? 'SACMA-YYYYMMDD-XXXXXX' : 'Enter tracking code'}
-                value={trackingCodeInput}
-                onChange={(e) => setTrackingCodeInput(e.target.value.toUpperCase())}
-                className="flex-1 font-mono"
-                disabled={isLookingUp}
-              />
-              <Button 
-                type="submit" 
-                disabled={isLookingUp}
-                className="whitespace-nowrap"
-              >
-                {isLookingUp ? (
-                  <span className="animate-spin">⌛</span>
-                ) : (
-                  <>
-                    <Search className="w-4 h-4 mr-2" />
-                    {language === 'vi' ? 'Tra Cứu' : 'Lookup'}
-                  </>
-                )}
-              </Button>
-            </form>
-            <p className="text-xs text-slate-500 mt-2">
-              {language === 'vi' 
-                ? 'Mã theo dõi được gửi qua email khi bạn hoàn tất đơn tư vấn'
-                : 'Tracking code is sent via email when you complete your application'}
-            </p>
-          </CardContent>
-        </Card>
-
         {/* CTA Banner for Consultation */}
         <div className="bg-gradient-to-r from-blue-600 to-blue-800 rounded-xl p-6 text-white shadow-lg">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">

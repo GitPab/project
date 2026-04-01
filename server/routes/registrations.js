@@ -8,6 +8,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { getPool } from '../dbAdapter.js';
 import { logger } from '../logger.js';
 import { requirePermission, hasPermission } from '../utils/rbac.js';
+import { broadcastEvent } from '../sseManager.js';
 
 const router = express.Router();
 
@@ -60,6 +61,17 @@ router.post('/', async (req, res) => {
     );
     
     logger.info('Registration created', { registrationId: rows[0].id, studentId: req.user.id, universityId });
+    
+    // Broadcast real-time event
+    broadcastEvent('new_registration', {
+      id: rows[0].id,
+      studentId: req.user.id,
+      studentName: req.user.name,
+      universityId,
+      visaSystem,
+      createdAt: new Date().toISOString()
+    });
+    
     res.status(201).json({ id: rows[0].id, message: 'Registration created successfully' });
   } catch (error) {
     logger.error('Failed to create registration', { error: error.message, studentId: req.user.id });

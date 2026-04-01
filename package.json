@@ -109,7 +109,8 @@
     "tailwindcss": "4.1.12",
     "terser": "^5.46.0",
     "typescript": "^5.0.0",
-    "vite": "^6.4.1"
+    "vite": "^6.4.1",
+    "vite-plugin-pwa": "^1.2.0"
   },
   "pnpm": {
     "overrides": {

@@ -16,14 +16,10 @@ async function getDynamicBaseUrl(): Promise<string> {
 }
 
 // Create axios instance with dynamic base URL
-let apiInstance: any = null;
-
 async function getApi() {
-  if (apiInstance) return apiInstance;
-  
   const baseURL = await getDynamicBaseUrl();
   
-  apiInstance = axios.create({
+  const apiInstance = axios.create({
     baseURL,
     timeout: 10000,
     headers: {
@@ -34,9 +30,13 @@ async function getApi() {
   // Request interceptor
   apiInstance.interceptors.request.use(
     (config: InternalAxiosRequestConfig) => {
-      const token = localStorage.getItem('auth_token');
+      const token = localStorage.getItem('auth_token') || localStorage.getItem('adminToken');
+      console.log('[API] Token found:', !!token, 'Key:', token ? (localStorage.getItem('auth_token') ? 'auth_token' : 'adminToken') : 'none');
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
+        console.log('[API] Sending with Authorization header');
+      } else {
+        console.log('[API] No token, sending without auth');
       }
       return config;
     },
@@ -50,6 +50,8 @@ async function getApi() {
       if (error.response?.status === 401) {
         localStorage.removeItem('auth_token');
         localStorage.removeItem('auth_user');
+        localStorage.removeItem('adminToken');
+        localStorage.removeItem('adminUser');
         window.location.href = '/login';
       }
       // If connection error, reset and retry once
@@ -57,7 +59,6 @@ async function getApi() {
         console.log('[API] Network error, resetting port cache...');
         resetServerPort();
         cachedApiUrl = null;
-        apiInstance = null;
       }
       return Promise.reject(error);
     }
@@ -67,16 +68,44 @@ async function getApi() {
 }
 
 // Helper for making API calls
-async function apiCall(method: string, endpoint: string, data?: any, config?: any) {
+async function apiCall(method: 'get' | 'post' | 'put' | 'patch' | 'delete', endpoint: string, data?: any, config?: any) {
   const api = await getApi();
   try {
-    const response = await api[method](endpoint, data, config);
+    let response;
+    switch (method) {
+      case 'get':
+        response = await api.get(endpoint, config);
+        break;
+      case 'post':
+        response = await api.post(endpoint, data, config);
+        break;
+      case 'put':
+        response = await api.put(endpoint, data, config);
+        break;
+      case 'patch':
+        response = await api.patch(endpoint, data, config);
+        break;
+      case 'delete':
+        response = await api.delete(endpoint, config);
+        break;
+    }
     return response;
   } catch (error: any) {
     // Retry once if connection error
     if (!error.response && error.message?.includes('Network Error')) {
       const api = await getApi();
-      return api[method](endpoint, data, config);
+      switch (method) {
+        case 'get':
+          return api.get(endpoint, config);
+        case 'post':
+          return api.post(endpoint, data, config);
+        case 'put':
+          return api.put(endpoint, data, config);
+        case 'patch':
+          return api.patch(endpoint, data, config);
+        case 'delete':
+          return api.delete(endpoint, config);
+      }
     }
     throw error;
   }

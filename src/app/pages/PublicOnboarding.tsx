@@ -11,6 +11,7 @@ import Statistics from '../components/Statistics';
 import UniversityPartners from '../components/UniversityPartners';
 import Testimonials from '../components/Testimonials';
 import EnhancedFooter from '../components/EnhancedFooter';
+import QuickSearchForm from '../components/QuickSearchForm';
 import {
   GraduationCap,
   Phone,
@@ -21,7 +22,9 @@ import {
   Award,
   TrendingUp,
   CheckCircle2,
-  Mail
+  Mail,
+  Lock,
+  UserCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { VISA_SYSTEMS } from '../../constants/visaSystems';
@@ -276,8 +279,8 @@ export default function PublicOnboarding() {
 
     toast.success(language === 'vi' ? 'Đăng ký tư vấn thành công!' : language === 'ko' ? '상담 신청 완료!' : 'Consultation request submitted!');
 
-    // Navigate to tracking code display page with the generated code
-    navigate(`/student/tracking/${trackingCode}`);
+    // Navigate to student home page
+    navigate('/student/home');
   };
 
   const getLabel = (item: any, field: string) => {
@@ -294,17 +297,27 @@ export default function PublicOnboarding() {
           {/* Logo/Brand */}
           <TBTLogo size="md" variant="full" />
 
-          {/* Right Actions */}
-          <div className="flex items-center space-x-6">
-            {/* Language Switcher */}
-            <div className="relative group">
-              <button className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-[#F8F9FA] transition-colors border border-[#558EFF]">
-                <Globe className="w-5 h-5 text-[#003AB7]" />
-                <span className="text-sm font-medium text-[#003AB7] font-['Be_Vietnam_Pro']">
-                  🇻🇳 VI
-                </span>
-              </button>
-            </div>
+          {/* Right Actions - Admin & Student Login */}
+          <div className="flex items-center space-x-4">
+            {/* Student Portal */}
+            <button
+              onClick={() => navigate('/student/home')}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
+              title="Cổng thông tin học viên"
+            >
+              <UserCircle className="w-4 h-4" />
+              <span className="text-sm font-medium font-['Be_Vietnam_Pro']">Học viên</span>
+            </button>
+            
+            {/* Admin Login */}
+            <button
+              onClick={() => navigate('/admin-login')}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#003AB7] text-white hover:bg-[#002A8F] transition-colors"
+              title="Đăng nhập Admin"
+            >
+              <Lock className="w-4 h-4" />
+              <span className="text-sm font-medium font-['Be_Vietnam_Pro']">Admin</span>
+            </button>
           </div>
         </div>
       </div>
@@ -318,8 +331,15 @@ export default function PublicOnboarding() {
         />
       </div>
 
+      {/* Quick Search Form - Conversion Feature */}
+      <div className="relative -mt-48 mb-12 z-10" id="quick-search-section">
+        <div className="container mx-auto px-4">
+          <QuickSearchForm />
+        </div>
+      </div>
+
       {/* Registration Form Card - Centered on Page */}
-      <div className="relative -mt-48 mb-16">
+      <div className="relative mb-16">
         <div className="container mx-auto px-4">
           <div className="max-w-[1366px] mx-auto">
             <div className="bg-white rounded-[30px] border border-[#558EFF] shadow-[14px_22px_25px_-9px_rgba(85,142,255,0.25)] p-8 md:p-12">
@@ -549,14 +569,22 @@ export default function PublicOnboarding() {
       {/* Testimonials Section */}
       <Testimonials />
 
-      {/* Footer Links */}
-      <div className="text-center space-y-4 mb-8">
-        <button
-          onClick={() => navigate('/login')}
-          className="block text-sm text-[#4D4D4D] hover:text-[#003AB7] transition-colors underline mx-auto font-['Be_Vietnam_Pro']"
-        >
-          🔐 Đăng Nhập Quản Trị Viên / Học Viên
-        </button>
+      {/* Tracking Lookup Link */}
+      <div className="container mx-auto px-4 mb-8">
+        <div className="bg-gradient-to-r from-[#F8F9FA] to-blue-50 rounded-xl p-6 text-center border border-[#558EFF]/30">
+          <h3 className="text-lg font-bold text-[#003AB7] mb-2 font-['Be_Vietnam_Pro']">
+            Đã đăng ký tư vấn?
+          </h3>
+          <p className="text-sm text-[#4D4D4D] mb-4">
+            Nhập mã tra cứu để xem tiến độ hồ sơ và thông tin chi tiết
+          </p>
+          <button
+            onClick={() => navigate('/student/tracking')}
+            className="bg-[#003AB7] hover:bg-[#002A8F] text-white px-6 py-2 rounded-lg font-medium transition-colors"
+          >
+            Tra cứu hồ sơ →
+          </button>
+        </div>
       </div>
 
       {/* Enhanced Footer */}

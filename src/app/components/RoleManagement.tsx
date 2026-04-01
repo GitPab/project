@@ -30,7 +30,7 @@ export default function RoleManagement() {
 
   const fetchAdminUsers = async () => {
     try {
-      const token = localStorage.getItem('auth_token');
+      const token = localStorage.getItem('auth_token') || localStorage.getItem('adminToken');
       const API_URL = await getApiUrl();
       const res = await fetch(`${API_URL}/admin/users`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -47,7 +47,7 @@ export default function RoleManagement() {
 
   const updateUserRole = async (userId: string, role: Role) => {
     try {
-      const token = localStorage.getItem('auth_token');
+      const token = localStorage.getItem('auth_token') || localStorage.getItem('adminToken');
       const API_URL = await getApiUrl();
       const res = await fetch(`${API_URL}/admin/users/${userId}/role`, {
         method: 'PUT',

@@ -25,7 +25,7 @@ async function getDynamicApiUrl(): Promise<string> {
 async function apiCall(endpoint: string, options: RequestInit = {}) {
   const API_URL = await getDynamicApiUrl();
   const url = `${API_URL}${endpoint}`;
-  const token = localStorage.getItem('auth_token') || '';
+  const token = localStorage.getItem('auth_token') || localStorage.getItem('adminToken') || '';
   
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -101,7 +101,7 @@ export default function DatabaseManager() {
       try {
         const API_URL = await getDynamicApiUrl();
         const response = await fetch(`${API_URL}/admin/db/stats`, {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}` }
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token') || localStorage.getItem('adminToken') || ''}` }
         });
         if (response.ok) {
           const data = await response.json();
@@ -110,7 +110,7 @@ export default function DatabaseManager() {
           }
         }
         const backupsResp = await fetch(`${API_URL}/admin/db/list-backups`, {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}` }
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token') || localStorage.getItem('adminToken') || ''}` }
         });
         if (backupsResp.ok) {
           const backupsData = await backupsResp.json();
@@ -232,7 +232,7 @@ export default function DatabaseManager() {
     try {
       const API_URL = await getDynamicApiUrl();
       const response = await fetch(`${API_URL}/universities?limit=10`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}` }
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token') || localStorage.getItem('adminToken') || ''}` }
       });
       if (response.ok) {
         const data = await response.json();

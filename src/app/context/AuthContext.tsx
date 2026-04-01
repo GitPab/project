@@ -91,13 +91,13 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(() => {
-    // Restore user from localStorage on init
-    const stored = localStorage.getItem('auth_user');
+    // Restore user from localStorage on init - try both keys
+    const stored = localStorage.getItem('auth_user') || localStorage.getItem('adminUser');
     return stored ? JSON.parse(stored) : null;
   });
   const [token, setToken] = useState<string | null>(() => {
-    // Restore token from localStorage on init
-    return localStorage.getItem('auth_token');
+    // Restore token from localStorage on init - try both keys
+    return localStorage.getItem('auth_token') || localStorage.getItem('adminToken');
   });
   const [isLoading, setIsLoading] = useState(false);
 

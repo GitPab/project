@@ -71,7 +71,7 @@ export default function UniversityForm({ university, onClose, onSave }: Universi
     isKoreanUniversity: university?.koreanData?.isKoreanUniversity ?? true,
     majors: university?.majors || university?.koreanData?.majors || [],
     ranking: university?.ranking || university?.koreanData?.koreanRanking || '',
-    partTimeInfo: university?.koreanData?.partTimeInfo || '',
+    partTimeInfo: (university as any)?.koreanData?.partTimeInfo || '',
     supportPolicies: university?.koreanData?.supportPolicies || [],
     refundPolicy: university?.koreanData?.refundPolicy || '',
     admissionsType: university?.koreanData?.admissionsType || '',
@@ -664,7 +664,7 @@ export default function UniversityForm({ university, onClose, onSave }: Universi
             Hủy
           </button>
           <button type="button" onClick={handleSubmit}
-            className="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors font-medium flex items-center justify-center gap-2 disabled:opacity-50"
+            className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center gap-2 disabled:opacity-50"
             disabled={isSubmitting}>
             {isSubmitting ? (
               <><Loader className="w-4 h-4 animate-spin" /> Đang lưu...</>

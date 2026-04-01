@@ -62,7 +62,7 @@ export default function Testimonials({ className = '' }: TestimonialsProps) {
     const loadTestimonials = async () => {
       try {
         // If not logged in, skip API and use static data to avoid 401 spam
-        if (!localStorage.getItem('auth_token')) {
+        if (!(localStorage.getItem('auth_token') || localStorage.getItem('adminToken'))) {
           setTestimonials(staticTestimonials);
           return;
         }

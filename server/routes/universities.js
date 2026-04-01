@@ -66,7 +66,15 @@ router.get('/', cacheMiddleware(300), async (req, res) => {
     const { rows } = await pool.query(query, params);
     
     res.json({
-      data: rows.map(r => ({ ...r, koreanData: r.korean_data ? JSON.parse(r.korean_data) : {} })),
+      data: rows.map(r => {
+        let koreanData = {};
+        try {
+          koreanData = r.korean_data ? JSON.parse(r.korean_data) : {};
+        } catch (e) {
+          logger.warn('Invalid korean_data JSON', { id: r.id, korean_data: r.korean_data });
+        }
+        return { ...r, koreanData };
+      }),
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -99,7 +107,14 @@ router.get('/:id', async (req, res) => {
     
     res.json({
       ...rows[0],
-      koreanData: rows[0].korean_data ? JSON.parse(rows[0].korean_data) : {}
+      koreanData: (() => {
+        try {
+          return rows[0].korean_data ? JSON.parse(rows[0].korean_data) : {};
+        } catch (e) {
+          logger.warn('Invalid korean_data JSON for university', { id: req.params.id, korean_data: rows[0].korean_data });
+          return {};
+        }
+      })()
     });
   } catch (error) {
     logger.error('Failed to fetch university', { error: error.message, id: req.params.id });

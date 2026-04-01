@@ -27,25 +27,25 @@ export default function UniversityCard({ university, onEdit, onQuickInfo }: Univ
   const { user } = useApp();
 
   const bestPrice = React.useMemo(() => {
-    const systems = Object.values(university.visa_systems || {});
+    const systems = Object.values((university as any).visa_systems || {});
     const available = systems.filter((s: any) => s?.available);
     if (!available.length) return null;
     return available.reduce((min: number, s: any) => {
       const price = s.invoice_krw || 0;
       return price < min ? price : min;
     }, Infinity);
-  }, [university.visa_systems]);
+  }, [(university as any).visa_systems]);
 
   const maxHB = getMaxScholarship(university);
   const hasVisa = !!bestPrice && bestPrice !== Infinity;
 
   const visaChips = React.useMemo(() => {
-    const systems = university.visa_systems || {};
+    const systems = (university as any).visa_systems || {};
     return Object.entries(systems)
       .filter(([_, s]: [string, any]) => s?.available)
       .slice(0, 5)
       .map(([key, _]) => key);
-  }, [university.visa_systems]);
+  }, [(university as any).visa_systems]);
 
   return (
     <div
@@ -86,7 +86,7 @@ export default function UniversityCard({ university, onEdit, onQuickInfo }: Univ
             flexShrink: 0,
           }}
         >
-          {university.logo || '🏫'}
+          {(university as any).logo || '🏫'}
         </div>
 
         {/* Title */}
@@ -103,7 +103,7 @@ export default function UniversityCard({ university, onEdit, onQuickInfo }: Univ
                 whiteSpace: 'nowrap',
               }}
             >
-              {university.name_vi || university.name}
+              {(university as any).name_vi || university.name}
             </h3>
             {university.top_tier && (
               <span
@@ -129,7 +129,7 @@ export default function UniversityCard({ university, onEdit, onQuickInfo }: Univ
 
           <div style={{ fontSize: 11, color: palette.textMuted }}>
             <Building2 size={11} style={{ display: 'inline', marginRight: 4 }} />
-            {university.name_korean || (university as any).koreanName}
+            {university.koreanName || (university as any).koreanName}
           </div>
         </div>
       </div>

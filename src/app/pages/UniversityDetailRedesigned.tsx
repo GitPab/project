@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import { useParams, useNavigate } from 'react-router';
 import { ChevronDown, ChevronUp, Info, MapPin, GraduationCap, Building2, ExternalLink } from 'lucide-react';
 import { Button } from '../components/ui/button';
+import StudentFixedSidebar from '../components/StudentFixedSidebar';
 import {
   DEFAULT_FEES_VND,
   DEFAULT_SO_TIET_KIEM_OPTIONS,
@@ -1777,6 +1778,19 @@ export default function UniversityDetailRedesigned() {
   const visaData = visaSystems[selectedVisa];
   const rawCommonFees = (university?.koreanData as any)?.commonFeesVND || (university?.koreanData as any)?.common_fees_vnd;
   
+  // Calculate total cost for sidebar
+  const totalCost = useMemo(() => {
+    if (!visaData) return 0;
+    
+    const baseFee = visaData.invoiceKRWPerYear || 0;
+    const scholarshipRate = topikLevel >= 6 ? 0.5 : topikLevel >= 5 ? 0.4 : topikLevel >= 4 ? 0.3 : topikLevel >= 3 ? 0.2 : 0;
+    const afterScholarship = baseFee * (1 - scholarshipRate);
+    
+    // Convert KRW to VND: KRW -> USD -> VND
+    const krwToVnd = EXCHANGE_RATES.vndToUsd / EXCHANGE_RATES.krwToUsd;
+    return afterScholarship * krwToVnd;
+  }, [visaData, topikLevel]);
+  
   return (
     <div style={{ background: '#F8F7F5', minHeight: '100vh' }}>
       {/* Full-width Hero */}
@@ -1880,6 +1894,11 @@ export default function UniversityDetailRedesigned() {
           </div>
         )}
       </div>
+      
+      <StudentFixedSidebar 
+        universityId={university?.id}
+        currentCost={totalCost}
+      />
       
       {/* Contact Form Modal */}
       <ContactFormModal 
