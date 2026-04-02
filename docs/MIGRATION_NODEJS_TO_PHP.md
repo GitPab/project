@@ -1,6 +1,6 @@
-# Kế Hoạch Migration: Node.js → PHP (Laravel)
+# Kế Hoạch Migration: Node.js → PHP (Laravel) — Phiên bản 2.0
 
-**Phiên bản:** 1.0  
+**Phiên bản:** 2.0 (Cập nhật sau review kỹ thuật)  
 **Ngày:** April 2, 2026  
 **Dự án:** SACMA - Student Abroad Cost Management Application  
 **Migration từ:** Node.js + Express → PHP + Laravel  
@@ -11,87 +11,227 @@
 ## 📋 Tóm Tắt
 
 Dự án SACMA hiện tại sử dụng:
-- **Frontend:** React 18 + TypeScript + Vite + Tailwind CSS
-- **Backend:** Node.js 18 + Express.js
-- **Database:** PostgreSQL (31 tables)
+- **Frontend:** React 18 + TypeScript + Vite + Tailwind CSS (giữ nguyên, deploy Vercel)
+- **Backend:** Node.js 18 + Express.js → **chuyển sang Laravel 10.x + PHP 8.2**
+- **Real-time:** SSE (Server-Sent Events) → **chuyển sang Laravel Reverb WebSocket**
+- **Database:** PostgreSQL (31 tables, giữ nguyên 100%)
 - **API:** 22 REST endpoints
 
-**Mục tiêu:** Chuyển backend sang PHP (Laravel) để team dễ maintain, giữ nguyên database và frontend.
+**⚠️ Lưu ý quan trọng sau review:**
+- Laravel **không chạy được trên Vercel** - cần chọn Railway/Render/DigitalOcean cho PHP backend
+- SSE trong PHP **block worker** - cần Laravel Reverb hoặc Pusher (thêm effort ~3-4 ngày)
+- Frontend có thay đổi nhỏ ở AuthContext để support Sanctum token format
 
 ---
 
-## ✅ Điều Kiện Tiên Quyết
+## ⚠️ 3 Vấn Đề Kỹ Thuật Nghiêm Trọng & Giải Pháp
 
-### 1. Database (KHÔNG THAY ĐỔI)
-```
-✓ PostgreSQL giữ nguyên
-✓ 31 tables giữ nguyên structure
-✓ All data giữ nguyên
-✓ Indexes, constraints giữ nguyên
-✓ Chỉ thay đổi connection string
+### 1. Hosting — Laravel Không Chạy Trên Vercel
+
+**Vấn đề:** Vercel chỉ hỗ trợ Serverless Functions (Node.js, Python, Go), không hỗ trợ PHP runtime.
+
+**Giải pháp đề xuất:**
+
+| Option | Platform | Chi phí | Ưu điểm | Nhược điểm |
+|--------|----------|---------|---------|------------|
+| **Khuyến nghị** | **Railway** | Free tier + pay-as-you-go | Auto-deploy từ GitHub, PostgreSQL built-in, dễ setup | Cần thẻ tín dụng |
+| **Khuyến nghị** | **Render** | Free tier + $7/tháng | Docker support, migration từ Node.js dễ, cùng platform | Web service sleep after 15min idle |
+| Cân nhắc | DigitalOcean App Platform | $12/tháng | Managed PostgreSQL, reliable | Phí cố định cao hơn |
+
+**Khuyến nghị cuối cùng:**
+- **Chọn Render** vì team đã dùng cho Node.js → migration dễ, cùng 1 platform quản lý
+- **Config `vercel.json` rewrite:** Frontend Vercel gọi API qua `destination: https://sacma-php.onrender.com/api/$1`
+
+---
+
+### 2. SSE Real-time → Laravel Reverb
+
+**Vấn đề:** Node.js dùng `sseManager.js` với `broadcastEvent()` để gửi real-time updates. PHP-FPM xử lý SSE kém:
+- Mỗi SSE connection block 1 worker process
+- PHP-FPM không share memory giữa các request → không thể dùng Map() giống Node.js
+- Max ~20 concurrent users là crash
+
+**Giải pháp:**
+
+| Option | Công nghệ | Chi phí | Effort |
+|--------|-----------|---------|--------|
+| **Khuyến nghị** | **Laravel Reverb** | Free (official Laravel) | ~3-4 ngày setup + test |
+| Backup | Pusher | Free tier giới hạn | 1 ngày setup, nhưng phí khi scale |
+| Backup | Ably | Free tier | 1 ngày setup, config phức tạp hơn Reverb |
+
+**Chi tiết implement Reverb:**
+```bash
+# 1. Setup Reverb server
+composer require laravel/reverb
+php artisan reverb:install
+
+# 2. Start WebSocket server
+php artisan reverb:start
+
+# 3. Frontend đổi EventSource → Laravel Echo
+npm install laravel-echo pusher-js
 ```
 
-### 2. Frontend (KHÔNG THAY ĐỔI)
-```
-✓ React + TypeScript giữ nguyên
-✓ API calls giữ nguyên format
-✓ Chỉ thay đổi base URL nếu cần
+**Frontend changes:**
+```typescript
+// Thay thế EventSource SSE
+// const source = new EventSource(`${API_URL}/sse/registrations?token=${token}`);
+
+// Bằng Laravel Echo
+import Echo from 'laravel-echo';
+import Pusher from 'pusher-js';
+
+window.Pusher = Pusher;
+const echo = new Echo({
+  broadcaster: 'reverb',
+  key: 'sacma-app-key',
+  wsHost: 'sacma-php.onrender.com',
+  wsPort: 6001,
+  wssPort: 6001,
+  useTLS: true,
+});
+
+echo.channel('registrations')
+  .listen('NewRegistration', (e) => {
+    console.log('New registration:', e);
+  });
 ```
 
-### 3. Yêu Cầu PHP Environment
+---
+
+### 3. Frontend AuthContext — Cần Update Cho Sanctum
+
+**Vấn đề:** Plan gốc nói "frontend không thay đổi" nhưng không hoàn toàn đúng. JWT Node.js trả về object có `userId, role, name` trong payload. Sanctum trả về `{ token, user: { id, name, role } }`.
+
+**Thay đổi cần thiết:**
+
+```typescript
+// AuthContext.tsx — sửa phần decode token
+
+// JWT Node.js (cũ):
+const user = jwtDecode(token); // { userId, role, name, email }
+
+// Sanctum Laravel (mới):
+// Token là plain string, không chứa payload
+// Cần lưu user object riêng từ response
+const login = async (email, password) => {
+  const response = await api.post('/auth/login', { email, password });
+  const { token, user } = response.data; // Lấy cả token + user
+  
+  localStorage.setItem('auth_token', token);
+  localStorage.setItem('auth_user', JSON.stringify(user)); // Lưu user riêng
+  
+  setUser(user);
+  setToken(token);
+};
 ```
-✓ PHP 8.2+
-✓ Composer
-✓ Laravel 10.x
-✓ PostgreSQL extension (pdo_pgsql)
+
+**Khác biệt quan trọng:**
+| | JWT Node.js | Sanctum Laravel |
+|---|---|---|
+| Token chứa payload | Có (decode được user) | Không (plain random string) |
+| Cần lưu user riêng | Không cần | **Cần lưu `auth_user`** |
+| Expiry check | Decode JWT xem `exp` | Gọi API `/auth/me` để check |
+
+---
+
+## ✅ Điều Kiện Tiên Quyết (Cập nhật)
 ✓ Web server (Nginx/Apache)
 ```
 
 ---
 
-## 🗓️ Timeline Migration (4-6 tuần)
+## 🗓️ Timeline Migration (7-8 tuần — có buffer cho Reverb)
 
-### Tuần 1: Setup & Foundation
+### Tuần 0 (Chuẩn bị — MỚI)
 | Ngày | Nhiệm vụ | Output |
 |------|----------|--------|
-| 1-2 | Tạo Laravel project, config DB | `sacma-php/` project |
-| 3 | Migrate authentication (JWT → Sanctum) | Auth API hoạt động |
-| 4-5 | Migrate Users & Roles API | Users CRUD hoạt động |
+| 1 | Setup Render service PHP + Dockerfile Laravel | Xác nhận deploy được trước khi viết code |
+| 2 | Setup Laravel Reverb server | Test WebSocket echo thành công |
+| 3 | Tạo Postman collection từ 22 Node.js endpoints | Dùng để test PHP sau này |
 
-### Tuần 2: Core APIs
+### Tuần 1-2 (Foundation — giữ nguyên plan gốc)
 | Ngày | Nhiệm vụ | Output |
 |------|----------|--------|
-| 6-7 | Migrate Universities API | Universities CRUD |
-| 8-9 | Migrate Students API | Students CRUD |
-| 10-12 | Migrate Registrations API | Registrations + tracking |
+| 1-2 | Laravel project + PostgreSQL + Auth (Sanctum) + RBAC | Base Laravel chạy được |
+| 3-5 | Universities API + Students API + Registrations API | 3 core APIs hoạt động |
+| 6-10 | Redis cache config + Storage config | Cache & file upload ready |
 
-### Tuần 3: Feature APIs (v2.0)
+### Tuần 3-4 (Feature APIs — thêm 2-3 ngày buffer)
 | Ngày | Nhiệm vụ | Output |
 |------|----------|--------|
-| 13-14 | Migrate Payments API | Payment management |
-| 15-16 | Migrate Notifications API | Notification system |
-| 17-19 | Migrate Documents API | Document upload/review |
+| 1-3 | Payments + Student Profiles + Documents API | 3 APIs |
+| 4-6 | Notifications + Messages + Appointments API | 3 APIs |
+| 7-10 | Scholarships + Visa Applications + User Preferences | 3 APIs + buffer |
 
-### Tuần 4: Advanced Features
+### Tuần 5 (Real-time + Email — THÊM MỚI)
 | Ngày | Nhiệm vụ | Output |
 |------|----------|--------|
-| 20-21 | Migrate Messages API | Internal messaging |
-| 22-23 | Migrate Appointments API | Calendar scheduling |
-| 24-26 | Migrate Scholarships & Visa | Complex workflows |
+| 1-2 | Laravel Reverb setup + broadcast events | `new_registration`, `status_update` events |
+| 3-4 | Frontend: đổi EventSource → Laravel Echo | Real-time hoạt động trên PHP |
+| 5 | Laravel Mail setup (SendGrid + SMTP fallback) | Email gửi được |
 
-### Tuần 5: Integration & Testing
+### Tuần 6 (Testing — mở rộng thêm 1 tuần)
 | Ngày | Nhiệm vụ | Output |
 |------|----------|--------|
-| 27-28 | Migrate remaining APIs (Preferences, Programs) | All 22 APIs done |
-| 29-30 | Integration testing | Bug fixes |
-| 31-33 | Frontend integration test | Full system test |
+| 1-3 | Chạy toàn bộ Postman collection | So sánh response Node.js vs Laravel |
+| 4-5 | Load test: 50 concurrent users | Response time < 500ms |
+| 6-7 | Frontend integration test | Tất cả flows hoạt động |
 
-### Tuần 6: Deployment
+### Tuần 7-8 (Parallel run + Cut over — THÊM MỚI)
 | Ngày | Nhiệm vụ | Output |
 |------|----------|--------|
-| 34-35 | Staging deployment | Test on staging |
-| 36-37 | Production deployment | Go live |
-| 38-42 | Monitoring & bug fixes | Stable system |
+| 1-3 | Chạy song song: 10% traffic → PHP, 90% → Node.js | Monitor error rate |
+| 4-7 | Tăng dần: 50% → 100% | Node.js vẫn live như fallback |
+| 8-10 | Cut over hoàn toàn | Giữ Node.js running thêm 2 tuần phòng rollback |
+
+---
+
+## 🏗️ Chiến Lược Chạy Song Song (Blue-Green Deployment)
+
+**Không tắt Node.js ngay khi Laravel xong. Chạy cả 2, chuyển traffic dần dần:**
+
+```
+┌─────────────────┐         ┌─────────────────┐
+│  Node.js (Blue) │         │ Laravel (Green) │
+│  ─────────────  │         │  ─────────────  │
+│  sacma-node.    │         │  sacma-php.     │
+│  onrender.com   │         │  onrender.com   │
+│                 │         │                 │
+│  Traffic:       │         │  Traffic:       │
+│  100% → 90% →   │         │  0% → 10% →     │
+│  50% → 0%       │         │  50% → 100%     │
+└────────┬────────┘         └────────┬────────┘
+         │                           │
+         └───────────┬───────────────┘
+                     │
+              ┌──────▼──────┐
+              │   Vercel    │
+              │  Frontend   │
+              │             │
+              │ vercel.json │
+              │ rewrites:   │
+              │ 10% → PHP   │
+              │ 90% → Node  │
+              └─────────────┘
+```
+
+**Config `vercel.json`:**
+```json
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://sacma-php.onrender.com/api/:path*",
+      "has": [{ "type": "header", "key": "x-beta-user", "value": "true" }]
+    },
+    {
+      "source": "/api/:path*",
+      "destination": "https://sacma-node.onrender.com/api/:path*"
+    }
+  ]
+}
+```
 
 ---
 
@@ -686,18 +826,48 @@ server {
 | Preferences + Programs | 1 | PHP Dev |
 | Testing & Bug fix | 5 | QA + Dev |
 | Deployment | 2 | DevOps |
-| **Tổng** | **30-33 ngày** | **~1.5 tháng** |
+| **Tổng** | **34-38 ngày** | **~8 tuần** |
 
 ---
 
-## ✅ Success Criteria
+## ✅ Checklist Trước Khi Bắt Đầu Migrate
 
-1. **All 22 API endpoints** hoạt động giống Node.js
-2. **Frontend không cần thay đổi** (chỉ đổi base URL)
-3. **Database giữ nguyên** (không mất data)
-4. **Authentication** hoạt động (JWT → Sanctum)
-5. **RBAC** hoạt động đúng permissions
-6. **Response format** giống Node.js (để frontend không broken)
+### Bắt buộc
+- [ ] **Backup toàn bộ PostgreSQL** database vào file `.sql`
+- [ ] **Tạo Postman collection** cho tất cả 22 endpoints của Node.js, save response mẫu
+- [ ] **Xác nhận hosting PHP** (Railway/Render) deploy thành công với project Laravel trống
+- [ ] **Test Laravel Reverb WebSocket** với 10 connections đồng thời
+
+### Nên có
+- [ ] Đọc toàn bộ `server/routes/features.js` (687 lines) — đây là file phức tạp nhất, migrate cẩn thận
+- [ ] Viết test case cho các business logic quan trọng (cost calculation, scholarship discount)
+
+---
+
+## ✅ Checklist Trước Khi Cut Over Production
+
+### Bắt buộc
+- [ ] Tất cả 22 endpoints Postman test pass 100%
+- [ ] Response format giống hệt Node.js — không vỡ frontend
+- [ ] Auth flow đầy đủ: login → token → protected routes → logout
+- [ ] Sanctum token expiry set đúng: `1440` minutes (24h)
+- [ ] CORS config đúng: allow `https://your-project.vercel.app`
+- [ ] WebSocket (Reverb) kết nối được từ production domain
+
+### Nên có
+- [ ] Upload ảnh test: gửi file lên Imgur/R2, nhận URL về
+- [ ] Email test: gửi email qua SendGrid từ Laravel
+- [ ] Load test 50 concurrent: response time < 500ms
+
+---
+
+## 🔄 Rollback Plan (Nếu Laravel Có Bug Nghiêm Trọng)
+
+```
+Bước 1: Đổi vercel.json destination về Node.js URL — 30 giây
+Bước 2: Push commit → Vercel auto redeploy — 2 phút
+Bước 3: 100% traffic về Node.js. Zero downtime.
+```
 
 ---
 
@@ -713,4 +883,4 @@ Nếu có vấn đề trong quá trình migration:
 
 **Prepared by:** Development Team  
 **Date:** April 2, 2026  
-**Version:** 1.0
+**Version:** 2.0 (Sau review kỹ thuật)

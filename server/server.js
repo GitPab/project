@@ -18,6 +18,7 @@ import { initializeMySQLDatabase } from './mysqlAdapter.js';
 
 // Middleware & Utilities
 import { logger, requestLogger } from './logger.js';
+import { setupSwagger } from './swagger.js';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -55,6 +56,7 @@ import userPreferencesRoutes from './routes/userPreferences.js';
 // Core Services
 import { connectRedis, disconnectRedis } from './cache.js';
 import { broadcastEvent } from './sseManager.js';
+import { ConnectionPoolMonitor } from './poolMonitor.js';
 
 // Load environment variables
 dotenv.config();
@@ -315,19 +317,6 @@ app.get('/api/sse/registrations', async (req, res) => {
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
-
-// Function to broadcast events to all connected clients
-export function broadcastEvent(eventType, data) {
-  const message = `data: ${JSON.stringify({ type: eventType, data, timestamp: new Date().toISOString() })}\n\n`;
-  clients.forEach((res, clientId) => {
-    try {
-      res.write(message);
-    } catch (err) {
-      console.error(`Failed to send to client ${clientId}:`, err);
-      clients.delete(clientId);
-    }
-  });
-}
 
 // ============================================
 // DATABASE INITIALIZATION
@@ -950,7 +939,6 @@ async function initializeDatabase() {
 }
 
 import autoSyncManager from './autoSync.js';
-import publicRoutes from './routes/public.js';
 
 // ============================================
 // SERVER STARTUP

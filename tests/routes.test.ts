@@ -10,7 +10,7 @@ import {
   validateRoute, 
   isAdminRoute, 
   isStudentRoute 
-} from '../constants/routes';
+} from '../src/app/constants/routes';
 
 // List of all routes from routes.tsx (manually sync or use test to verify)
 const DEFINED_ROUTES = [
@@ -91,9 +91,9 @@ describe('Route Constants', () => {
 
 describe('Route Consistency', () => {
   it('should not have overlapping admin and student routes', () => {
-    const overlap = ROUTE_LAYOUTS.ADMIN_ROUTES.filter(adminRoute =>
-      ROUTE_LAYOUTS.STUDENT_ROUTES.some(studentRoute => 
-        adminRoute === studentRoute
+    const overlap = [...ROUTE_LAYOUTS.ADMIN_ROUTES].filter(adminRoute =>
+      [...ROUTE_LAYOUTS.STUDENT_ROUTES].some(studentRoute => 
+        (adminRoute as string) === (studentRoute as string)
       )
     );
     expect(overlap).toHaveLength(0);

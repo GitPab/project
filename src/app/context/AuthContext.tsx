@@ -75,6 +75,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isAdmin: boolean;
   isStudent: boolean;
+  isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   register: (userData: RegisterData) => Promise<void>;
@@ -138,9 +139,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
-    // Clear localStorage
+    // Clear ALL localStorage keys (both old and new naming)
     localStorage.removeItem('auth_user');
     localStorage.removeItem('auth_token');
+    localStorage.removeItem('adminUser');
+    localStorage.removeItem('adminToken');
     
     setUser(null);
     setToken(null);
@@ -188,6 +191,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isAuthenticated: !!user,
     isAdmin: !!user?.role && adminRoles.includes(user.role),
     isStudent: user?.role === 'student',
+    isLoading,
     login,
     logout,
     register

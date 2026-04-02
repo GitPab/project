@@ -1,9 +1,10 @@
 import { lazy, Suspense, useState, useEffect } from 'react';
-import { createHashRouter, Navigate, Outlet, useNavigate } from 'react-router';
+import { createHashRouter, Navigate, Outlet, useNavigate, useLocation } from 'react-router';
+import { useAuth } from './context/AuthContext';
 
 // Eager imports for critical pages
 import PublicOnboarding from './pages/PublicOnboarding';
-import AdminLoginSimple from './pages/AdminLoginSimple';
+import Login from './pages/Login';
 import TrackingLookupSimple from './pages/TrackingLookupSimple';
 import FirstTimeSetup from './pages/FirstTimeSetup';
 import Layout from './components/Layout';
@@ -55,6 +56,12 @@ const withSuspense = (Component: React.ComponentType) => () => (
 // Route error component
 function RouteError() {
   const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Don't show error for auth redirects
+  if (location.pathname === '/login' || location.pathname === '/') {
+    return <Navigate to="/" replace />;
+  }
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="text-center">
@@ -70,21 +77,16 @@ function RouteError() {
     </div>
   );
 }
-// Simple admin check using state to prevent multiple redirects
+// Auth protected route wrapper using AuthContext
 function AdminProtected() {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const { isAuthenticated, isLoading } = useAuth();
   
-  useEffect(() => {
-    const token = localStorage.getItem('adminToken') || localStorage.getItem('auth_token');
-    if (!token) {
-      window.location.href = '/#/admin-login';
-    } else {
-      setIsAuthenticated(true);
-    }
-  }, []);
-  
-  if (isAuthenticated === null) {
+  if (isLoading) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
+  
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
   }
   
   return <Outlet />;
@@ -108,12 +110,12 @@ export const router = createHashRouter([
   },
   {
     path: '/admin-login',
-    Component: AdminLoginSimple,
-    errorElement: <RouteError />
+    Component: () => <Navigate to="/login" replace />
   },
   {
     path: '/login',
-    Component: () => <Navigate to="/admin-login" replace />
+    Component: Login,
+    errorElement: <RouteError />
   },
   {
     path: '/first-time-setup',

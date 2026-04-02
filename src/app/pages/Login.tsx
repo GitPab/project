@@ -35,11 +35,12 @@ export default function Login() {
 
   // Already logged in → auto redirect based on role
   useEffect(() => {
+    // Skip if still loading auth state
     if (isAuthenticated && user) {
       if (user.role === 'admin') {
-        navigate('/admin/dashboard');
+        navigate('/admin/dashboard', { replace: true });
       } else {
-        navigate('/student/home');
+        navigate('/student/home', { replace: true });
       }
     }
   }, [isAuthenticated, user, navigate]);
@@ -62,14 +63,14 @@ export default function Login() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 flex items-center justify-center p-4">
       <div className="w-full max-w-5xl">
-        {/* Back to Onboarding Link */}
+        {/* Back to Home Link */}
         <div className="mb-4 text-center">
           <button
             onClick={() => navigate('/')}
             className="text-sm text-slate-500 hover:text-[#003AB7] transition-colors inline-flex items-center gap-1"
           >
             <ArrowLeft className="w-4 h-4" />
-            Back to Student Onboarding
+            Quay lại trang chủ
           </button>
         </div>
 
@@ -78,9 +79,9 @@ export default function Login() {
           <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-primary to-blue-700 rounded-2xl mb-4 shadow-lg">
             <GraduationCap className="w-10 h-10 text-white" />
           </div>
-          <h1 className="text-4xl font-bold text-slate-900 mb-2">Du Học Cost Manager</h1>
-          <p className="text-slate-600 text-lg">Asia-Focused International Education Journey</p>
-          <p className="text-slate-500 text-sm mt-1">🌏 Featuring 50+ top Asian universities | 🇰🇷🇨🇳🇯🇵🇸🇬🇻🇳🇮🇳🇹🇭🇲🇾</p>
+          <h1 className="text-4xl font-bold text-slate-900 mb-2">SACMA</h1>
+          <p className="text-slate-600 text-lg">Hệ thống Quản lý Du học Hàn Quốc</p>
+          <p className="text-slate-500 text-sm mt-1">Đăng nhập dành cho Admin và Học viên</p>
         </div>
 
         <div className="max-w-md mx-auto">
@@ -88,13 +89,13 @@ export default function Login() {
           <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-8">
             <div className="text-center mb-6">
               <Lock className="w-12 h-12 text-slate-400 mx-auto mb-3" />
-              <h2 className="text-2xl font-bold text-slate-900 mb-2">Manual Login</h2>
-              <p className="text-slate-600 text-sm">Enter your credentials</p>
+              <h2 className="text-2xl font-bold text-slate-900 mb-2">Đăng nhập</h2>
+              <p className="text-slate-600 text-sm">Nhập email và mật khẩu của bạn</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label className="block mb-2 text-sm font-medium text-slate-700">Email Address</label>
+                <label className="block mb-2 text-sm font-medium text-slate-700">Email</label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                   <input
@@ -102,7 +103,7 @@ export default function Login() {
                     value={form.email}
                     onChange={(e) => setForm(prev => ({ ...prev, email: e.target.value }))}
                     className="w-full pl-11 pr-4 py-3 bg-slate-50 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#003AB7]/50 focus:border-[#003AB7] transition-all"
-                    placeholder="your.email@example.com"
+                    placeholder="email@example.com"
                     required
                   />
                 </div>
@@ -145,12 +146,12 @@ export default function Login() {
             </form>
 
             <div className="mt-6 text-center text-sm text-slate-600">
-              Chưa có tài khoản?{' '}
+              Chưa có tài khoản học viên?{' '}
               <button
                 onClick={() => navigate('/register')}
                 className="text-[#003AB7] font-semibold hover:underline"
               >
-                Đăng ký học viên
+                Đăng ký ngay
               </button>
             </div>
           </div>
