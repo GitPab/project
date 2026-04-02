@@ -45,18 +45,20 @@ export function calculateSimpleUniversityCost(university: any): SimpleCostCalcul
               }
               break;
             case 'optional_multiple':
-            case 'variable_time':
+            case 'variable_time': {
               const defaultOption = fee.options?.find((opt: any) => opt.id === fee.default_selected) || fee.options?.[0];
               if (defaultOption) {
                 feeAmount = defaultOption.value || 0;
               }
               break;
-            case 'percentage':
+            }
+            case 'percentage': {
               const defaultCondition = fee.conditions?.[0];
               if (defaultCondition) {
                 feeAmount = -((fee.base_value || 0) * (defaultCondition.percentage || 0)) / 100;
               }
               break;
+            }
           }
           
           systemsTotal += feeAmount;

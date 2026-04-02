@@ -1038,7 +1038,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // NOTIFICATION FUNCTIONS
   // ============================================
 
-  const handleCreateNotification = (data: Omit<Notification, 'id' | 'createdAt' | 'isRead'>) => {
+  const handleCreateNotification = async (data: Omit<Notification, 'id' | 'createdAt' | 'isRead'>) => {
     const id = crypto.randomUUID();
     const newNotification: Notification = {
       ...data,
@@ -1049,35 +1049,61 @@ export function AppProvider({ children }: { children: ReactNode }) {
     
     setNotifications(prev => [newNotification, ...prev]);
     
-    if (dbInitialized) {
-      try {
-        createNotification({
-          id,
-          recipientEmail: data.recipientEmail,
-          recipientRole: data.recipientRole,
-          title: data.title,
-          message: data.message,
-          type: data.type,
-          relatedEntityType: data.relatedEntityType,
-          relatedEntityId: data.relatedEntityId,
-          createdBy: data.createdBy
-        });
-      } catch (error) {
-        console.error('Failed to create notification:', error);
+    // Save to API (PostgreSQL)
+    try {
+      const { notificationApi } = await import('../services/api');
+      await notificationApi.create({
+        id,
+        recipient_email: data.recipientEmail,
+        recipient_role: data.recipientRole,
+        title: data.title,
+        message: data.message,
+        type: data.type,
+        related_entity_type: data.relatedEntityType,
+        related_entity_id: data.relatedEntityId,
+        created_by: data.createdBy
+      });
+    } catch (error) {
+      console.error('Failed to create notification via API:', error);
+      // Fallback to SQLite for offline
+      if (dbInitialized) {
+        try {
+          createNotification({
+            id,
+            recipientEmail: data.recipientEmail,
+            recipientRole: data.recipientRole,
+            title: data.title,
+            message: data.message,
+            type: data.type,
+            relatedEntityType: data.relatedEntityType,
+            relatedEntityId: data.relatedEntityId,
+            createdBy: data.createdBy
+          });
+        } catch (e) {
+          console.error('SQLite fallback failed:', e);
+        }
       }
     }
   };
 
-  const handleMarkNotificationRead = (id: string) => {
+  const handleMarkNotificationRead = async (id: string) => {
     setNotifications(prev => prev.map(n => 
       n.id === id ? { ...n, isRead: true, readAt: new Date().toISOString() } : n
     ));
     
-    if (dbInitialized) {
-      try {
-        markNotificationAsRead(id);
-      } catch (error) {
-        console.error('Failed to mark notification as read:', error);
+    // Update via API (PostgreSQL) first
+    try {
+      const { notificationApi } = await import('../services/api');
+      await notificationApi.markAsRead(id);
+    } catch (error) {
+      console.error('Failed to mark notification as read via API:', error);
+      // Fallback to SQLite for offline
+      if (dbInitialized) {
+        try {
+          markNotificationAsRead(id);
+        } catch (e) {
+          console.error('SQLite fallback failed:', e);
+        }
       }
     }
   };

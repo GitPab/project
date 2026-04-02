@@ -296,9 +296,9 @@ const parsePipeList = (str: string | undefined): string[] => {
 
 const parseFee = (str: string) => {
   if (!str) return { min: 0, max: 0 };
-  const clean = str.replace(/\./g, '').replace(/[^\d~\-]/g, ' ').trim();
+  const clean = str.replace(/\./g, '').replace(/[^\d~-]/g, ' ').trim();
   const parts = clean
-    .split(/[~\-]/)
+    .split(/[~-]/)
     .map(p => parseInt(p.trim(), 10))
     .filter(n => !Number.isNaN(n));
   return { min: parts[0] ?? 0, max: parts[1] ?? parts[0] ?? 0 };

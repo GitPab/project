@@ -1,31 +1,65 @@
 import React, { useEffect, useState } from 'react';
-import { useApp } from '../context/AppContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { useLanguage } from '../context/LanguageContext';
 import { Calendar, School, User, RefreshCw, Code } from 'lucide-react';
 import { searchTrackingCodesByEmail } from '../services/trackingCodeService';
+import { registrationApi } from '../services/api';
 import type { TrackingCode } from '@/types/tracking';
 
+interface Registration {
+  id: string;
+  student_id: string;
+  student_name?: string;
+  studentEmail?: string;
+  university_id: string;
+  university_name?: string;
+  status: string;
+  visa_system?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export default function AdminRegistrations() {
-  const { registrations, universities, user: currentUser } = useApp();
   const { currency, toggleCurrency, formatCurrency } = useCurrency();
   const { language } = useLanguage();
-  const [trackingCodesByEmail, setTrackingCodesByEmail] = useState<Map<string, TrackingCode>>(new Map());
+  const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [trackingCodesByEmail, setTrackingCodesByEmail] = useState<Map<string, TrackingCode>>(new Map());
 
-  // Load all tracking codes on component mount
+  // Fetch registrations from API
+  useEffect(() => {
+    const fetchRegistrations = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await registrationApi.getAll();
+        const data = response.data || [];
+        setRegistrations(data);
+      } catch (err: any) {
+        console.error('Failed to fetch registrations:', err);
+        setError(err.message || 'Failed to load registrations');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRegistrations();
+  }, []);
+
+  // Load tracking codes for each unique email
   useEffect(() => {
     const loadTrackingCodes = async () => {
+      if (registrations.length === 0) return;
+      
       try {
         const codeMap = new Map<string, TrackingCode>();
-
-        // Search for tracking codes for each unique email in registrations
-        const uniqueEmails = [...new Set(registrations.map(r => r.studentEmail))];
+        const uniqueEmails = [...new Set(registrations.map(r => r.student_name || r.studentEmail).filter(Boolean))];
 
         for (const email of uniqueEmails) {
+          if (!email) continue;
           const codes = await searchTrackingCodesByEmail(email);
           if (codes.length > 0) {
-            // Store the first (most recent) tracking code for this email
             codeMap.set(email, codes[0]);
           }
         }
@@ -33,16 +67,15 @@ export default function AdminRegistrations() {
         setTrackingCodesByEmail(codeMap);
       } catch (error) {
         console.error('Failed to load tracking codes:', error);
-      } finally {
-        setLoading(false);
       }
     };
 
     loadTrackingCodes();
   }, [registrations]);
 
-  const getUniversityById = (id: string) => {
-    return universities.find(uni => uni.id === id);
+  // Không cần lookup universities nữa vì API đã trả về university_name
+  const getUniversityName = (registration: Registration) => {
+    return registration.university_name || 'Unknown University';
   };
 
   const formatDate = (dateString: string) => {
@@ -83,7 +116,22 @@ export default function AdminRegistrations() {
           </h3>
         </div>
 
-        {registrations.length === 0 ? (
+        {loading ? (
+          <div className="text-center py-12">
+            <RefreshCw className="w-8 h-8 text-slate-400 mx-auto mb-3 animate-spin" />
+            <p className="text-slate-600">Loading registrations...</p>
+          </div>
+        ) : error ? (
+          <div className="text-center py-12">
+            <p className="text-red-600">{error}</p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="mt-2 px-4 py-2 bg-primary text-white rounded hover:bg-primary-dark"
+            >
+              Retry
+            </button>
+          </div>
+        ) : registrations.length === 0 ? (
           <div className="text-center py-12">
             <User className="w-12 h-12 text-slate-400 mx-auto mb-3" />
             <p className="text-slate-600 font-medium">
@@ -96,12 +144,11 @@ export default function AdminRegistrations() {
         ) : (
           <div className="space-y-3">
             {registrations.map((registration, index) => {
-              const university = getUniversityById(registration.universityId);
-              if (!university) return null;
+              const universityName = getUniversityName(registration);
 
               return (
                 <div
-                  key={index}
+                  key={registration.id || index}
                   className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors gap-3"
                 >
                   <div className="flex items-center gap-4">
@@ -109,18 +156,18 @@ export default function AdminRegistrations() {
                       <School className="w-6 h-6 text-primary" />
                     </div>
                     <div className="flex-1">
-                      <h4 className="text-base font-semibold text-slate-900 mb-1">{university.name}</h4>
-                      <p className="text-sm text-slate-600">{university.country}</p>
+                      <h4 className="text-base font-semibold text-slate-900 mb-1">{universityName}</h4>
+                      <p className="text-sm text-slate-600">{registration.status || 'pending'}</p>
                       <p className="text-xs text-slate-500 mt-1">
                         <span className="font-medium">
                           {language === 'vi' ? 'Học sinh' : language === 'ko' ? '학생' : 'Student'}:
-                        </span> {registration.studentEmail}
+                        </span> {registration.student_name || registration.studentEmail || 'N/A'}
                       </p>
-                      {trackingCodesByEmail.has(registration.studentEmail) && (
+                      {registration.student_name && trackingCodesByEmail.has(registration.student_name) && (
                         <div className="mt-2 flex items-center gap-2">
                           <Code className="w-3 h-3 text-blue-600" />
                           <code className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded">
-                            {trackingCodesByEmail.get(registration.studentEmail)?.code}
+                            {trackingCodesByEmail.get(registration.student_name)?.code}
                           </code>
                         </div>
                       )}
@@ -128,7 +175,7 @@ export default function AdminRegistrations() {
                   </div>
                   <div className="flex items-center gap-2 text-sm text-slate-600">
                     <Calendar className="w-4 h-4" />
-                    {formatDate(registration.registeredAt)}
+                    {formatDate(registration.created_at)}
                   </div>
                 </div>
               );

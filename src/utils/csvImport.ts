@@ -9,8 +9,8 @@ const DANGEROUS_PATTERNS = [
   /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
   /javascript:/gi,
   /on\w+\s*=/gi,
-  /\.\.[\/\\]/,
-  /\x00/,
+  /\.\.[/\\]/,
+  /\x00/, // eslint-disable-line no-control-regex
 ];
 
 const MAX_FIELD_LENGTHS: Record<string, number> = {
@@ -62,6 +62,7 @@ export function sanitizeField(value: string, fieldName: string): SanitizationRes
 
   // Remove control characters
   sanitized = sanitized
+    // eslint-disable-next-line no-control-regex
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
     .replace(/\s+/g, ' ');
 

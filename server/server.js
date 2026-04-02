@@ -428,6 +428,23 @@ async function initializeDatabase() {
       )
     `);
     
+    // Media table - Media library for images and files
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS media (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name VARCHAR(255) NOT NULL,
+        url TEXT NOT NULL,
+        type VARCHAR(50) NOT NULL,
+        university_id UUID REFERENCES universities(id) ON DELETE SET NULL,
+        university_name VARCHAR(255),
+        size VARCHAR(50) DEFAULT '0 KB',
+        mime_type VARCHAR(100),
+        uploaded_by VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
     // Notifications table - System alerts
     await pool.query(`
       CREATE TABLE IF NOT EXISTS notifications (
@@ -865,6 +882,11 @@ async function initializeDatabase() {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_documents_student ON documents(student_id)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_documents_type ON documents(document_type)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_documents_status ON documents(status)`);
+    
+    // Indexes for media table
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_media_type ON media(type)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_media_university ON media(university_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_media_created ON media(created_at)`);
     
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read)`);

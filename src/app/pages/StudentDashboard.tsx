@@ -6,6 +6,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { searchTrackingCodesByEmail, getTrackingCode } from '../services/trackingCodeService';
 import { getAllUniversities } from '../services/universityService';
+import { uploadApi } from '../services/api';
 import { toast } from 'sonner';
 import type { TrackingCode } from '@/types/tracking';
 import type { ProgressStage, StudentProgress } from '@/types';
@@ -13,7 +14,7 @@ import {
   LayoutDashboard, School, Wallet, TrendingUp, MessageSquare,
   User, GraduationCap, Search, MapPin, ArrowRight, Bell, FileText,
   CheckCircle2, Circle, Clock, AlertCircle, ChevronRight,
-  Calendar, Upload, CheckCircle, Copy, Check, X, CalendarCheck
+  Calendar, Upload, CheckCircle, Copy, Check, X, CalendarCheck, Loader2
 } from 'lucide-react';
 
 // Simple currency formatter
@@ -29,14 +30,16 @@ interface StageDetailModalProps {
   stageId: number;
   stageData: ProgressStage;
   onClose: () => void;
-  onDocumentUpload: (stageId: number, fileName: string) => void;
+  onDocumentUpload: (stageId: number, fileName: string, url?: string) => void;
 }
 
 function StageDetailModal({ stageId, stageData, onClose, onDocumentUpload }: StageDetailModalProps) {
   const { t } = useLanguage();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadedDocs, setUploadedDocs] = useState<string[]>(
     (stageData as any).documents || []
   );
+  const [uploading, setUploading] = useState(false);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -51,13 +54,43 @@ function StageDetailModal({ stageId, stageData, onClose, onDocumentUpload }: Sta
     }
   };
 
-  const handleFileUpload = () => {
-    const mockFileName = `Stage_${stageId}_Document_${Date.now()}.pdf`;
-    setUploadedDocs([...uploadedDocs, mockFileName]);
-    onDocumentUpload(stageId, mockFileName);
-    toast.success(t('progress.documentUploaded'), {
-      description: mockFileName,
-    });
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file size (5MB limit)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File quá lớn', { description: 'Kích thước tối đa 5MB' });
+      return;
+    }
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Định dạng không hỗ trợ', { description: 'Chỉ chấp nhận ảnh và PDF' });
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const url = await uploadApi.uploadImage(file);
+      setUploadedDocs([...uploadedDocs, file.name]);
+      onDocumentUpload(stageId, file.name, url);
+      toast.success(t('progress.documentUploaded'), {
+        description: file.name,
+      });
+    } catch (error: any) {
+      toast.error('Upload thất bại', { description: error.message || 'Vui lòng thử lại' });
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
   };
 
   return (
@@ -112,12 +145,29 @@ function StageDetailModal({ stageId, stageData, onClose, onDocumentUpload }: Sta
 
           <div>
             <label className="text-sm font-semibold text-slate-700 mb-2 block">{t('progress.documents')}</label>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileSelect}
+              accept="image/*,.pdf"
+              className="hidden"
+            />
             <button
-              onClick={handleFileUpload}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-50 border-2 border-dashed border-blue-300 rounded-lg hover:bg-blue-100 transition-colors text-blue-700 font-medium mb-3"
+              onClick={handleUploadClick}
+              disabled={uploading}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-50 border-2 border-dashed border-blue-300 rounded-lg hover:bg-blue-100 transition-colors text-blue-700 font-medium mb-3 disabled:opacity-50"
             >
-              <Upload className="w-5 h-5" />
-              {t('progress.uploadDocument')}
+              {uploading ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Đang tải lên...
+                </>
+              ) : (
+                <>
+                  <Upload className="w-5 h-5" />
+                  {t('progress.uploadDocument')}
+                </>
+              )}
             </button>
 
             {uploadedDocs.length > 0 && (
@@ -259,7 +309,7 @@ export default function StudentDashboard() {
     }
   }, [userProgress, notifications.length, t]);
 
-  const handleDocumentUpload = (stageId: number, fileName: string) => {
+  const handleDocumentUpload = (stageId: number, fileName: string, url?: string) => {
     const newNotification = `${t('progress.documentUploaded')}: ${t(`stage.${stageId}.title`)}`;
     setNotifications([newNotification, ...notifications]);
   };

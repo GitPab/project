@@ -71,7 +71,7 @@ export function calculateSystemCost(system: UniversitySystem): CostBreakdown {
         break;
 
       case 'optional_multiple':
-      case 'variable_time':
+      case 'variable_time': {
         // Use default option or first option if available
         const defaultOption = fee.options?.find(opt => opt.id === fee.default_selected) || fee.options?.[0];
         if (defaultOption) {
@@ -79,8 +79,9 @@ export function calculateSystemCost(system: UniversitySystem): CostBreakdown {
           optionalCosts += feeAmount;
         }
         break;
+      }
 
-      case 'percentage':
+      case 'percentage': {
         // Calculate discount (negative value for display)
         const defaultCondition = fee.conditions?.[0];
         if (defaultCondition) {
@@ -88,6 +89,7 @@ export function calculateSystemCost(system: UniversitySystem): CostBreakdown {
           optionalCosts += feeAmount; // This will be negative (discount)
         }
         break;
+      }
     }
 
     // Apply time-based calculations

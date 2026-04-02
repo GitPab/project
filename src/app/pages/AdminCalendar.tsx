@@ -1,16 +1,37 @@
 import React, { useState, useEffect } from 'react';
-import { useApp } from '../context/AppContext';
+import { appointmentApi } from '../services/api';
 import { Calendar, Plus, Trash2, Edit2, Clock, Video, MapPin, CheckCircle, XCircle, X, Save, Loader2, AlertCircle } from 'lucide-react';
 import { Appointment } from '../../types';
 
 const AdminCalendar: React.FC = () => {
-  const { appointments, scheduleAppointment, updateAppointmentStatus, cancelAppointment } = useApp();
   const [events, setEvents] = useState<Appointment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  
+
+  // Fetch appointments from API
+  useEffect(() => {
+    const fetchAppointments = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await appointmentApi.getAll();
+        const data = response.data?.data || response.data || [];
+        setEvents(data);
+      } catch (err: any) {
+        console.error('Failed to fetch appointments:', err);
+        setError(err.message || 'Failed to load appointments');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAppointments();
+  }, []);
+
   const [formData, setFormData] = useState({
     studentEmail: '',
     title: '',
@@ -24,9 +45,15 @@ const AdminCalendar: React.FC = () => {
     notes: ''
   });
 
-  useEffect(() => {
-    setEvents(appointments);
-  }, [appointments]);
+  const refreshAppointments = async () => {
+    try {
+      const response = await appointmentApi.getAll();
+      const data = response.data?.data || response.data || [];
+      setEvents(data);
+    } catch (err) {
+      console.error('Failed to refresh appointments:', err);
+    }
+  };
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
@@ -69,12 +96,12 @@ const AdminCalendar: React.FC = () => {
     
     setIsSubmitting(true);
     try {
-      await scheduleAppointment({
+      await appointmentApi.create({
         ...formData,
         status: 'scheduled',
-        adminEmail: 'admin@sacma.vn', // Default admin email
         reminderSent: false
       });
+      await refreshAppointments();
       setShowModal(false);
       setFormData({
         studentEmail: '',
@@ -92,6 +119,24 @@ const AdminCalendar: React.FC = () => {
       console.error('Failed to schedule appointment:', error);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleConfirm = async (id: string) => {
+    try {
+      await appointmentApi.updateStatus(id, 'confirmed');
+      await refreshAppointments();
+    } catch (error) {
+      console.error('Failed to confirm appointment:', error);
+    }
+  };
+
+  const handleCancel = async (id: string) => {
+    try {
+      await appointmentApi.delete(id);
+      await refreshAppointments();
+    } catch (error) {
+      console.error('Failed to cancel appointment:', error);
     }
   };
 
@@ -119,7 +164,23 @@ const AdminCalendar: React.FC = () => {
             <Clock className="w-5 h-5" />
             Lịch hẹn sắp tới
           </h2>
-          {upcomingEvents.length === 0 ? (
+          {loading ? (
+          <div className="bg-white rounded-lg shadow p-8 text-center">
+            <Loader2 className="w-12 h-12 mx-auto mb-2 text-gray-300 animate-spin" />
+            <p className="text-gray-500">Đang tải lịch hẹn...</p>
+          </div>
+        ) : error ? (
+          <div className="bg-white rounded-lg shadow p-8 text-center">
+            <AlertCircle className="w-12 h-12 mx-auto mb-2 text-red-300" />
+            <p className="text-red-500">{error}</p>
+            <button 
+              onClick={refreshAppointments}
+              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              Thử lại
+            </button>
+          </div>
+        ) : upcomingEvents.length === 0 ? (
             <div className="bg-white rounded-lg shadow p-8 text-center">
               <Calendar className="w-12 h-12 mx-auto mb-2 text-gray-300" />
               <p className="text-gray-500">Không có lịch hẹn nào sắp tới</p>
@@ -154,7 +215,7 @@ const AdminCalendar: React.FC = () => {
                   <div className="flex gap-1">
                     {event.status === 'scheduled' && (
                       <button
-                        onClick={() => updateAppointmentStatus(event.id, 'confirmed')}
+                        onClick={() => handleConfirm(event.id)}
                         className="p-2 text-green-600 hover:bg-green-50 rounded"
                         title="Xác nhận"
                       >
@@ -162,7 +223,7 @@ const AdminCalendar: React.FC = () => {
                       </button>
                     )}
                     <button
-                      onClick={() => cancelAppointment(event.id)}
+                      onClick={() => handleCancel(event.id)}
                       className="p-2 text-red-600 hover:bg-red-50 rounded"
                       title="Hủy"
                     >

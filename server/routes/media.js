@@ -1,56 +1,38 @@
 import express from 'express';
 import { authenticateToken } from '../middleware/auth.js';
-import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
+import { getPool } from '../dbAdapter.js';
+import { requirePermission } from '../utils/rbac.js';
 
 const router = express.Router();
 
-// Get __dirname equivalent in ES modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// In-memory storage for media (in production, use cloud storage like S3)
-let mediaStorage = [];
-const mediaDataPath = path.join(__dirname, '../data/media.json');
-
-// Load media from file on startup
-try {
-  if (fs.existsSync(mediaDataPath)) {
-    const data = fs.readFileSync(mediaDataPath, 'utf8');
-    mediaStorage = JSON.parse(data).media || [];
-  }
-} catch (e) {
-  console.error('Failed to load media:', e);
-}
-
-// Save media to file
-function saveMediaToFile() {
-  try {
-    const dir = path.dirname(mediaDataPath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    fs.writeFileSync(mediaDataPath, JSON.stringify({ media: mediaStorage }, null, 2));
-  } catch (e) {
-    console.error('Failed to save media:', e);
-  }
-}
-
 // GET /api/media - Get all media items
 router.get('/', async (req, res) => {
+  const pool = await getPool();
   try {
-    const { type } = req.query;
-    let items = [...mediaStorage];
+    const { type, university_id } = req.query;
+    
+    let query = 'SELECT * FROM media';
+    const params = [];
+    const conditions = [];
     
     if (type && type !== 'all') {
-      items = items.filter(item => item.type === type);
+      conditions.push('type = $1');
+      params.push(type);
     }
     
-    // Sort by createdAt desc
-    items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    if (university_id) {
+      conditions.push(`university_id = $${params.length + 1}`);
+      params.push(university_id);
+    }
     
-    res.json({ success: true, data: items });
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
+    }
+    
+    query += ' ORDER BY created_at DESC';
+    
+    const { rows } = await pool.query(query, params);
+    res.json({ success: true, data: rows });
   } catch (error) {
     console.error('Get media error:', error);
     res.status(500).json({ success: false, error: 'Failed to get media' });
@@ -59,43 +41,40 @@ router.get('/', async (req, res) => {
 
 // GET /api/media/:id - Get single media item
 router.get('/:id', async (req, res) => {
+  const pool = await getPool();
   try {
-    const item = mediaStorage.find(m => m.id === req.params.id);
-    if (!item) {
+    const { rows } = await pool.query('SELECT * FROM media WHERE id = $1', [req.params.id]);
+    if (rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Media not found' });
     }
-    res.json({ success: true, data: item });
+    res.json({ success: true, data: rows[0] });
   } catch (error) {
     console.error('Get media error:', error);
     res.status(500).json({ success: false, error: 'Failed to get media' });
   }
 });
 
-// POST /api/media - Upload new media (mock - in production use multer for file upload)
-router.post('/', authenticateToken, async (req, res) => {
+// POST /api/media - Create new media record
+router.post('/', authenticateToken, requirePermission('create', 'media'), async (req, res) => {
+  const pool = await getPool();
   try {
-    const { name, url, type, universityId, universityName, size } = req.body;
+    const { name, url, type, university_id, university_name, size, mime_type } = req.body;
     
     if (!name || !url || !type) {
       return res.status(400).json({ success: false, error: 'Missing required fields' });
     }
     
-    const newItem = {
-      id: `media-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      name,
-      url,
-      type,
-      universityId: universityId || null,
-      universityName: universityName || null,
-      size: size || '0 KB',
-      createdAt: new Date().toISOString(),
-      uploadedBy: req.user?.email || 'unknown'
-    };
+    const { v4: uuidv4 } = await import('uuid');
+    const id = uuidv4();
     
-    mediaStorage.unshift(newItem);
-    saveMediaToFile();
+    const { rows } = await pool.query(
+      `INSERT INTO media (id, name, url, type, university_id, university_name, size, mime_type, uploaded_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       RETURNING *`,
+      [id, name, url, type, university_id || null, university_name || null, size || '0 KB', mime_type || null, req.user?.email || 'unknown']
+    );
     
-    res.json({ success: true, data: newItem, message: 'Media uploaded successfully' });
+    res.json({ success: true, data: rows[0], message: 'Media uploaded successfully' });
   } catch (error) {
     console.error('Upload media error:', error);
     res.status(500).json({ success: false, error: 'Failed to upload media' });
@@ -103,17 +82,19 @@ router.post('/', authenticateToken, async (req, res) => {
 });
 
 // DELETE /api/media/:id - Delete media item
-router.delete('/:id', authenticateToken, async (req, res) => {
+router.delete('/:id', authenticateToken, requirePermission('delete', 'media'), async (req, res) => {
+  const pool = await getPool();
   try {
-    const index = mediaStorage.findIndex(m => m.id === req.params.id);
-    if (index === -1) {
+    const { rows } = await pool.query(
+      'DELETE FROM media WHERE id = $1 RETURNING *',
+      [req.params.id]
+    );
+    
+    if (rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Media not found' });
     }
     
-    const deletedItem = mediaStorage.splice(index, 1)[0];
-    saveMediaToFile();
-    
-    res.json({ success: true, message: 'Media deleted', data: deletedItem });
+    res.json({ success: true, message: 'Media deleted', data: rows[0] });
   } catch (error) {
     console.error('Delete media error:', error);
     res.status(500).json({ success: false, error: 'Failed to delete media' });
@@ -121,23 +102,42 @@ router.delete('/:id', authenticateToken, async (req, res) => {
 });
 
 // PUT /api/media/:id - Update media metadata
-router.put('/:id', authenticateToken, async (req, res) => {
+router.put('/:id', authenticateToken, requirePermission('edit', 'media'), async (req, res) => {
+  const pool = await getPool();
   try {
-    const item = mediaStorage.find(m => m.id === req.params.id);
-    if (!item) {
+    const { name, university_id, university_name } = req.body;
+    
+    const updates = [];
+    const values = [];
+    let paramCount = 1;
+    
+    if (name) {
+      updates.push(`name = $${paramCount++}`);
+      values.push(name);
+    }
+    if (university_id !== undefined) {
+      updates.push(`university_id = $${paramCount++}`);
+      values.push(university_id);
+    }
+    if (university_name !== undefined) {
+      updates.push(`university_name = $${paramCount++}`);
+      values.push(university_name);
+    }
+    
+    if (updates.length === 0) {
+      return res.status(400).json({ success: false, error: 'No fields to update' });
+    }
+    
+    values.push(req.params.id);
+    const query = `UPDATE media SET ${updates.join(', ')}, updated_at = NOW() WHERE id = $${paramCount} RETURNING *`;
+    
+    const { rows } = await pool.query(query, values);
+    
+    if (rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Media not found' });
     }
     
-    const { name, universityId, universityName } = req.body;
-    
-    if (name) item.name = name;
-    if (universityId !== undefined) item.universityId = universityId;
-    if (universityName !== undefined) item.universityName = universityName;
-    item.updatedAt = new Date().toISOString();
-    
-    saveMediaToFile();
-    
-    res.json({ success: true, data: item, message: 'Media updated' });
+    res.json({ success: true, data: rows[0], message: 'Media updated' });
   } catch (error) {
     console.error('Update media error:', error);
     res.status(500).json({ success: false, error: 'Failed to update media' });

@@ -192,6 +192,138 @@ export const registrationApi = {
   }
 };
 
+// Appointments API
+export const appointmentApi = {
+  getAll: async (params?: { status?: string; date_from?: string; date_to?: string }) => {
+    const api = await getApi();
+    const queryParams = params ? new URLSearchParams(params as Record<string, string>).toString() : '';
+    return api.get(`/appointments${queryParams ? `?${queryParams}` : ''}`);
+  },
+  getById: async (id: string) => {
+    const api = await getApi();
+    return api.get(`/appointments/${id}`);
+  },
+  create: async (data: any) => {
+    const api = await getApi();
+    return api.post('/appointments', data);
+  },
+  update: async (id: string, data: any) => {
+    const api = await getApi();
+    return api.put(`/appointments/${id}`, data);
+  },
+  delete: async (id: string) => {
+    const api = await getApi();
+    return api.delete(`/appointments/${id}`);
+  },
+  updateStatus: async (id: string, status: string) => {
+    const api = await getApi();
+    return api.patch(`/appointments/${id}`, { status });
+  }
+};
+
+// Payments API
+export const paymentApi = {
+  getAll: async () => {
+    const api = await getApi();
+    return api.get('/payments');
+  },
+  getById: async (id: string) => {
+    const api = await getApi();
+    return api.get(`/payments/${id}`);
+  },
+  create: async (data: any) => {
+    const api = await getApi();
+    return api.post('/payments', data);
+  },
+  update: async (id: string, data: any) => {
+    const api = await getApi();
+    return api.put(`/payments/${id}`, data);
+  },
+  delete: async (id: string) => {
+    const api = await getApi();
+    return api.delete(`/payments/${id}`);
+  },
+  getSummary: async () => {
+    const api = await getApi();
+    return api.get('/payments/student/summary');
+  }
+};
+
+// Messages API
+export const messageApi = {
+  getAll: async (params?: { type?: string; limit?: number; offset?: number }) => {
+    const api = await getApi();
+    const queryParams = params ? new URLSearchParams(params as Record<string, string>).toString() : '';
+    return api.get(`/messages${queryParams ? `?${queryParams}` : ''}`);
+  },
+  getById: async (id: string) => {
+    const api = await getApi();
+    return api.get(`/messages/${id}`);
+  },
+  create: async (data: { recipient_id: string; subject: string; content: string; parent_id?: string }) => {
+    const api = await getApi();
+    return api.post('/messages', data);
+  },
+  delete: async (id: string) => {
+    const api = await getApi();
+    return api.delete(`/messages/${id}`);
+  }
+};
+
+// Documents API
+export const documentApi = {
+  getAll: async (params?: { student_id?: string; status?: string; type?: string }) => {
+    const api = await getApi();
+    const queryParams = params ? new URLSearchParams(params as Record<string, string>).toString() : '';
+    return api.get(`/documents${queryParams ? `?${queryParams}` : ''}`);
+  },
+  getById: async (id: string) => {
+    const api = await getApi();
+    return api.get(`/documents/${id}`);
+  },
+  create: async (data: any) => {
+    const api = await getApi();
+    return api.post('/documents', data);
+  },
+  review: async (id: string, data: { status: string; notes?: string }) => {
+    const api = await getApi();
+    return api.put(`/documents/${id}/review`, data);
+  },
+  delete: async (id: string) => {
+    const api = await getApi();
+    return api.delete(`/documents/${id}`);
+  }
+};
+
+// Notifications API
+export const notificationApi = {
+  getAll: async (params?: { user_id?: string; is_read?: boolean; limit?: number }) => {
+    const api = await getApi();
+    const queryParams = params ? new URLSearchParams(params as Record<string, string>).toString() : '';
+    return api.get(`/notifications${queryParams ? `?${queryParams}` : ''}`);
+  },
+  getById: async (id: string) => {
+    const api = await getApi();
+    return api.get(`/notifications/${id}`);
+  },
+  create: async (data: any) => {
+    const api = await getApi();
+    return api.post('/notifications', data);
+  },
+  markAsRead: async (id: string) => {
+    const api = await getApi();
+    return api.put(`/notifications/${id}/read`, {});
+  },
+  markAllAsRead: async () => {
+    const api = await getApi();
+    return api.put('/notifications/read-all', {});
+  },
+  delete: async (id: string) => {
+    const api = await getApi();
+    return api.delete(`/notifications/${id}`);
+  }
+};
+
 // Upload API - for images to Cloudflare R2
 export const uploadApi = {
   uploadImage: async (file: File): Promise<string> => {

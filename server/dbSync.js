@@ -361,30 +361,35 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 
   try {
     switch (action) {
-      case 'export':
+      case 'export': {
         const result = await sync.exportToFile(process.argv[3]);
         console.log(`✅ Exported ${result.recordCount} records to ${result.filepath}`);
         break;
+      }
       
-      case 'import':
+      case 'import': {
         const importResult = await sync.importFromFile(process.argv[3]);
         console.log(`✅ Imported ${importResult.imported} records`);
         break;
+      }
       
-      case 'sync-to-mysql':
+      case 'sync-to-mysql': {
         const toMySQL = await sync.syncPgToMySQL();
         console.log('✅ Synced to MySQL:', toMySQL);
         break;
+      }
       
-      case 'sync-to-pg':
+      case 'sync-to-pg': {
         const toPg = await sync.syncMySQLToPg();
         console.log('✅ Synced to PostgreSQL:', toPg);
         break;
+      }
       
-      case 'sync-bidirectional':
+      case 'sync-bidirectional': {
         const bi = await sync.syncBidirectional();
         console.log('✅ Bidirectional sync complete:', bi);
         break;
+      }
       
       default:
         console.log('Usage: node dbSync.js [export|import|sync-to-mysql|sync-to-pg|sync-bidirectional] [filename]');

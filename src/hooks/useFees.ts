@@ -195,15 +195,16 @@ export function useFees(universityId?: string): UseFeesResult {
           break;
           
         case 'optional_multiple':
-        case 'variable_time':
+        case 'variable_time': {
           const selectedOptionId = selectedOptions[fee.id];
           const selectedOption = fee.options?.find(opt => opt.id === selectedOptionId);
           if (selectedOption) {
             feeAmount = selectedOption.value;
           }
           break;
+        }
           
-        case 'percentage':
+        case 'percentage': {
           const selectedConditionId = selectedConditions[fee.id];
           const selectedCondition = fee.conditions?.find(cond => cond.id === selectedConditionId);
           if (selectedCondition) {
@@ -212,6 +213,7 @@ export function useFees(universityId?: string): UseFeesResult {
             feeAmount = baseAmount - discount;
           }
           break;
+        }
       }
 
       if (fee.time_unit && timeValues[fee.id]) {
