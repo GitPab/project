@@ -1,6 +1,14 @@
-const express = require('express');
+import express from 'express';
+import { authenticateToken } from '../middleware/auth.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
 const router = express.Router();
-const { authenticateToken } = require('../middleware/auth');
+
+// Get __dirname equivalent in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // GET /api/exchange-rates - Get all exchange rates
 router.get('/', async (req, res) => {
@@ -8,22 +16,27 @@ router.get('/', async (req, res) => {
     // Get from database or return defaults
     const pool = req.app.locals.pool;
     if (pool) {
-      const { rows } = await pool.query('SELECT * FROM exchange_rates ORDER BY code');
-      if (rows.length > 0) {
-        return res.json({
-          success: true,
-          data: rows.map(r => ({
-            code: r.code,
-            name: r.name,
-            symbol: r.symbol,
-            rate: parseFloat(r.rate),
-            lastUpdated: r.last_updated || r.updated_at
-          }))
-        });
+      try {
+        const { rows } = await pool.query('SELECT * FROM exchange_rates ORDER BY code');
+        if (rows.length > 0) {
+          return res.json({
+            success: true,
+            data: rows.map(r => ({
+              code: r.code,
+              name: r.name,
+              symbol: r.symbol,
+              rate: parseFloat(r.rate),
+              lastUpdated: r.last_updated || r.updated_at
+            }))
+          });
+        }
+      } catch (dbError) {
+        // Database error (table may not exist) - log and return defaults
+        console.log('Exchange rates DB query failed (table may not exist), returning defaults');
       }
     }
     
-    // Return defaults if no DB or no data
+    // Return defaults if no DB, no data, or DB error
     const defaultRates = [
       { code: 'KRW', name: 'Hàn Quốc Won', symbol: '₩', rate: 18.9, lastUpdated: new Date().toISOString().split('T')[0] },
       { code: 'USD', name: 'Mỹ Dollar', symbol: '$', rate: 25500, lastUpdated: new Date().toISOString().split('T')[0] },
@@ -55,8 +68,6 @@ router.put('/', authenticateToken, async (req, res) => {
     const pool = req.app.locals.pool;
     if (!pool) {
       // Save to a JSON file if no database
-      const fs = require('fs');
-      const path = require('path');
       const ratesPath = path.join(__dirname, '../data/exchange-rates.json');
       
       // Ensure directory exists
@@ -119,4 +130,4 @@ router.put('/', authenticateToken, async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;

@@ -1,8 +1,14 @@
-const express = require('express');
+import express from 'express';
+import { authenticateToken } from '../middleware/auth.js';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
 const router = express.Router();
-const { authenticateToken } = require('../middleware/auth');
-const path = require('path');
-const fs = require('fs');
+
+// Get __dirname equivalent in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // In-memory storage for media (in production, use cloud storage like S3)
 let mediaStorage = [];
@@ -138,4 +144,4 @@ router.put('/:id', authenticateToken, async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;

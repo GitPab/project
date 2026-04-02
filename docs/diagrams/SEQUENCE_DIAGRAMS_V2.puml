@@ -1,0 +1,347 @@
+@startuml Sequence_PaymentFlow
+title Payment Management Flow - Sequence Diagram
+
+actor Student
+actor Admin
+participant "React Frontend" as Frontend
+participant "Express Backend" as Backend
+participant "Auth Middleware" as Auth
+participant "RBAC Middleware" as RBAC
+database "PostgreSQL" as DB
+participant "Email Service" as Email
+
+== Student Views Payments ==
+Student -> Frontend: Navigate to Payments page
+Frontend -> Backend: GET /api/payments (Authorization: Bearer token)
+Backend -> Auth: verifyToken(token)
+Auth --> Backend: req.user
+Backend -> DB: SELECT * FROM payments WHERE student_id = ?
+DB --> Backend: payments array
+Backend --> Frontend: 200 OK [payments]
+Frontend --> Student: Display payment list
+
+== Admin Creates Payment ==
+Admin -> Frontend: Click "Create Payment"
+Frontend -> Frontend: Open PaymentForm modal
+Admin -> Frontend: Enter payment details
+Frontend -> Backend: POST /api/payments (Authorization: Bearer token, body: paymentData)
+Backend -> Auth: verifyToken(token)
+Auth --> Backend: req.user
+Backend -> RBAC: checkPermission(req.user.role, 'manage', 'payment')
+alt No permission
+    Backend --> Frontend: 403 Forbidden
+else Has permission
+    Backend -> DB: INSERT INTO payments (id, student_id, amount, currency, method, status, created_at)
+    DB --> Backend: new payment id
+    Backend -> Email: Send payment notification to student
+    Email --> Backend: sent
+    Backend --> Frontend: 201 Created {id, message}
+    Frontend --> Admin: Show success
+end
+
+== Student Makes Payment ==
+Student -> Frontend: Click "Pay Now"
+Frontend -> Backend: PUT /api/payments/:id (body: {status: "completed", paid_at: Date})
+Backend -> Auth: verifyToken(token)
+Auth --> Backend: req.user
+Backend -> DB: UPDATE payments SET status = "completed", paid_at = ?, transaction_id = ? WHERE id = ?
+DB --> Backend: success
+Backend -> Email: Send payment confirmation
+Email --> Backend: sent
+Backend --> Frontend: 200 OK {message: "Payment completed"}
+Frontend --> Student: Show confirmation
+
+== Admin Views Payment Summary ==
+Admin -> Frontend: Navigate to Payment Summary
+Frontend -> Backend: GET /api/payments/student/summary
+Backend -> Auth: verifyToken(token)
+Auth --> Backend: req.user
+Backend -> DB: SELECT SUM(amount) as total, COUNT(*) as count FROM payments WHERE status = "completed"
+DB --> Backend: summary data
+Backend --> Frontend: 200 OK {total_paid, total_pending, count}
+Frontend --> Admin: Display summary
+
+@enduml
+
+@startuml Sequence_NotificationFlow
+title Notification System - Sequence Diagram
+
+actor User
+actor Admin
+participant "React Frontend" as Frontend
+participant "Express Backend" as Backend
+participant "Auth Middleware" as Auth
+database "PostgreSQL" as DB
+participant "Email Service" as Email
+participant "SSE Manager" as SSE
+
+== User Receives Notification ==
+Backend -> DB: INSERT INTO notifications (user_id, type, title, message, is_read)
+DB --> Backend: notification id
+Backend -> SSE: broadcastEvent("notification", {userId, notification})
+SSE --> Frontend: SSE event received
+Frontend -> Frontend: Show toast notification
+Frontend -> Frontend: Update notification badge count
+
+== User Views Notifications ==
+User -> Frontend: Click notification bell
+Frontend -> Backend: GET /api/notifications (Authorization: Bearer token)
+Backend -> Auth: verifyToken(token)
+Auth --> Backend: req.user
+Backend -> DB: SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC
+DB --> Backend: notifications array
+Backend --> Frontend: 200 OK [notifications]
+Frontend --> User: Display notification list
+
+== User Marks as Read ==
+User -> Frontend: Click notification
+Frontend -> Backend: PUT /api/notifications/:id/read
+Backend -> Auth: verifyToken(token)
+Auth --> Backend: req.user
+Backend -> DB: UPDATE notifications SET is_read = true, read_at = NOW() WHERE id = ?
+DB --> Backend: success
+Backend --> Frontend: 200 OK
+Frontend -> Frontend: Remove unread indicator
+
+== Admin Broadcasts Notification ==
+Admin -> Frontend: Go to Notifications page
+Frontend -> Backend: POST /api/notifications/broadcast (body: {title, message, type})
+Backend -> Auth: verifyToken(token)
+Auth --> Backend: req.user
+Backend -> DB: SELECT id FROM users WHERE role != 'student'
+DB --> Backend: admin user ids
+loop For each admin
+    Backend -> DB: INSERT INTO notifications (user_id, type, title, message)
+end
+Backend -> SSE: broadcastEvent("notification", {broadcast: true})
+Backend --> Frontend: 201 Created {count: recipients}
+Frontend --> Admin: Show success
+
+@enduml
+
+@startuml Sequence_DocumentFlow
+title Document Upload & Review Flow - Sequence Diagram
+
+actor Student
+actor Admin
+participant "React Frontend" as Frontend
+participant "Express Backend" as Backend
+participant "Auth Middleware" as Auth
+participant "RBAC Middleware" as RBAC
+database "PostgreSQL" as DB
+participant "Imgur API" as Imgur
+participant "Email Service" as Email
+
+== Student Uploads Document ==
+Student -> Frontend: Click "Upload Document"
+Frontend -> Frontend: Open file picker
+Student -> Frontend: Select file
+Frontend -> Imgur: Upload image
+Imgur --> Frontend: image URL
+Frontend -> Backend: POST /api/documents (body: {type, url, description})
+Backend -> Auth: verifyToken(token)
+Auth --> Backend: req.user
+Backend -> DB: INSERT INTO documents (id, student_id, type, url, status, created_at)
+DB --> Backend: document id
+Backend --> Frontend: 201 Created
+Frontend --> Student: Show upload success
+
+== Admin Reviews Document ==
+Admin -> Frontend: Navigate to Documents page
+Frontend -> Backend: GET /api/documents
+Backend -> Auth: verifyToken(token)
+Auth --> Backend: req.user
+Backend -> RBAC: checkPermission(req.user.role, 'view', 'document')
+Backend -> DB: SELECT d.*, u.name as student_name FROM documents d JOIN users u ON d.student_id = u.id
+DB --> Backend: documents array
+Backend --> Frontend: 200 OK [documents]
+Frontend --> Admin: Display pending documents
+
+Admin -> Frontend: Click "Review" on document
+Frontend -> Backend: GET /api/documents/:id
+Backend --> Frontend: document details
+Frontend --> Admin: Show document preview
+
+Admin -> Frontend: Select status (approved/rejected)
+Frontend -> Backend: PUT /api/documents/:id/review (body: {status, notes})
+Backend -> Auth: verifyToken(token)
+Auth --> Backend: req.user
+Backend -> RBAC: checkPermission(req.user.role, 'manage', 'document')
+Backend -> DB: UPDATE documents SET status = ?, reviewed_by = ?, reviewed_at = NOW() WHERE id = ?
+DB --> Backend: success
+Backend -> Email: Send review notification to student
+Email --> Backend: sent
+Backend --> Frontend: 200 OK
+Frontend --> Admin: Show success
+
+@enduml
+
+@startuml Sequence_ScholarshipFlow
+title Scholarship Application Flow - Sequence Diagram
+
+actor Student
+actor Admin
+participant "React Frontend" as Frontend
+participant "Express Backend" as Backend
+participant "Auth Middleware" as Auth
+participant "RBAC Middleware" as RBAC
+database "PostgreSQL" as DB
+participant "Email Service" as Email
+
+== Student Views Scholarships ==
+Student -> Frontend: Navigate to Scholarships page
+Frontend -> Backend: GET /api/scholarships
+Backend -> DB: SELECT * FROM scholarships WHERE deadline > NOW()
+DB --> Backend: scholarships array
+Backend --> Frontend: 200 OK [scholarships]
+Frontend --> Student: Display available scholarships
+
+== Student Applies for Scholarship ==
+Student -> Frontend: Click "Apply" on scholarship
+Frontend -> Frontend: Open application form
+Student -> Frontend: Fill application details
+Frontend -> Backend: POST /api/scholarships/:id/apply (body: applicationData)
+Backend -> Auth: verifyToken(token)
+Auth --> Backend: req.user
+Backend -> DB: INSERT INTO scholarship_applications (id, scholarship_id, student_id, status, applied_at, data)
+DB --> Backend: application id
+Backend -> Email: Notify admin of new application
+Email --> Backend: sent
+Backend --> Frontend: 201 Created
+Frontend --> Student: Show success message
+
+== Admin Reviews Applications ==
+Admin -> Frontend: Navigate to Scholarship Applications
+Frontend -> Backend: GET /api/scholarships/applications
+Backend -> Auth: verifyToken(token)
+Auth --> Backend: req.user
+Backend -> RBAC: checkPermission(req.user.role, 'manage', 'scholarship')
+Backend -> DB: SELECT sa.*, s.name as scholarship_name, u.name as student_name FROM scholarship_applications sa JOIN scholarships s ON sa.scholarship_id = s.id JOIN users u ON sa.student_id = u.id
+DB --> Backend: applications array
+Backend --> Frontend: 200 OK [applications]
+Frontend --> Admin: Display pending applications
+
+Admin -> Frontend: Review application & make decision
+Frontend -> Backend: PUT /api/scholarships/applications/:id/review (body: {status: "approved" or "rejected", notes})
+Backend -> Auth: verifyToken(token)
+Auth --> Backend: req.user
+Backend -> RBAC: checkPermission(req.user.role, 'manage', 'scholarship')
+Backend -> DB: UPDATE scholarship_applications SET status = ?, notes = ?, reviewed_at = NOW() WHERE id = ?
+DB --> Backend: success
+Backend -> Email: Send decision notification to student
+Email --> Backend: sent
+Backend --> Frontend: 200 OK
+Frontend --> Admin: Show success
+
+@enduml
+
+@startuml Sequence_VisaApplicationFlow
+title Visa Application Flow - Sequence Diagram
+
+actor Student
+actor Admin
+participant "React Frontend" as Frontend
+participant "Express Backend" as Backend
+participant "Auth Middleware" as Auth
+database "PostgreSQL" as DB
+participant "Email Service" as Email
+
+== Student Creates Visa Application ==
+Student -> Frontend: Navigate to Visa Applications
+Frontend -> Backend: GET /api/visa-applications
+Backend -> Auth: verifyToken(token)
+Auth --> Backend: req.user
+Backend -> DB: SELECT * FROM visa_applications WHERE student_id = ?
+DB --> Backend: applications array
+Backend --> Frontend: 200 OK [applications]
+Frontend --> Student: Display current applications
+
+Student -> Frontend: Click "New Application"
+Frontend -> Frontend: Open application form
+Student -> Frontend: Select visa type & enter details
+Frontend -> Backend: POST /api/visa-applications (body: {visa_type, application_data})
+Backend -> Auth: verifyToken(token)
+Auth --> Backend: req.user
+Backend -> DB: INSERT INTO visa_applications (id, student_id, visa_type, status, submitted_at, data)
+DB --> Backend: application id
+Backend --> Frontend: 201 Created
+Frontend --> Student: Show success
+
+== Student Tracks Application ==
+Student -> Frontend: Refresh page
+Frontend -> Backend: GET /api/visa-applications/:id
+Backend -> DB: SELECT * FROM visa_applications WHERE id = ?
+DB --> Backend: application data
+Backend --> Frontend: 200 OK {application}
+Frontend --> Student: Display current status
+
+== Admin Updates Visa Status ==
+Admin -> Frontend: Navigate to Visa Applications
+Frontend -> Backend: GET /api/visa-applications
+Backend -> Auth: verifyToken(token)
+Auth --> Backend: req.user
+Backend -> DB: SELECT va.*, u.name as student_name FROM visa_applications va JOIN users u ON va.student_id = u.id
+DB --> Backend: applications array
+Backend --> Frontend: 200 OK [applications]
+Frontend --> Admin: Display all applications
+
+Admin -> Frontend: Update status (submitted -> under_review -> approved)
+Frontend -> Backend: PUT /api/visa-applications/:id/status (body: {status})
+Backend -> Auth: verifyToken(token)
+Auth --> Backend: req.user
+Backend -> DB: UPDATE visa_applications SET status = ?, updated_at = NOW() WHERE id = ?
+DB --> Backend: success
+Backend -> Email: Notify student of status change
+Email --> Backend: sent
+Backend --> Frontend: 200 OK
+Frontend --> Admin: Show success
+
+@enduml
+
+@startuml Sequence_RealTimeUpdates
+title SSE Real-time Updates - Sequence Diagram
+
+actor User
+participant "React Frontend" as Frontend
+participant "Express Backend" as Backend
+participant "SSE Manager" as SSE
+database "PostgreSQL" as DB
+participant "Event Broadcaster" as EventBcast
+
+== Initial Connection ==
+User -> Frontend: Open application
+Frontend -> Backend: Connect to SSE /api/sse/registrations (Authorization: Bearer token)
+Backend -> Backend: Validate token
+Backend -> SSE: Create EventSource connection
+SSE --> Frontend: Connection established
+Frontend -> Frontend: Start heartbeat ping
+
+== New Registration Event ==
+User -> Frontend: Submit registration form
+Frontend -> Backend: POST /api/registrations
+Backend -> DB: INSERT INTO registrations
+DB --> Backend: new registration id
+Backend -> EventBcast: broadcastEvent("new_registration", registrationData)
+EventBcast -> SSE: Notify all connected clients
+SSE -> Frontend: SSE message received
+Frontend -> Frontend: Update registration list
+Frontend -> Frontend: Show toast notification
+
+== Connection Recovery ==
+alt Connection lost
+    Frontend -> Frontend: Detect disconnect
+    Frontend -> Frontend: Show offline indicator
+    Frontend -> Backend: Retry connection (exponential backoff)
+    Backend -> SSE: Reconnect
+    SSE --> Frontend: Connection restored
+    Frontend -> Frontend: Hide offline indicator
+    Frontend -> Frontend: Sync missed events
+end
+
+== Heartbeat ==
+loop Every 30 seconds
+    SSE --> Frontend: :heartbeat
+    Frontend -> Frontend: Reset timeout
+end
+
+@enduml

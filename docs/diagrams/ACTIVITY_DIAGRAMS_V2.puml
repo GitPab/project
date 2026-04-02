@@ -1,0 +1,675 @@
+@startuml Activity_PaymentProcess
+title Payment Process - Activity Diagram (v2.0)
+
+|Student|
+start
+:Navigate to Payments page;
+
+|Frontend|
+:Load payment history;
+:Display payment list;
+
+|Student|
+if (Has pending payment?) then (yes)
+    :Click "Pay Now";
+    
+    |Frontend|
+    :Open payment form;
+    :Select payment method;
+    
+    |Student|
+    :Enter payment details;
+    :Confirm payment;
+    
+    |Frontend|
+    :Validate payment info;
+    if (Valid?) then (yes)
+        :POST /api/payments/:id/process;
+        
+        |Backend|
+        :Verify authentication;
+        :Validate payment data;
+        
+        |Database|
+        :UPDATE payments
+        SET status = 'completed',
+            paid_at = NOW(),
+            transaction_id = ?;
+        
+        |Backend|
+        :Send confirmation email;
+        :Return success;
+        
+        |Frontend|
+        :Show success message;
+        :Update payment status;
+        
+        |Student|
+        :Receive confirmation;
+        :Download receipt;
+        stop
+    else (no)
+        |Frontend|
+        :Show validation error;
+        stop
+    endif
+else (no)
+    |Student|
+    :View payment history;
+    :Download receipts;
+    stop
+endif
+
+@enduml
+
+@startuml Activity_NotificationProcess
+title Notification Process - Activity Diagram (v2.0)
+
+|User|
+start
+:Navigate to application;
+
+|Frontend|
+:Connect to SSE endpoint;
+:Initialize notification listener;
+
+|System|
+if (New event occurs?) then (yes)
+    :Generate notification;
+    
+    |Database|
+    :INSERT INTO notifications;
+    
+    |System|
+    :Broadcast via SSE;
+    
+    |Frontend|
+    :Receive notification;
+    :Show toast alert;
+    :Update badge count;
+    
+    |User|
+    :Click notification bell;
+    
+    |Frontend|
+    :GET /api/notifications;
+    
+    |Backend|
+    :Fetch notifications;
+    
+    |Frontend|
+    :Display notification list;
+    
+    |User|
+    :Click notification;
+    
+    |Frontend|
+    :Mark as read;
+    :PUT /api/notifications/:id/read;
+    
+    |Database|
+    :UPDATE notifications
+    SET is_read = true;
+    
+    |Frontend|
+    :Remove unread indicator;
+    :Navigate to related page;
+    stop
+else (no)
+    |User|
+    :Continue browsing;
+    stop
+endif
+
+@enduml
+
+@startuml Activity_DocumentUpload
+title Document Upload & Review - Activity Diagram (v2.0)
+
+|Student|
+start
+:Navigate to Documents page;
+
+|Frontend|
+:Load document list;
+
+|Student|
+:Click "Upload Document";
+
+|Frontend|
+:Open file picker;
+
+|Student|
+:Select file;
+:Select document type;
+
+|Frontend|
+:Validate file;
+if (Valid?) then (yes)
+    :Upload to Imgur;
+    
+    |External|
+    :Imgur API;
+    :Return image URL;
+    
+    |Frontend|
+    :POST /api/documents;
+    
+    |Backend|
+    :Verify authentication;
+    
+    |Database|
+    :INSERT INTO documents
+    (student_id, type, url, status);
+    
+    |Backend|
+    :Return success;
+    
+    |Frontend|
+    :Show success message;
+    :Add to document list;
+    
+    |System|
+    :Notify admin of new document;
+    
+    |Student|
+    :Wait for review;
+    
+    |Admin|
+    :View notification;
+    :Navigate to Documents;
+    :Review document;
+    
+    if (Decision) then (approve)
+        :Click "Approve";
+        
+        |Backend|
+        :UPDATE documents
+        SET status = 'approved',
+            reviewed_by = admin_id;
+        
+        |System|
+        :Send approval email;
+        
+        |Student|
+        :Receive approval notification;
+        stop
+    else (reject)
+        :Click "Reject";
+        :Enter reason;
+        
+        |Backend|
+        :UPDATE documents
+        SET status = 'rejected',
+            notes = reason;
+        
+        |System|
+        :Send rejection email;
+        
+        |Student|
+        :Receive rejection notification;
+        :Upload revised document;
+        stop
+    endif
+else (no)
+    |Frontend|
+    :Show file error;
+    stop
+endif
+
+@enduml
+
+@startuml Activity_MessageFlow
+title Messaging System - Activity Diagram (v2.0)
+
+|Sender|
+start
+:Navigate to Messages;
+
+|Frontend|
+:Load inbox;
+
+|Sender|
+:Click "New Message";
+
+|Frontend|
+:Open compose form;
+
+|Sender|
+:Select recipient;
+:Enter subject;
+:Enter message;
+:Click Send;
+
+|Frontend|
+:Validate message;
+if (Valid?) then (yes)
+    :POST /api/messages;
+    
+    |Backend|
+    :Verify authentication;
+    
+    |Database|
+    :INSERT INTO messages
+    (sender_id, receiver_id, subject, content);
+    
+    |Backend|
+    :Send notification email;
+    :Return success;
+    
+    |Frontend|
+    :Show sent confirmation;
+    :Add to sent folder;
+    
+    |Receiver|
+    :Receive email notification;
+    :Navigate to Messages;
+    
+    |Frontend|
+    :Display new message;
+    :Mark as unread;
+    
+    |Receiver|
+    :Read message;
+    
+    |Frontend|
+    :Mark as read;
+    
+    |Database|
+    :UPDATE messages
+    SET is_read = true;
+    
+    |Receiver|
+    if (Reply?) then (yes)
+        :Click Reply;
+        :Type response;
+        :Send reply;
+        
+        |Frontend|
+        :POST reply message;
+        stop
+    else (no)
+        stop
+    endif
+else (no)
+    |Frontend|
+    :Show validation error;
+    stop
+endif
+
+@enduml
+
+@startuml Activity_ScholarshipApplication
+title Scholarship Application - Activity Diagram (v2.0)
+
+|Student|
+start
+:Navigate to Scholarships;
+
+|Frontend|
+:Load available scholarships;
+
+|Student|
+:Browse scholarships;
+:Click on scholarship;
+
+|Frontend|
+:Display details;
+
+|Student|
+if (Eligible?) then (yes)
+    :Click "Apply";
+    
+    |Frontend|
+    :Open application form;
+    
+    |Student|
+    :Fill personal info;
+    :Enter academic details;
+    :Upload documents;
+    :Submit application;
+    
+    |Frontend|
+    :Validate application;
+    if (Complete?) then (yes)
+        :POST /api/scholarships/:id/apply;
+        
+        |Backend|
+        :Verify eligibility;
+        
+        |Database|
+        :INSERT INTO scholarship_applications
+        (scholarship_id, student_id, status, data);
+        
+        |Backend|
+        :Send confirmation email;
+        :Notify admins;
+        
+        |Frontend|
+        :Show success;
+        
+        |Student|
+        :Track application status;
+        
+        |Admin|
+        :View application;
+        :Review documents;
+        
+        if (Decision) then (approve)
+            :Approve application;
+            :Enter award amount;
+            
+            |Backend|
+            :UPDATE application
+            SET status = 'approved';
+            
+            |System|
+            :Send award email;
+            
+            |Student|
+            :Receive award notification;
+            :Accept scholarship;
+            stop
+        else (reject)
+            :Reject application;
+            :Enter reason;
+            
+            |Backend|
+            :UPDATE application
+            SET status = 'rejected';
+            
+            |System|
+            :Send rejection email;
+            
+            |Student|
+            :Receive rejection;
+            :Apply for other scholarships;
+            stop
+        endif
+    else (no)
+        |Frontend|
+        :Show incomplete warning;
+        stop
+    endif
+else (no)
+    |Student|
+    :View other scholarships;
+    stop
+endif
+
+@enduml
+
+@startuml Activity_AppointmentScheduling
+title Appointment Scheduling - Activity Diagram (v2.0)
+
+|Student|
+start
+:Navigate to Appointments;
+
+|Frontend|
+:Load appointment page;
+
+|Student|
+:Click "Schedule Appointment";
+
+|Frontend|
+:Open scheduling form;
+
+|Student|
+:Select appointment type;
+:Select preferred date;
+
+|Frontend|
+:GET /api/appointments/available-slots;
+
+|Backend|
+:Query available slots;
+
+|Database|
+:SELECT available times
+WHERE staff_id = ?
+AND status = 'available';
+
+|Frontend|
+:Display available slots;
+
+|Student|
+:Select time slot;
+:Enter notes;
+:Confirm appointment;
+
+|Frontend|
+:POST /api/appointments;
+
+|Backend|
+:Verify authentication;
+
+|Database|
+:INSERT INTO appointments
+(student_id, staff_id, scheduled_at, status);
+
+|Backend|
+:Send confirmation emails;
+
+|Frontend|
+:Show confirmation;
+:Add to calendar;
+
+|Student|
+:Receive confirmation email;
+
+|Staff|
+:Receive notification;
+:Review appointment;
+
+if (Can attend?) then (yes)
+    :Confirm appointment;
+    
+    |Backend|
+    :UPDATE status = 'confirmed';
+    
+    |System|
+    :Send reminder (24h before);
+    
+    |Student|
+    :Attend appointment;
+    
+    |Staff|
+    :Mark as completed;
+    
+    |Backend|
+    :UPDATE status = 'completed';
+    stop
+else (no)
+    |Staff|
+    :Cancel appointment;
+    
+    |Backend|
+    :UPDATE status = 'cancelled';
+    
+    |System|
+    :Notify student;
+    
+    |Student|
+    :Reschedule;
+    stop
+endif
+
+@enduml
+
+@startuml Activity_VisaApplication
+title Visa Application Process - Activity Diagram (v2.0)
+
+|Student|
+start
+:Navigate to Visa Applications;
+
+|Frontend|
+:Load existing applications;
+
+|Student|
+:Click "New Application";
+
+|Frontend|
+:Open application form;
+
+|Student|
+:Select visa type (D-2/D-4/D-4-1);
+:Enter personal information;
+:Upload required documents;
+:Submit application;
+
+|Frontend|
+:Validate application;
+if (Complete?) then (yes)
+    :POST /api/visa-applications;
+    
+    |Backend|
+    :Verify documents;
+    
+    |Database|
+    :INSERT INTO visa_applications
+    (student_id, visa_type, status, data);
+    
+    |Backend|
+    :Send confirmation;
+    :Notify admin;
+    
+    |Frontend|
+    :Show tracking code;
+    :Display status tracker;
+    
+    |Student|
+    :Track application status;
+    
+    fork
+        |Admin|
+        :Review application;
+        :Update status to 'under_review';
+        
+        |Backend|
+        :UPDATE status;
+        :Notify student;
+    fork again
+        |Student|
+        :Wait for update;
+        :Check status periodically;
+    end fork
+    
+    |Admin|
+    if (Decision) then (approved)
+        :Update to 'approved';
+        :Enter visa details;
+        
+        |Backend|
+        :UPDATE status = 'approved',
+            approved_at = NOW();
+        
+        |System|
+        :Send approval email;
+        
+        |Student|
+        :Receive approval;
+        :Collect passport;
+        
+        |Backend|
+        :UPDATE status = 'collected';
+        stop
+    else (rejected)
+        :Update to 'rejected';
+        :Enter reason;
+        
+        |Backend|
+        :UPDATE status = 'rejected';
+        
+        |System|
+        :Send rejection email;
+        
+        |Student|
+        :Receive rejection;
+        :Review feedback;
+        :Reapply if needed;
+        stop
+    endif
+else (no)
+    |Frontend|
+    :Show missing documents;
+    stop
+endif
+
+@enduml
+
+@startuml Activity_OfflineSync
+title Offline-First Data Synchronization - Activity Diagram (v2.0)
+
+|User|
+start
+:Open application;
+
+|System|
+:Check network status;
+
+if (Online?) then (yes)
+    |Frontend|
+    :Connect to server;
+    :Sync pending changes;
+    
+    |Backend|
+    :Process queued operations;
+    
+    |Database|
+    :Apply changes;
+    
+    |Frontend|
+    :Clear local queue;
+    :Load fresh data;
+    
+    |User|
+    :Use application normally;
+    
+    if (Makes changes?) then (yes)
+        |Frontend|
+        :Save to local DB;
+        :Sync immediately;
+        stop
+    else (no)
+        stop
+    endif
+else (offline)
+    |Frontend|
+    :Show offline indicator;
+    :Load cached data;
+    
+    |User|
+    :Continue using app;
+    
+    if (Makes changes?) then (yes)
+        |Frontend|
+        :Queue operation locally;
+        :Show "will sync when online";
+        
+        |System|
+        :Wait for connection;
+        
+        |User|
+        :Close app;
+        
+        |System|
+        :Background sync pending;
+        
+        |Network|
+        :Connection restored;
+        
+        |System|
+        :Auto-sync queued changes;
+        :Resolve conflicts if any;
+        :Notify user of sync;
+        stop
+    else (no)
+        |User|
+        :Browse cached data;
+        stop
+    endif
+endif
+
+@enduml

@@ -120,6 +120,11 @@ export const router = createHashRouter([
     Component: FirstTimeSetup,
     errorElement: <RouteError />
   },
+  {
+    path: '/student/tracking',
+    Component: TrackingLookupSimple,
+    errorElement: <RouteError />
+  },
   // Student routes with Layout (same structure as admin)
   {
     path: '/student',

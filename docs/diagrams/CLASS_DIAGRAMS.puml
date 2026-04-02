@@ -351,9 +351,81 @@ package "Route Controllers" {
         -calculateExpiry()
         -sendInviteEmail(email, token)
     }
+    
+    class PaymentController {
+        +getAll(req, res)
+        +getById(req, res)
+        +create(req, res)
+        +update(req, res)
+        +delete(req, res)
+        +getStudentSummary(req, res)
+    }
+    
+    class NotificationController {
+        +getAll(req, res)
+        +getUnreadCount(req, res)
+        +create(req, res)
+        +broadcast(req, res)
+        +markAsRead(req, res)
+        +markAllAsRead(req, res)
+        +clearAll(req, res)
+    }
+    
+    class DocumentController {
+        +getAll(req, res)
+        +getById(req, res)
+        +upload(req, res)
+        +review(req, res)
+        +delete(req, res)
+    }
+    
+    class MessageController {
+        +getInbox(req, res)
+        +getSent(req, res)
+        +getById(req, res)
+        +send(req, res)
+        +delete(req, res)
+    }
+    
+    class AppointmentController {
+        +getAll(req, res)
+        +getById(req, res)
+        +create(req, res)
+        +update(req, res)
+        +cancel(req, res)
+        +delete(req, res)
+        +getAvailableSlots(req, res)
+    }
+    
+    class ScholarshipController {
+        +getAll(req, res)
+        +getById(req, res)
+        +create(req, res)
+        +update(req, res)
+        +delete(req, res)
+        +apply(req, res)
+        +getMyApplications(req, res)
+        +reviewApplication(req, res)
+    }
+    
+    class VisaController {
+        +getAll(req, res)
+        +getById(req, res)
+        +create(req, res)
+        +update(req, res)
+        +delete(req, res)
+        +updateStatus(req, res)
+    }
+    
+    class PreferenceController {
+        +get(req, res)
+        +create(req, res)
+        +update(req, res)
+        +updateSingle(req, res)
+    }
 }
 
-package "Models" {
+package "Models (v2.0 - 15 Entities)" {
     
     class UserModel {
         +UUID id
@@ -410,6 +482,127 @@ package "Models" {
         +findByToken(token)
         +markAsUsed(id)
     }
+    
+    class PaymentModel {
+        +UUID id
+        +UUID studentId
+        +UUID registrationId
+        +decimal amount
+        +string currency
+        +string method
+        +string status
+        +Date paidAt
+        +create(data)
+        +findByStudent(studentId)
+        +updateStatus(id, status)
+    }
+    
+    class NotificationModel {
+        +UUID id
+        +UUID userId
+        +string type
+        +string title
+        +string message
+        +boolean isRead
+        +Date readAt
+        +create(data)
+        +findByUser(userId)
+        +markAsRead(id)
+        +markAllAsRead(userId)
+    }
+    
+    class DocumentModel {
+        +UUID id
+        +UUID studentId
+        +string type
+        +string url
+        +string status
+        +UUID reviewedBy
+        +Date reviewedAt
+        +create(data)
+        +findByStudent(studentId)
+        +updateStatus(id, status, reviewer)
+    }
+    
+    class MessageModel {
+        +UUID id
+        +UUID senderId
+        +UUID receiverId
+        +string subject
+        +string content
+        +boolean isRead
+        +boolean isDeleted
+        +create(data)
+        +findInbox(userId)
+        +findSent(userId)
+        +markAsRead(id)
+        +softDelete(id)
+    }
+    
+    class AppointmentModel {
+        +UUID id
+        +UUID studentId
+        +UUID staffId
+        +string title
+        +string description
+        +Date scheduledAt
+        +string status
+        +create(data)
+        +findByStudent(studentId)
+        +findByStaff(staffId)
+        +updateStatus(id, status)
+    }
+    
+    class ScholarshipModel {
+        +UUID id
+        +string name
+        +string description
+        +decimal amount
+        +Date deadline
+        +object requirements
+        +create(data)
+        +findAll()
+        +findById(id)
+    }
+    
+    class ScholarshipApplicationModel {
+        +UUID id
+        +UUID scholarshipId
+        +UUID studentId
+        +string status
+        +Date appliedAt
+        +object applicationData
+        +create(data)
+        +findByStudent(studentId)
+        +findByScholarship(id)
+        +updateStatus(id, status)
+    }
+    
+    class VisaApplicationModel {
+        +UUID id
+        +UUID studentId
+        +string visaType
+        +string status
+        +Date submittedAt
+        +Date approvedAt
+        +object applicationData
+        +create(data)
+        +findByStudent(studentId)
+        +updateStatus(id, status)
+    }
+    
+    class UserPreferenceModel {
+        +UUID id
+        +UUID userId
+        +string language
+        +string theme
+        +string currency
+        +boolean notificationsEnabled
+        +object preferences
+        +create(data)
+        +findByUser(userId)
+        +update(userId, data)
+    }
 }
 
 package "Utilities" {
@@ -452,5 +645,23 @@ AdminInviteController --> UserModel : uses
 AdminInviteController --> InvitationModel : uses
 AdminInviteController --> EmailService : uses
 AdminInviteController --> PasswordService : uses
+
+' NEW v2.0 Controllers
+PaymentController --> PaymentModel : uses
+NotificationController --> NotificationModel : uses
+DocumentController --> DocumentModel : uses
+MessageController --> MessageModel : uses
+AppointmentController --> AppointmentModel : uses
+ScholarshipController --> ScholarshipModel : uses
+ScholarshipController --> ScholarshipApplicationModel : uses
+VisaController --> VisaApplicationModel : uses
+PreferenceController --> UserPreferenceModel : uses
+
+' Service relationships
+PaymentController --> EmailService : sends receipts
+NotificationController --> EmailService : sends notifications
+DocumentController --> EmailService : notifies review
+MessageController --> EmailService : notifies new message
+AppointmentController --> EmailService : sends reminders
 
 @enduml

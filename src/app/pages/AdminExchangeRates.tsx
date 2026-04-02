@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { toast } from 'sonner';
-import { RefreshCw, Save, TrendingUp, DollarSign, Wallet, Loader2 } from 'lucide-react';
+import { RefreshCw, Save, TrendingUp, DollarSign, Wallet, Loader2, Globe } from 'lucide-react';
 import api from '../services/api';
 
 interface ExchangeRate {
@@ -14,12 +14,15 @@ interface ExchangeRate {
   lastUpdated: string;
 }
 
+// Generate current date string once
+const getCurrentDate = () => new Date().toISOString().split('T')[0];
+
 const DEFAULT_RATES: ExchangeRate[] = [
-  { code: 'KRW', name: 'Hàn Quốc Won', symbol: '₩', rate: 18.9, lastUpdated: '2024-01-01' },
-  { code: 'USD', name: 'Mỹ Dollar', symbol: '$', rate: 25500, lastUpdated: '2024-01-01' },
-  { code: 'JPY', name: 'Nhật Yên', symbol: '¥', rate: 170, lastUpdated: '2024-01-01' },
-  { code: 'CNY', name: 'Trung Quốc Yuan', symbol: '¥', rate: 3500, lastUpdated: '2024-01-01' },
-  { code: 'EUR', name: 'Euro', symbol: '€', rate: 28000, lastUpdated: '2024-01-01' },
+  { code: 'KRW', name: 'Hàn Quốc Won', symbol: '₩', rate: 18.9, lastUpdated: getCurrentDate() },
+  { code: 'USD', name: 'Mỹ Dollar', symbol: '$', rate: 25500, lastUpdated: getCurrentDate() },
+  { code: 'JPY', name: 'Nhật Yên', symbol: '¥', rate: 170, lastUpdated: getCurrentDate() },
+  { code: 'CNY', name: 'Trung Quốc Yuan', symbol: '¥', rate: 3500, lastUpdated: getCurrentDate() },
+  { code: 'EUR', name: 'Euro', symbol: '€', rate: 28000, lastUpdated: getCurrentDate() },
 ];
 
 export default function AdminExchangeRates() {
@@ -27,11 +30,67 @@ export default function AdminExchangeRates() {
   const [hasChanges, setHasChanges] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isFetchingRealRates, setIsFetchingRealRates] = useState(false);
 
   // Load rates from API on mount
   useEffect(() => {
     fetchRates();
   }, []);
+
+  // Fetch real exchange rates from external API
+  const fetchRealExchangeRates = async () => {
+    setIsFetchingRealRates(true);
+    try {
+      // Using exchangerate-api.com (free tier available)
+      const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+      if (!response.ok) throw new Error('Failed to fetch');
+      
+      const data = await response.json();
+      const usdRates = data.rates;
+      
+      // Convert to VND base (API returns rates against USD)
+      // 1 USD = X VND, so we need to calculate cross rates
+      const usdToVnd = 25500; // Approximate USD/VND rate
+      
+      const updatedRates = rates.map(rate => {
+        let newRate = rate.rate;
+        
+        switch (rate.code) {
+          case 'USD':
+            newRate = usdToVnd;
+            break;
+          case 'KRW':
+            // USD/KRW rate, convert to VND: 1 KRW = USD/VND / USD/KRW
+            newRate = usdToVnd / (usdRates.KRW || 1350);
+            break;
+          case 'JPY':
+            newRate = usdToVnd / (usdRates.JPY || 150);
+            break;
+          case 'CNY':
+            newRate = usdToVnd / (usdRates.CNY || 7.2);
+            break;
+          case 'EUR':
+            newRate = usdToVnd / (usdRates.EUR || 0.92);
+            break;
+        }
+        
+        return {
+          ...rate,
+          rate: Math.round(newRate * 100) / 100,
+          lastUpdated: getCurrentDate()
+        };
+      });
+      
+      setRates(updatedRates);
+      setHasChanges(true);
+      toast.success('Đã cập nhật tỷ giá từ thị trường thực!');
+    } catch (error) {
+      console.error('Failed to fetch real rates:', error);
+      toast.error('Không thể lấy tỷ giá từ API. Dùng tỷ giá mặc định.');
+    } finally {
+      setIsFetchingRealRates(false);
+    }
+  };
 
   const fetchRates = async () => {
     try {
@@ -150,6 +209,19 @@ export default function AdminExchangeRates() {
         </div>
 
         <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={fetchRealExchangeRates}
+            disabled={isFetchingRealRates || isLoading}
+            className="bg-green-50 hover:bg-green-100 border-green-300 text-green-700"
+          >
+            {isFetchingRealRates ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Globe className="w-4 h-4 mr-2" />
+            )}
+            {isFetchingRealRates ? 'Đang lấy...' : 'Tỷ giá thực'}
+          </Button>
           <Button 
             variant="outline" 
             onClick={handleReset}

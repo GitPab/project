@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { Settings, Bell, Moon, Globe, Clock, Save, Shield, Smartphone, X, Loader2, Copy, CheckCircle } from 'lucide-react';
+import { toast } from 'sonner';
+import api from '../services/api';
+import { Settings, Bell, Moon, Globe, Clock, Save, Shield, Smartphone, X, Loader2, Copy, CheckCircle, Trash2, AlertTriangle } from 'lucide-react';
 import { UserPreferences } from '../../types';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -25,6 +27,9 @@ const AdminSettings: React.FC = () => {
   const [verificationCode, setVerificationCode] = useState('');
   const [isSettingUp2FA, setIsSettingUp2FA] = useState(false);
   const [copiedBackupCode, setCopiedBackupCode] = useState<string | null>(null);
+  const [clearDataModal, setClearDataModal] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
+  const [clearDataConfirmText, setClearDataConfirmText] = useState('');
 
   useEffect(() => {
     if (userPreferences) {
@@ -90,6 +95,24 @@ const AdminSettings: React.FC = () => {
     }
   };
 
+  const handleClearAllData = async () => {
+    if (clearDataConfirmText !== 'XÓA TẤT CẢ') return;
+    
+    setIsClearing(true);
+    try {
+      // Call API to clear all data
+      await api.delete('/admin/clear-all-data');
+      toast.success('Đã xóa tất cả dữ liệu thành công');
+      setClearDataModal(false);
+      setClearDataConfirmText('');
+      // Reload page after clear
+      window.location.reload();
+    } catch (error) {
+      toast.error('Không thể xóa dữ liệu');
+    } finally {
+      setIsClearing(false);
+    }
+  };
   const copyBackupCode = (code: string) => {
     navigator.clipboard.writeText(code);
     setCopiedBackupCode(code);
@@ -286,6 +309,29 @@ const AdminSettings: React.FC = () => {
           </div>
         </div>
 
+        {/* Data Management */}
+        <div className="bg-white rounded-lg shadow p-6 border border-red-200">
+          <div className="flex items-center gap-2 mb-4">
+            <Trash2 className="w-5 h-5 text-red-600" />
+            <h2 className="text-lg font-semibold text-red-700">Quản lý dữ liệu</h2>
+          </div>
+          <div className="flex items-center justify-between p-4 border border-red-100 rounded bg-red-50">
+            <div>
+              <p className="font-medium text-red-700">Xóa tất cả dữ liệu</p>
+              <p className="text-sm text-red-500">
+                Xóa toàn bộ dữ liệu hệ thống. Hành động này không thể hoàn tác!
+              </p>
+            </div>
+            <button
+              onClick={() => setClearDataModal(true)}
+              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 flex items-center gap-2"
+            >
+              <Trash2 className="w-4 h-4" />
+              Xóa tất cả
+            </button>
+          </div>
+        </div>
+
         {/* Save Button */}
         <div className="flex justify-end">
           <button
@@ -457,6 +503,77 @@ const AdminSettings: React.FC = () => {
                   </button>
                 </>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Clear All Data Modal */}
+      {clearDataModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+            <div className="flex items-center gap-3 p-4 border-b">
+              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Xác nhận xóa tất cả dữ liệu</h3>
+                <p className="text-sm text-gray-500">Hành động này không thể hoàn tác</p>
+              </div>
+            </div>
+            
+            <div className="p-6">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                <p className="text-sm text-red-700">
+                  <strong>Cảnh báo:</strong> Việc này sẽ xóa toàn bộ dữ liệu hệ thống bao gồm:
+                </p>
+                <ul className="text-sm text-red-600 mt-2 list-disc list-inside">
+                  <li>Tất cả người dùng và học sinh</li>
+                  <li>Thông tin trường đại học</li>
+                  <li>Đơn đăng ký và thanh toán</li>
+                  <li>Lịch sử hoạt động</li>
+                </ul>
+              </div>
+              
+              <p className="text-sm text-gray-600 mb-2">
+                Nhập <strong>"XÓA TẤT CẢ"</strong> để xác nhận:
+              </p>
+              <input
+                type="text"
+                value={clearDataConfirmText}
+                onChange={(e) => setClearDataConfirmText(e.target.value)}
+                placeholder="XÓA TẤT CẢ"
+                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
+              />
+            </div>
+
+            <div className="flex gap-3 justify-end p-4 border-t">
+              <button
+                onClick={() => {
+                  setClearDataModal(false);
+                  setClearDataConfirmText('');
+                }}
+                disabled={isClearing}
+                className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleClearAllData}
+                disabled={isClearing || clearDataConfirmText !== 'XÓA TẤT CẢ'}
+                className="px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {isClearing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Đang xóa...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    Xác nhận xóa
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>

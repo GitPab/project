@@ -1,23 +1,32 @@
 # SACMA - Student Abroad Cost Management Application
 
-**Version:** 1.0.0
-**Status:** 🟢 Production Ready
-**Last Updated:** March 12, 2026
+**Version:** 2.0.0  
+**Status:** 🟢 Production Ready  
+**Last Updated:** April 2, 2026
 
 ---
 
 ## 📱 Overview
 
-SACMA is a comprehensive cost management platform for Vietnamese students studying abroad. It provides student onboarding, cost tracking, admin dashboards, and multilingual support (Vietnamese, Korean, English).
+SACMA is a comprehensive cost management platform for Vietnamese students studying abroad in Korea. It provides student onboarding, cost tracking, admin dashboards, real-time notifications, payment management, and multilingual support (Vietnamese, Korean, English).
 
-### Key Features
+### ✨ Key Features
+
 - ✅ **Student Tracking System** - Unique tracking codes for each student
 - ✅ **VND-Based Pricing** - All costs stored in Vietnamese Dong
 - ✅ **Admin Dashboard** - Monitor registrations and track student progress
 - ✅ **Cost Calculator** - Flexible currency inputs and conversions
 - ✅ **Multilingual UI** - Vietnamese, Korean, English support
 - ✅ **Public Onboarding** - No login required for initial registration
-- ✅ **Real-time Updates** - Supabase integration ready
+- ✅ **Real-time Updates** - SSE (Server-Sent Events) for live data
+- ✅ **Payment Management** - Track payments and invoices
+- ✅ **Document Management** - Upload and review student documents
+- ✅ **Messaging System** - Internal communication between students and admins
+- ✅ **Appointment Scheduling** - Calendar for meetings and consultations
+- ✅ **Scholarship Management** - Apply for and manage scholarships
+- ✅ **Visa Application Tracking** - Track visa application status
+- ✅ **Offline-First** - Works offline with background sync
+- ✅ **RBAC** - Role-based access control (Admin, Student, Staff)
 
 ---
 
@@ -26,6 +35,7 @@ SACMA is a comprehensive cost management platform for Vietnamese students studyi
 ### Prerequisites
 - Node.js 18+ (LTS)
 - npm 9+
+- PostgreSQL 14+ (or Supabase)
 - Git
 
 ### Installation
@@ -37,6 +47,10 @@ cd project
 # Install dependencies
 npm install
 cd server && npm install && cd ..
+
+# Setup environment
+cp .env.example .env.local
+cp server/.env.example server/.env
 
 # Run both frontend and backend together
 npm run dev:full
@@ -59,17 +73,29 @@ VITE_SUPABASE_ANON_KEY=your-anon-key
 VITE_API_URL=http://localhost:3001/api
 ```
 
-### Backend Environment (server/.env)
+#### Backend (server/.env)
 ```env
-# Multiple frontend origins (comma-separated) for CORS support
-FRONTEND_URL=http://localhost:5173
-
-# OR multiple origins (comma-separated)
-FRONTEND_URLS=http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173
-
-# Database
-DATABASE_URL=postgresql://postgres:password@localhost:5432/sacma
+# Server Configuration
 PORT=3001
+FRONTEND_URL=http://localhost:5173
+NODE_ENV=development
+
+# Database (PostgreSQL)
+DATABASE_URL=postgresql://postgres:password@localhost:5432/sacma
+DB_TYPE=postgresql
+
+# JWT
+JWT_SECRET=your-secret-key-change-in-production
+
+# Optional: Redis for caching
+REDIS_URL=redis://localhost:6379
+
+# Optional: Email (SendGrid/SMTP)
+SENDGRID_API_KEY=your-sendgrid-key
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-email@gmail.com
+SMTP_PASS=your-app-password
 ```
 
 ### Development Workflow

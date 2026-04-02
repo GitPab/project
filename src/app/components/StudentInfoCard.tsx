@@ -1,29 +1,93 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, MapPin, GraduationCap, Calendar, Award, Phone, Mail } from 'lucide-react';
 
 interface StudentInfoCardProps {
-  name: string;
-  university: string;
-  program: string;
-  startDate: string;
-  status: string;
-  phone: string;
-  email: string;
+  name?: string;
+  university?: string;
+  program?: string;
+  startDate?: string;
+  status?: string;
+  phone?: string;
+  email?: string;
   avatar?: string;
   className?: string;
 }
 
+interface StudentProfile {
+  fullName: string;
+  phone: string;
+  email?: string;
+  university?: string;
+  program?: string;
+  startDate?: string;
+  status?: string;
+}
+
 export default function StudentInfoCard({
-  name,
-  university,
-  program,
-  startDate,
-  status,
-  phone,
-  email,
+  name: propName,
+  university: propUniversity,
+  program: propProgram,
+  startDate: propStartDate,
+  status: propStatus,
+  phone: propPhone,
+  email: propEmail,
   avatar,
   className = ''
 }: StudentInfoCardProps) {
+  const [profile, setProfile] = useState<StudentProfile | null>(null);
+
+  // Load from localStorage/sessionStorage if props not provided
+  useEffect(() => {
+    if (!propName || !propPhone) {
+      // Try sessionStorage first (from QuickSearchForm)
+      const sessionData = sessionStorage.getItem('quickSearch');
+      if (sessionData) {
+        try {
+          const parsed = JSON.parse(sessionData);
+          setProfile({
+            fullName: parsed.fullName || '',
+            phone: parsed.phone || '',
+            email: parsed.email || '',
+            university: parsed.university || 'Chưa chọn trường',
+            program: parsed.visaSystem || 'Chưa chọn chương trình',
+            startDate: parsed.startDate || new Date().toLocaleDateString('vi-VN'),
+            status: 'pending'
+          });
+          return;
+        } catch (e) {
+          console.error('Failed to parse sessionStorage:', e);
+        }
+      }
+
+      // Try localStorage (from registered student profile)
+      const localData = localStorage.getItem('studentProfile');
+      if (localData) {
+        try {
+          const parsed = JSON.parse(localData);
+          setProfile({
+            fullName: parsed.fullName || parsed.name || '',
+            phone: parsed.phone || '',
+            email: parsed.email || '',
+            university: parsed.university || 'Chưa chọn trường',
+            program: parsed.program || parsed.visaSystem || 'Chưa chọn chương trình',
+            startDate: parsed.startDate || new Date().toLocaleDateString('vi-VN'),
+            status: parsed.status || 'pending'
+          });
+        } catch (e) {
+          console.error('Failed to parse localStorage:', e);
+        }
+      }
+    }
+  }, [propName, propPhone]);
+
+  // Use props if provided, otherwise use loaded profile
+  const name = propName || profile?.fullName || 'Chưa có thông tin';
+  const university = propUniversity || profile?.university || 'Chưa chọn trường';
+  const program = propProgram || profile?.program || 'Chưa chọn chương trình';
+  const startDate = propStartDate || profile?.startDate || new Date().toLocaleDateString('vi-VN');
+  const status = propStatus || profile?.status || 'pending';
+  const phone = propPhone || profile?.phone || 'Chưa có SĐT';
+  const email = propEmail || profile?.email || 'Chưa có email';
   const statusColors = {
     'active': 'bg-green-100 text-green-800',
     'pending': 'bg-yellow-100 text-yellow-800',

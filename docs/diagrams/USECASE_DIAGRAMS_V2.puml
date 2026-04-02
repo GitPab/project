@@ -1,0 +1,627 @@
+@startuml UseCase_v2_SystemOverview
+title SACMA v2.0 - Use Case Diagram - System Overview
+
+left to right direction
+
+actor "Super Admin" as SuperAdmin
+actor "Admin" as Admin
+actor "Admin Manager" as AdminManager
+actor "Content Editor" as ContentEditor
+actor "Finance Admin" as FinanceAdmin
+actor "Viewer" as Viewer
+actor "Student" as Student
+
+rectangle "SACMA System v2.0" {
+    
+    package "User Management" {
+        usecase "Login" as UC1
+        usecase "Logout" as UC2
+        usecase "Invite Admin" as UC3
+        usecase "Manage Roles" as UC4
+        usecase "View Profile" as UC5
+        usecase "Edit Profile" as UC6
+        usecase "Change Password" as UC7
+    }
+    
+    package "University Management" {
+        usecase "View Universities" as UC8
+        usecase "Add University" as UC9
+        usecase "Edit University" as UC10
+        usecase "Delete University" as UC11
+        usecase "Import CSV" as UC12
+        usecase "Export Data" as UC13
+    }
+    
+    package "Student Management" {
+        usecase "View Students" as UC14
+        usecase "Add Student" as UC15
+        usecase "Edit Student" as UC16
+        usecase "Delete Student" as UC17
+        usecase "Track Progress" as UC18
+    }
+    
+    package "Registration Management" {
+        usecase "Submit Registration" as UC19
+        usecase "View Registrations" as UC20
+        usecase "Approve Registration" as UC21
+        usecase "Reject Registration" as UC22
+    }
+    
+    package "Payment Management (v2.0)" {
+        usecase "View Payments" as UC23
+        usecase "Create Payment" as UC24
+        usecase "Process Payment" as UC25
+        usecase "View Payment History" as UC26
+        usecase "Generate Payment Report" as UC27
+    }
+    
+    package "Notification System (v2.0)" {
+        usecase "View Notifications" as UC28
+        usecase "Mark as Read" as UC29
+        usecase "Send Notification" as UC30
+        usecase "Broadcast Notification" as UC31
+        usecase "Configure Notifications" as UC32
+    }
+    
+    package "Document Management (v2.0)" {
+        usecase "Upload Document" as UC33
+        usecase "View Documents" as UC34
+        usecase "Review Document" as UC35
+        usecase "Approve Document" as UC36
+        usecase "Reject Document" as UC37
+    }
+    
+    package "Messaging System (v2.0)" {
+        usecase "Send Message" as UC38
+        usecase "View Inbox" as UC39
+        usecase "View Sent Messages" as UC40
+        usecase "Reply to Message" as UC41
+    }
+    
+    package "Appointment System (v2.0)" {
+        usecase "Schedule Appointment" as UC42
+        usecase "View Appointments" as UC43
+        usecase "Cancel Appointment" as UC44
+        usecase "Confirm Appointment" as UC45
+    }
+    
+    package "Scholarship System (v2.0)" {
+        usecase "View Scholarships" as UC46
+        usecase "Apply for Scholarship" as UC47
+        usecase "Review Applications" as UC48
+        usecase "Approve Scholarship" as UC49
+        usecase "Reject Scholarship" as UC50
+    }
+    
+    package "Visa Management (v2.0)" {
+        usecase "Submit Visa Application" as UC51
+        usecase "View Visa Status" as UC52
+        usecase "Update Visa Status" as UC53
+        usecase "Track Visa Progress" as UC54
+    }
+    
+    package "User Preferences (v2.0)" {
+        usecase "Set Language" as UC55
+        usecase "Set Theme" as UC56
+        usecase "Set Currency" as UC57
+        usecase "Configure Privacy" as UC58
+    }
+    
+    package "Analytics & Reports" {
+        usecase "View Dashboard" as UC59
+        usecase "View Analytics" as UC60
+        usecase "Generate Reports" as UC61
+    }
+    
+    package "System Administration" {
+        usecase "Manage Settings" as UC62
+        usecase "View Audit Logs" as UC63
+        usecase "Database Management" as UC64
+    }
+}
+
+' Super Admin - all permissions
+SuperAdmin --> UC1
+SuperAdmin --> UC2
+SuperAdmin --> UC3
+SuperAdmin --> UC4
+SuperAdmin --> UC5
+SuperAdmin --> UC6
+SuperAdmin --> UC7
+SuperAdmin --> UC8
+SuperAdmin --> UC9
+SuperAdmin --> UC10
+SuperAdmin --> UC11
+SuperAdmin --> UC12
+SuperAdmin --> UC13
+SuperAdmin --> UC14
+SuperAdmin --> UC15
+SuperAdmin --> UC16
+SuperAdmin --> UC17
+SuperAdmin --> UC18
+SuperAdmin --> UC19
+SuperAdmin --> UC20
+SuperAdmin --> UC21
+SuperAdmin --> UC22
+SuperAdmin --> UC23
+SuperAdmin --> UC24
+SuperAdmin --> UC25
+SuperAdmin --> UC26
+SuperAdmin --> UC27
+SuperAdmin --> UC28
+SuperAdmin --> UC29
+SuperAdmin --> UC30
+SuperAdmin --> UC31
+SuperAdmin --> UC32
+SuperAdmin --> UC33
+SuperAdmin --> UC34
+SuperAdmin --> UC35
+SuperAdmin --> UC36
+SuperAdmin --> UC37
+SuperAdmin --> UC38
+SuperAdmin --> UC39
+SuperAdmin --> UC40
+SuperAdmin --> UC41
+SuperAdmin --> UC42
+SuperAdmin --> UC43
+SuperAdmin --> UC44
+SuperAdmin --> UC45
+SuperAdmin --> UC46
+SuperAdmin --> UC47
+SuperAdmin --> UC48
+SuperAdmin --> UC49
+SuperAdmin --> UC50
+SuperAdmin --> UC51
+SuperAdmin --> UC52
+SuperAdmin --> UC53
+SuperAdmin --> UC54
+SuperAdmin --> UC55
+SuperAdmin --> UC56
+SuperAdmin --> UC57
+SuperAdmin --> UC58
+SuperAdmin --> UC59
+SuperAdmin --> UC60
+SuperAdmin --> UC61
+SuperAdmin --> UC62
+SuperAdmin --> UC63
+SuperAdmin --> UC64
+
+' Admin
+Admin --> UC1
+Admin --> UC2
+Admin --> UC5
+Admin --> UC6
+Admin --> UC7
+Admin --> UC8
+Admin --> UC9
+Admin --> UC10
+Admin --> UC11
+Admin --> UC12
+Admin --> UC13
+Admin --> UC14
+Admin --> UC15
+Admin --> UC16
+Admin --> UC17
+Admin --> UC18
+Admin --> UC19
+Admin --> UC20
+Admin --> UC21
+Admin --> UC22
+Admin --> UC23
+Admin --> UC24
+Admin --> UC25
+Admin --> UC26
+Admin --> UC27
+Admin --> UC28
+Admin --> UC29
+Admin --> UC30
+Admin --> UC31
+Admin --> UC32
+Admin --> UC33
+Admin --> UC34
+Admin --> UC35
+Admin --> UC36
+Admin --> UC37
+Admin --> UC38
+Admin --> UC39
+Admin --> UC40
+Admin --> UC41
+Admin --> UC42
+Admin --> UC43
+Admin --> UC44
+Admin --> UC45
+Admin --> UC46
+Admin --> UC47
+Admin --> UC48
+Admin --> UC49
+Admin --> UC50
+Admin --> UC51
+Admin --> UC52
+Admin --> UC53
+Admin --> UC54
+Admin --> UC55
+Admin --> UC56
+Admin --> UC57
+Admin --> UC58
+Admin --> UC59
+Admin --> UC60
+Admin --> UC61
+Admin --> UC62
+Admin --> UC63
+Admin --> UC64
+
+' Admin Manager
+AdminManager --> UC1
+AdminManager --> UC2
+AdminManager --> UC5
+AdminManager --> UC6
+AdminManager --> UC8
+AdminManager --> UC14
+AdminManager --> UC15
+AdminManager --> UC16
+AdminManager --> UC18
+AdminManager --> UC20
+AdminManager --> UC21
+AdminManager --> UC22
+AdminManager --> UC23
+AdminManager --> UC26
+AdminManager --> UC28
+AdminManager --> UC29
+AdminManager --> UC30
+AdminManager --> UC33
+AdminManager --> UC34
+AdminManager --> UC35
+AdminManager --> UC38
+AdminManager --> UC39
+AdminManager --> UC40
+AdminManager --> UC41
+AdminManager --> UC42
+AdminManager --> UC43
+AdminManager --> UC44
+AdminManager --> UC45
+AdminManager --> UC46
+AdminManager --> UC47
+AdminManager --> UC48
+AdminManager --> UC49
+AdminManager --> UC50
+AdminManager --> UC51
+AdminManager --> UC52
+AdminManager --> UC53
+AdminManager --> UC54
+AdminManager --> UC59
+AdminManager --> UC60
+AdminManager --> UC61
+
+' Content Editor
+ContentEditor --> UC1
+ContentEditor --> UC2
+ContentEditor --> UC5
+ContentEditor --> UC8
+ContentEditor --> UC9
+ContentEditor --> UC10
+ContentEditor --> UC12
+ContentEditor --> UC14
+ContentEditor --> UC18
+ContentEditor --> UC20
+ContentEditor --> UC28
+ContentEditor --> UC29
+ContentEditor --> UC33
+ContentEditor --> UC34
+ContentEditor --> UC38
+ContentEditor --> UC39
+ContentEditor --> UC40
+ContentEditor --> UC41
+ContentEditor --> UC46
+ContentEditor --> UC47
+ContentEditor --> UC59
+
+' Finance Admin
+FinanceAdmin --> UC1
+FinanceAdmin --> UC2
+FinanceAdmin --> UC5
+FinanceAdmin --> UC8
+FinanceAdmin --> UC14
+FinanceAdmin --> UC20
+FinanceAdmin --> UC23
+FinanceAdmin --> UC24
+FinanceAdmin --> UC25
+FinanceAdmin --> UC26
+FinanceAdmin --> UC27
+FinanceAdmin --> UC28
+FinanceAdmin --> UC29
+FinanceAdmin --> UC46
+FinanceAdmin --> UC47
+FinanceAdmin --> UC48
+FinanceAdmin --> UC49
+FinanceAdmin --> UC50
+FinanceAdmin --> UC59
+FinanceAdmin --> UC60
+
+' Viewer
+Viewer --> UC1
+Viewer --> UC2
+Viewer --> UC5
+Viewer --> UC8
+Viewer --> UC14
+Viewer --> UC20
+Viewer --> UC23
+Viewer --> UC26
+Viewer --> UC28
+Viewer --> UC29
+Viewer --> UC34
+Viewer --> UC39
+Viewer --> UC43
+Viewer --> UC46
+Viewer --> UC52
+Viewer --> UC59
+
+' Student
+Student --> UC1
+Student --> UC2
+Student --> UC5
+Student --> UC6
+Student --> UC7
+Student --> UC8
+Student --> UC14
+Student --> UC19
+Student --> UC26
+Student --> UC28
+Student --> UC29
+Student --> UC32
+Student --> UC33
+Student --> UC34
+Student --> UC38
+Student --> UC39
+Student --> UC40
+Student --> UC41
+Student --> UC42
+Student --> UC43
+Student --> UC44
+Student --> UC46
+Student --> UC47
+Student --> UC51
+Student --> UC52
+Student --> UC54
+Student --> UC55
+Student --> UC56
+Student --> UC57
+Student --> UC58
+
+@enduml
+
+@startuml UseCase_PaymentManagement
+title Payment Management - Use Case Diagram
+
+left to right direction
+
+actor "Student" as Student
+actor "Finance Admin" as Finance
+actor "Admin" as Admin
+
+rectangle "Payment Management Module" {
+    
+    usecase "View Payment History" as UC1
+    usecase "View Payment Details" as UC2
+    usecase "Make Payment" as UC3
+    usecase "Download Receipt" as UC4
+    
+    usecase "Create Payment Request" as UC5
+    usecase "Edit Payment" as UC6
+    usecase "Cancel Payment" as UC7
+    usecase "Process Refund" as UC8
+    usecase "View Payment Summary" as UC9
+    usecase "Generate Payment Report" as UC10
+    usecase "Send Payment Reminder" as UC11
+    
+    usecase "View All Payments" as UC12
+    usecase "Filter Payments" as UC13
+    usecase "Export Payment Data" as UC14
+}
+
+Student --> UC1
+Student --> UC2
+Student --> UC3
+Student --> UC4
+
+Finance --> UC1
+Finance --> UC2
+Finance --> UC5
+Finance --> UC6
+Finance --> UC7
+Finance --> UC8
+Finance --> UC9
+Finance --> UC10
+Finance --> UC11
+Finance --> UC12
+Finance --> UC13
+Finance --> UC14
+
+Admin --> UC1
+Admin --> UC2
+Admin --> UC5
+Admin --> UC6
+Admin --> UC7
+Admin --> UC9
+Admin --> UC10
+Admin --> UC12
+Admin --> UC13
+Admin --> UC14
+
+@enduml
+
+@startuml UseCase_DocumentManagement
+title Document Management - Use Case Diagram
+
+left to right direction
+
+actor "Student" as Student
+actor "Admin" as Admin
+
+rectangle "Document Management Module" {
+    
+    usecase "Upload Document" as UC1
+    usecase "View My Documents" as UC2
+    usecase "Delete Document" as UC3
+    usecase "Download Document" as UC4
+    
+    usecase "View All Documents" as UC5
+    usecase "Review Document" as UC6
+    usecase "Approve Document" as UC7
+    usecase "Reject Document" as UC8
+    usecase "Request Revision" as UC9
+    usecase "Filter by Status" as UC10
+    usecase "Filter by Type" as UC11
+}
+
+Student --> UC1
+Student --> UC2
+Student --> UC3
+Student --> UC4
+
+Admin --> UC5
+Admin --> UC6
+Admin --> UC7
+Admin --> UC8
+Admin --> UC9
+Admin --> UC10
+Admin --> UC11
+
+@enduml
+
+@startuml UseCase_MessagingSystem
+title Messaging System - Use Case Diagram
+
+left to right direction
+
+actor "Student" as Student
+actor "Admin" as Admin
+
+rectangle "Messaging System Module" {
+    
+    usecase "Send Message" as UC1
+    usecase "View Inbox" as UC2
+    usecase "View Sent Messages" as UC3
+    usecase "Read Message" as UC4
+    usecase "Reply to Message" as UC5
+    usecase "Delete Message" as UC6
+    usecase "Mark as Read" as UC7
+    usecase "Search Messages" as UC8
+    usecase "Filter by Date" as UC9
+}
+
+Student --> UC1
+Student --> UC2
+Student --> UC3
+Student --> UC4
+Student --> UC5
+Student --> UC6
+Student --> UC7
+Student --> UC8
+Student --> UC9
+
+Admin --> UC1
+Admin --> UC2
+Admin --> UC3
+Admin --> UC4
+Admin --> UC5
+Admin --> UC6
+Admin --> UC7
+Admin --> UC8
+Admin --> UC9
+
+@enduml
+
+@startuml UseCase_AppointmentSystem
+title Appointment System - Use Case Diagram
+
+left to right direction
+
+actor "Student" as Student
+actor "Admin" as Admin
+
+rectangle "Appointment System Module" {
+    
+    usecase "Schedule Appointment" as UC1
+    usecase "View Available Slots" as UC2
+    usecase "View My Appointments" as UC3
+    usecase "Cancel Appointment" as UC4
+    usecase "Reschedule Appointment" as UC5
+    
+    usecase "Manage Schedule" as UC6
+    usecase "View All Appointments" as UC7
+    usecase "Confirm Appointment" as UC8
+    usecase "Mark as Completed" as UC9
+    usecase "Mark as No-Show" as UC10
+    usecase "Block Time Slot" as UC11
+}
+
+Student --> UC1
+Student --> UC2
+Student --> UC3
+Student --> UC4
+Student --> UC5
+
+Admin --> UC1
+Admin --> UC3
+Admin --> UC6
+Admin --> UC7
+Admin --> UC8
+Admin --> UC9
+Admin --> UC10
+Admin --> UC11
+
+@enduml
+
+@startuml UseCase_ScholarshipSystem
+title Scholarship System - Use Case Diagram
+
+left to right direction
+
+actor "Student" as Student
+actor "Admin" as Admin
+actor "Finance Admin" as Finance
+
+rectangle "Scholarship System Module" {
+    
+    usecase "View Scholarships" as UC1
+    usecase "View Scholarship Details" as UC2
+    usecase "Apply for Scholarship" as UC3
+    usecase "View My Applications" as UC4
+    usecase "Upload Documents" as UC5
+    usecase "Withdraw Application" as UC6
+    
+    usecase "Create Scholarship" as UC7
+    usecase "Edit Scholarship" as UC8
+    usecase "Delete Scholarship" as UC9
+    usecase "View Applications" as UC10
+    usecase "Review Application" as UC11
+    usecase "Approve Application" as UC12
+    usecase "Reject Application" as UC13
+    usecase "Request More Info" as UC14
+}
+
+Student --> UC1
+Student --> UC2
+Student --> UC3
+Student --> UC4
+Student --> UC5
+Student --> UC6
+
+Admin --> UC1
+Admin --> UC2
+Admin --> UC7
+Admin --> UC8
+Admin --> UC9
+Admin --> UC10
+Admin --> UC11
+Admin --> UC12
+Admin --> UC13
+Admin --> UC14
+
+Finance --> UC1
+Finance --> UC10
+Finance --> UC11
+Finance --> UC12
+Finance --> UC13
+
+@enduml

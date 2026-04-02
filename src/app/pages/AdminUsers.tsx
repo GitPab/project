@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { usePermission, PermissionGuard } from '../components/PermissionGuard';
 import { toast } from 'sonner';
-import { Search, UserX, UserCheck, RefreshCw, Clock, Users, Filter } from 'lucide-react';
+import { Search, UserX, UserCheck, RefreshCw, Clock, Users, Filter, Trash2, AlertTriangle } from 'lucide-react';
 import api from '../services/api';
 
 interface User {
@@ -23,6 +23,11 @@ export default function AdminUsers() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
   const [togglingUser, setTogglingUser] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; user: User | null }>({
+    isOpen: false,
+    user: null
+  });
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const canManageUsers = hasPermission('USER_MANAGE');
 
@@ -65,6 +70,26 @@ export default function AdminUsers() {
       toast.error('Thao tác thất bại');
     } finally {
       setTogglingUser(null);
+    }
+  };
+
+  const openDeleteModal = (user: User) => {
+    setDeleteConfirm({ isOpen: true, user });
+  };
+
+  const handleDeleteUser = async () => {
+    if (!deleteConfirm.user || !canManageUsers) return;
+    
+    setIsDeleting(true);
+    try {
+      await api.delete(`/students/${deleteConfirm.user.id}`);
+      setUsers(prev => prev.filter(u => u.id !== deleteConfirm.user!.id));
+      toast.success('Đã xóa người dùng thành công');
+      setDeleteConfirm({ isOpen: false, user: null });
+    } catch (error) {
+      toast.error('Không thể xóa người dùng');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -248,31 +273,42 @@ export default function AdminUsers() {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <PermissionGuard permission="USER_MANAGE">
-                      <button
-                        onClick={() => toggleUserStatus(user.id)}
-                        disabled={togglingUser === user.id}
-                        className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-                          user.is_active 
-                            ? 'bg-red-100 text-red-700 hover:bg-red-200' 
-                            : 'bg-green-100 text-green-700 hover:bg-green-200'
-                        } disabled:opacity-50 disabled:cursor-not-allowed`}
-                      >
-                        {togglingUser === user.id ? (
-                          <RefreshCw size={14} className="animate-spin" />
-                        ) : user.is_active ? (
-                          <>
-                            <UserX size={14} className="inline mr-1" />
-                            Vô hiệu hóa
-                          </>
-                        ) : (
-                          <>
-                            <UserCheck size={14} className="inline mr-1" />
-                            Kích hoạt
-                          </>
-                        )}
-                      </button>
-                    </PermissionGuard>
+                    <div className="flex items-center justify-end gap-2">
+                      <PermissionGuard permission="USER_MANAGE">
+                        <button
+                          onClick={() => toggleUserStatus(user.id)}
+                          disabled={togglingUser === user.id}
+                          className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                            user.is_active 
+                              ? 'bg-red-100 text-red-700 hover:bg-red-200' 
+                              : 'bg-green-100 text-green-700 hover:bg-green-200'
+                          } disabled:opacity-50 disabled:cursor-not-allowed`}
+                        >
+                          {togglingUser === user.id ? (
+                            <RefreshCw size={14} className="animate-spin" />
+                          ) : user.is_active ? (
+                            <>
+                              <UserX size={14} className="inline mr-1" />
+                              Vô hiệu hóa
+                            </>
+                          ) : (
+                            <>
+                              <UserCheck size={14} className="inline mr-1" />
+                              Kích hoạt
+                            </>
+                          )}
+                        </button>
+                      </PermissionGuard>
+                      <PermissionGuard permission="USER_MANAGE">
+                        <button
+                          onClick={() => openDeleteModal(user)}
+                          className="px-3 py-1 rounded-lg text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+                          title="Xóa người dùng"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </PermissionGuard>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -281,10 +317,55 @@ export default function AdminUsers() {
         </table>
       </div>
 
-      {/* Summary */}
-      <div className="mt-4 text-sm text-gray-500">
-        Hiển thị {filteredUsers.length} / {users.length} người dùng
-      </div>
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm.isOpen && deleteConfirm.user && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                <AlertTriangle className="w-6 h-6 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Xác nhận xóa</h3>
+                <p className="text-sm text-gray-500">Hành động này không thể hoàn tác</p>
+              </div>
+            </div>
+            
+            <div className="bg-gray-50 rounded-lg p-4 mb-6">
+              <p className="text-sm text-gray-600 mb-2">Bạn sắp xóa người dùng:</p>
+              <p className="font-medium text-gray-900">{deleteConfirm.user.name}</p>
+              <p className="text-sm text-gray-500">{deleteConfirm.user.email}</p>
+            </div>
+
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setDeleteConfirm({ isOpen: false, user: null })}
+                disabled={isDeleting}
+                className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleDeleteUser}
+                disabled={isDeleting}
+                className="px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {isDeleting ? (
+                  <>
+                    <RefreshCw size={16} className="animate-spin" />
+                    Đang xóa...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={16} />
+                    Xóa người dùng
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

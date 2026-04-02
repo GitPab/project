@@ -18,9 +18,11 @@ import { initializeMySQLDatabase } from './mysqlAdapter.js';
 
 // Middleware & Utilities
 import { logger, requestLogger } from './logger.js';
-import { connectRedis, disconnectRedis } from './cache.js';
-import { ConnectionPoolMonitor } from './poolMonitor.js';
-import { setupSwagger } from './swagger.js';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Route Modules
 import authRoutes from './routes/auth.js';
@@ -32,12 +34,27 @@ import uploadRoutes from './routes/uploads.js';
 import healthRoutes from './routes/health.js';
 import featureRoutes from './routes/features.js';
 import adminInviteRoutes from './routes/adminInvite.js';
+import mediaRoutes from './routes/media.js';
+import exchangeRatesRoutes from './routes/exchangeRates.js';
+import publicRoutes from './routes/public.js';
 
-// CommonJS routes (loaded via createRequire)
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const mediaRoutes = require('./routes/media.js');
-const exchangeRatesRoutes = require('./routes/exchangeRates.js');
+// Core Features
+import paymentsRoutes from './routes/payments.js';
+import studentProfilesRoutes from './routes/studentProfiles.js';
+import notificationsRoutes from './routes/notifications.js';
+
+// Additional Features
+import documentsRoutes from './routes/documents.js';
+import programsRoutes from './routes/programs.js';
+import messagesRoutes from './routes/messages.js';
+import appointmentsRoutes from './routes/appointments.js';
+import scholarshipsRoutes from './routes/scholarships.js';
+import visaApplicationsRoutes from './routes/visaApplications.js';
+import userPreferencesRoutes from './routes/userPreferences.js';
+
+// Core Services
+import { connectRedis, disconnectRedis } from './cache.js';
+import { broadcastEvent } from './sseManager.js';
 
 // Load environment variables
 dotenv.config();
@@ -176,6 +193,20 @@ app.use('/api/public', publicRoutes);
 app.use('/api/media', mediaRoutes);
 app.use('/api/exchange-rates', exchangeRatesRoutes);
 
+// Core Features
+app.use('/api/payments', paymentsRoutes);
+app.use('/api/student-profiles', studentProfilesRoutes);
+app.use('/api/notifications', notificationsRoutes);
+
+// Additional Features
+app.use('/api/documents', documentsRoutes);
+app.use('/api/programs', programsRoutes);
+app.use('/api/messages', messagesRoutes);
+app.use('/api/appointments', appointmentsRoutes);
+app.use('/api/scholarships', scholarshipsRoutes);
+app.use('/api/visa-applications', visaApplicationsRoutes);
+app.use('/api/user-preferences', userPreferencesRoutes);
+
 // TEMP: Reset admin password endpoint
 app.post('/api/reset-admin', async (req, res) => {
   try {
@@ -201,49 +232,88 @@ const clients = new Map();
 app.options('/api/sse/registrations', cors(corsOptions));
 
 app.get('/api/sse/registrations', async (req, res) => {
-  // EventSource doesn't support custom headers, read token from query string
-  const token = req.query.token || req.headers.authorization?.split(' ')[1];
-  if (!token) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  // Verify token
-  let user;
   try {
-    user = jwt.verify(token, process.env.JWT_SECRET);
+    // EventSource doesn't support custom headers, read token from query string
+    const token = req.query.token || req.headers.authorization?.split(' ')[1];
+    if (!token) {
+      console.log('[SSE] No token provided');
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Verify token
+    let user;
+    try {
+      user = jwt.verify(token, process.env.JWT_SECRET);
+      console.log(`[SSE] User authenticated: ${user.email}`);
+    } catch (err) {
+      console.log('[SSE] Invalid token:', err.message);
+      return res.status(403).json({ error: 'Invalid token' });
+    }
+
+    // IMPORTANT: Set CORS headers for SSE BEFORE any response
+    const origin = req.headers.origin;
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
+    
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+
+    const clientId = Date.now();
+    clients.set(clientId, res);
+    console.log(`[SSE] Client ${clientId} connected. Total clients: ${clients.size}`);
+
+    // Send initial connection message
+    res.write(`data: ${JSON.stringify({ type: 'connected', clientId })}\n\n`);
+
+    // Send current registration count
+    try {
+      const pool = await getPool();
+      const { rows } = await pool.query('SELECT COUNT(*) as count FROM registrations');
+      res.write(`data: ${JSON.stringify({ type: 'stats', registrations: parseInt(rows[0].count) })}\n\n`);
+    } catch (err) {
+      console.error('[SSE] Stats error:', err.message);
+      // Don't close connection on stats error, just skip it
+    }
+
+    // Heartbeat to keep connection alive
+    const heartbeat = setInterval(() => {
+      try {
+        res.write(`:heartbeat\n\n`);
+      } catch (err) {
+        console.error(`[SSE] Heartbeat error for client ${clientId}:`, err.message);
+        clearInterval(heartbeat);
+        clients.delete(clientId);
+      }
+    }, 30000);
+
+    // Handle client disconnect
+    req.on('close', () => {
+      clearInterval(heartbeat);
+      clients.delete(clientId);
+      console.log(`[SSE] Client ${clientId} disconnected. Total clients: ${clients.size}`);
+    });
+
+    // Handle errors
+    req.on('error', (err) => {
+      console.error(`[SSE] Request error for client ${clientId}:`, err.message);
+      clearInterval(heartbeat);
+      clients.delete(clientId);
+    });
+
+    res.on('error', (err) => {
+      console.error(`[SSE] Response error for client ${clientId}:`, err.message);
+      clearInterval(heartbeat);
+      clients.delete(clientId);
+    });
+
   } catch (err) {
-    return res.status(403).json({ error: 'Invalid token' });
+    console.error('[SSE] Unexpected error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
   }
-
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-
-  const clientId = Date.now();
-  clients.set(clientId, res);
-
-  // Send initial connection message
-  res.write(`data: ${JSON.stringify({ type: 'connected', clientId })}\n\n`);
-
-  // Send current registration count
-  try {
-    const pool = await getPool();
-    const { rows } = await pool.query('SELECT COUNT(*) as count FROM registrations');
-    res.write(`data: ${JSON.stringify({ type: 'stats', registrations: parseInt(rows[0].count) })}\n\n`);
-  } catch (err) {
-    console.error('SSE stats error:', err);
-  }
-
-  // Heartbeat to keep connection alive
-  const heartbeat = setInterval(() => {
-    res.write(`:heartbeat\n\n`);
-  }, 30000);
-
-  req.on('close', () => {
-    clearInterval(heartbeat);
-    clients.delete(clientId);
-    console.log(`SSE client ${clientId} disconnected`);
-  });
 });
 
 // Function to broadcast events to all connected clients

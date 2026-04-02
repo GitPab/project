@@ -15,12 +15,11 @@ export function useRealtimeUpdates() {
   const [stats, setStats] = useState({ registrations: 0 });
   const [lastEvent, setLastEvent] = useState<SSEMessage | null>(null);
   const [retryCount, setRetryCount] = useState(0);
-
-  console.log('🚀 useRealtimeUpdates hook called');
+  const maxRetries = 10; // Max retry limit
+  const isMaxRetriesReached = retryCount >= maxRetries;
 
   useEffect(() => {
     const token = getToken();
-    console.log('🔑 Token from getToken():', token ? 'exists' : 'null');
     if (!token) return;
 
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
@@ -28,21 +27,27 @@ export function useRealtimeUpdates() {
     
     let eventSource: EventSource | null = null;
     let reconnectTimeout: NodeJS.Timeout | null = null;
+    let isManualClose = false;
 
     const connect = () => {
+      // Stop trying if max retries reached
+      if (retryCount >= maxRetries) {
+        console.log(`[SSE] Max retries (${maxRetries}) reached, stopping reconnect attempts`);
+        return;
+      }
+
       if (eventSource) {
         eventSource.close();
       }
 
       // EventSource doesn't support custom headers, pass token via query string
       const sseUrl = `${baseUrl}/api/sse/registrations?token=${encodeURIComponent(token)}`;
-      console.log('🌐 SSE connecting to:', sseUrl);
       eventSource = new EventSource(sseUrl);
 
       eventSource.onopen = () => {
         setIsConnected(true);
         setRetryCount(0);
-        console.log('🔌 SSE Connected');
+        console.log('[SSE] Connection established');
       };
 
       eventSource.onmessage = (event) => {
@@ -52,7 +57,7 @@ export function useRealtimeUpdates() {
 
           switch (data.type) {
             case 'connected':
-              console.log('✅ Real-time connection established:', data.clientId);
+              console.log('[SSE] Connected with clientId:', data.clientId);
               break;
             
             case 'stats':
@@ -76,13 +81,14 @@ export function useRealtimeUpdates() {
               break;
           }
         } catch (err) {
-          console.error('SSE parse error:', err);
+          console.error('[SSE] Parse error:', err);
         }
       };
 
       eventSource.onerror = (error) => {
-        console.error('❌ SSE Error:', error);
-        console.log('🔍 SSE readyState:', eventSource?.readyState); // 0=connecting, 1=open, 2=closed
+        if (isManualClose) return; // Don't reconnect on manual close
+        
+        console.error('[SSE] Connection error:', error);
         setIsConnected(false);
         
         // Close current connection
@@ -91,11 +97,18 @@ export function useRealtimeUpdates() {
           eventSource = null;
         }
         
-        // Auto-reconnect with exponential backoff
+        // Check if max retries reached
+        if (retryCount >= maxRetries) {
+          console.log(`[SSE] Max retries (${maxRetries}) reached, giving up`);
+          toast.error('Realtime connection failed. Please refresh the page.');
+          return;
+        }
+        
+        // Auto-reconnect with exponential backoff (max 30s)
         const delay = Math.min(5000 * Math.pow(2, retryCount), 30000);
+        console.log(`[SSE] Reconnecting in ${delay}ms (attempt ${retryCount + 1}/${maxRetries})`);
         setRetryCount(prev => prev + 1);
         
-        console.log(`🔄 SSE reconnecting in ${delay}ms... (attempt ${retryCount + 1})`);
         reconnectTimeout = setTimeout(() => {
           connect();
         }, delay);
@@ -105,7 +118,22 @@ export function useRealtimeUpdates() {
     // Initial connection
     connect();
 
+    // Handle page unload - clean close
+    const handleBeforeUnload = () => {
+      isManualClose = true;
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+      }
+      if (eventSource) {
+        eventSource.close();
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
     return () => {
+      isManualClose = true;
+      window.removeEventListener('beforeunload', handleBeforeUnload);
       if (reconnectTimeout) {
         clearTimeout(reconnectTimeout);
       }
@@ -113,7 +141,6 @@ export function useRealtimeUpdates() {
         eventSource.close();
       }
       setIsConnected(false);
-      console.log('🔌 SSE Disconnected');
     };
   }, [retryCount]);
 

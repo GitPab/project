@@ -39,6 +39,22 @@ export default function ScholarshipBanner({
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/4" />
         <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/4" />
         
+        {/* Marketing Image */}
+        <div className="absolute top-4 right-4 md:top-6 md:right-8 w-24 h-24 md:w-32 md:h-32 opacity-90">
+          <img 
+            src="/img/scholarship-39tr.png" 
+            alt="Học bổng 39TR"
+            className="w-full h-full object-contain drop-shadow-lg"
+            onError={(e) => {
+              // Fallback if image doesn't exist
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
+          />
+          <div className="absolute -bottom-2 -right-2 bg-yellow-400 text-orange-700 text-xs font-bold px-2 py-1 rounded-full shadow-lg animate-pulse">
+            39TR
+          </div>
+        </div>
+        
         <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-3">

@@ -3,16 +3,19 @@ import { Outlet, NavLink, useNavigate, Navigate, useLocation } from 'react-route
 import { useAuth } from '../context/AuthContext';
 import { usePermission } from './PermissionGuard';
 import { useRealtimeUpdates } from '../hooks/useRealtimeUpdates';
+import { SyncIndicator } from './SyncIndicator';
 import api from '../services/api';
 import { LayoutDashboard, School, Users, LogOut, Menu, X, Shield, UserCircle, Lock, Edit3, TrendingUp, ChevronsLeft, ChevronsRight, BarChart3, ClipboardList, Mail, Workflow, Settings, Database, GraduationCap, Calendar, MessageSquare, ShieldCheck, Bell, Wifi, WifiOff, UserCog, ImageIcon, DollarSign } from 'lucide-react';
+import { RouteValidator } from './RouteValidator';
+import { isAdminRoute } from '../constants/routes';
 
 export default function Layout() {
   const { logout, user, isAdmin: authIsAdmin } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   
-  // Force admin mode when on admin routes
-  const isAdmin = authIsAdmin || location.pathname.startsWith('/admin');
+  // Determine layout based on route using centralized validation
+  const isAdmin = isAdminRoute(location.pathname);
   const { isConnected, stats } = useRealtimeUpdates();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
@@ -67,23 +70,23 @@ export default function Layout() {
   // Admin menu items with required permissions - organized by groups
   const adminMenuItems = [
     // Dashboard & Analytics
-    { path: '/admin/dashboard',     icon: LayoutDashboard, label: 'Trang chủ',        permission: 'university:view' },
-    { path: '/admin/analytics',     icon: BarChart3,       label: 'Thống kê',        permission: 'analytics:view' },
+    { path: '/admin/dashboard',     icon: LayoutDashboard, label: 'Trang chủ',        permission: 'UNIVERSITY_VIEW' },
+    { path: '/admin/analytics',     icon: BarChart3,       label: 'Thống kê',        permission: 'ANALYTICS_VIEW' },
     
     // University Management
-    { path: '/admin/universities',  icon: School,          label: 'Danh sách trường', permission: 'university:view' },
-    { path: '/admin/scholarships',  icon: GraduationCap,   label: 'Học bổng',        permission: 'university:view' },
+    { path: '/admin/universities',  icon: School,          label: 'Danh sách trường', permission: 'UNIVERSITY_VIEW' },
+    { path: '/admin/scholarships',  icon: GraduationCap,   label: 'Học bổng',        permission: 'UNIVERSITY_VIEW' },
     
     // Student Management
-    { path: '/admin/students',      icon: Users,           label: 'Theo dõi học viên',permission: 'student:view' },
-    { path: '/admin/registrations', icon: Users,           label: 'Đăng ký',         permission: 'application:view' },
-    { path: '/admin/visa',          icon: ShieldCheck,     label: 'Theo dõi Visa',   permission: 'student:view' },
-    { path: '/admin/calendar',      icon: Calendar,        label: 'Lịch hẹn',        permission: 'student:view' },
-    { path: '/admin/feedback',      icon: MessageSquare,   label: 'Đánh giá',        permission: 'analytics:view' },
+    { path: '/admin/students',      icon: Users,           label: 'Theo dõi học viên',permission: 'STUDENT_VIEW' },
+    { path: '/admin/registrations', icon: Users,           label: 'Đăng ký',         permission: 'APPLICATION_VIEW' },
+    { path: '/admin/visa',          icon: ShieldCheck,     label: 'Theo dõi Visa',   permission: 'STUDENT_VIEW' },
+    { path: '/admin/calendar',      icon: Calendar,        label: 'Lịch hẹn',        permission: 'STUDENT_VIEW' },
+    { path: '/admin/feedback',      icon: MessageSquare,   label: 'Đánh giá',        permission: 'ANALYTICS_VIEW' },
     
     // Content & Media
-    { path: '/admin/media',        icon: ImageIcon,       label: 'Thư viện Media',   permission: 'manage:settings' },
-    { path: '/admin/templates',     icon: Mail,            label: 'Mẫu Email',       permission: 'manage:settings' },
+    { path: '/admin/media',        icon: ImageIcon,       label: 'Thư viện Media',   permission: 'SETTINGS_MANAGE' },
+    { path: '/admin/templates',     icon: Mail,            label: 'Mẫu Email',       permission: 'SETTINGS_MANAGE' },
     
     // Operations
     { path: '/admin/bulk',         icon: Database,        label: 'Thao tác hàng loạt', permission: 'university:create' },
@@ -111,7 +114,8 @@ export default function Layout() {
       ];
 
   return (
-    <div className="flex h-screen bg-blue-50">
+    <RouteValidator expectedLayout={isAdmin ? 'admin' : 'student'}>
+      <div className="flex h-screen bg-blue-50">
       {/* Desktop sidebar */}
       <aside className="hidden md:flex md:flex-col bg-white border-r border-slate-200 shadow-sm" style={{ width: sidebarCollapsed ? '88px' : '256px' }}>
         <div className="h-16 flex items-center justify-between px-4 border-b border-slate-200">
@@ -229,15 +233,18 @@ export default function Layout() {
       <div ref={contentRef} className="flex-1 flex flex-col overflow-auto">
         <header className="hidden md:flex h-16 bg-white border-b border-slate-200 items-center justify-end px-6 shadow-sm gap-3 shrink-0">
           {isAdmin && (
-            <div title={healthTooltip} style={{ display: 'flex', alignItems: 'center', gap: 6, marginRight: 8 }}>
-              <span style={{
-                width: 10,
-                height: 10,
-                borderRadius: '50%',
-                background: healthStatus === 'ok' ? '#10B981' : healthStatus === 'degraded' ? '#F59E0B' : '#9CA3AF'
-              }} />
-              <span style={{ fontSize: 12, color: '#6B7280' }}>Health</span>
-            </div>
+            <>
+              <SyncIndicator />
+              <div title={healthTooltip} style={{ display: 'flex', alignItems: 'center', gap: 6, marginRight: 8 }}>
+                <span style={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: '50%',
+                  background: healthStatus === 'ok' ? '#10B981' : healthStatus === 'degraded' ? '#F59E0B' : '#9CA3AF'
+                }} />
+                <span style={{ fontSize: 12, color: '#6B7280' }}>Health</span>
+              </div>
+            </>
           )}
           <div className={`flex items-center gap-3 px-4 py-2 ${isAdmin ? 'bg-blue-600' : 'bg-emerald-600'} text-white rounded-lg text-sm font-medium`}>
             {isAdmin ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
@@ -324,6 +331,7 @@ export default function Layout() {
           </div>
         </footer>
       </div>
-    </div>
+      </div>
+    </RouteValidator>
   );
 }

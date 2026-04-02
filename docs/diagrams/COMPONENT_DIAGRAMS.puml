@@ -55,11 +55,30 @@ package "Backend API (Render)" {
         [JWT Handler] as JWTHandler
     }
     
-    package "Route Handlers" {
-        [Auth Routes] as AuthRoutes
-        [University Routes] as UnivRoutes
-        [Registration Routes] as RegRoutes
+    package "Feature Routes (NEW v2.0)" {
+        [Payment Routes] as PayRoutes
+        [Student Profile Routes] as ProfRoutes
+        [Notification Routes] as NotifRoutes
+        [Document Routes] as DocRoutes
+        [Program Routes] as ProgRoutes
+        [Message Routes] as MsgRoutes
+        [Appointment Routes] as ApptRoutes
+        [Scholarship Routes] as ScholRoutes
+        [Visa Application Routes] as VisaRoutes
+        [User Preference Routes] as PrefRoutes
+    }
+    
+    package "Utility Routes" {
+        [Upload Routes] as UploadRoutes
+        [Feature Flags Routes] as FeatRoutes
         [Admin Invite Routes] as InviteRoutes
+        [Media Routes] as MediaRoutes
+        [Exchange Rate Routes] as ExchRoutes
+    }
+    
+    package "Real-time" {
+        [SSE Manager] as SSEMgr
+        [Event Broadcaster] as EventBcast
     }
     
     package "Database Access" {
@@ -71,12 +90,22 @@ package "Backend API (Render)" {
 package "Database (Supabase)" {
     [PostgreSQL Database] as Postgres
     
-    package "Tables" {
+    package "Tables (31 total)" {
         [Users Table] as UsersTbl
         [Universities Table] as UnivTbl
         [Registrations Table] as RegTbl
         [Student Progress Table] as ProgressTbl
         [Invitations Table] as InviteTbl
+        [Payments Table] as PayTbl
+        [Student Profiles Table] as ProfTbl
+        [Notifications Table] as NotifTbl
+        [Documents Table] as DocTbl
+        [Programs Table] as ProgTbl
+        [Messages Table] as MsgTbl
+        [Appointments Table] as ApptTbl
+        [Scholarships Table] as ScholTbl
+        [Visa Applications Table] as VisaTbl
+        [User Preferences Table] as PrefTbl
     }
 }
 
@@ -84,6 +113,7 @@ package "External Services" {
     [Imgur API] as Imgur
     [JWT Service] as JWT
     [Email Service (SMTP)] as Email
+    [Redis Cache] as Redis
 }
 
 ' Connections
@@ -117,10 +147,32 @@ RBACMiddleware --> UnivRoutes : protected
 RBACMiddleware --> RegRoutes : protected
 RBACMiddleware --> InviteRoutes : protected
 
+RBACMiddleware --> PayRoutes : protected
+RBACMiddleware --> ProfRoutes : protected
+RBACMiddleware --> NotifRoutes : protected
+RBACMiddleware --> DocRoutes : protected
+RBACMiddleware --> ProgRoutes : protected
+RBACMiddleware --> MsgRoutes : protected
+RBACMiddleware --> ApptRoutes : protected
+RBACMiddleware --> ScholRoutes : protected
+RBACMiddleware --> VisaRoutes : protected
+RBACMiddleware --> PrefRoutes : protected
+
 AuthRoutes --> PgPool : queries
 UnivRoutes --> PgPool : queries
 RegRoutes --> PgPool : queries
 InviteRoutes --> PgPool : queries
+
+PayRoutes --> PgPool : queries
+ProfRoutes --> PgPool : queries
+NotifRoutes --> PgPool : queries
+DocRoutes --> PgPool : queries
+ProgRoutes --> PgPool : queries
+MsgRoutes --> PgPool : queries
+ApptRoutes --> PgPool : queries
+ScholRoutes --> PgPool : queries
+VisaRoutes --> PgPool : queries
+PrefRoutes --> PgPool : queries
 
 PgPool --> QueryBuilder
 QueryBuilder --> Postgres : SQL
@@ -130,10 +182,25 @@ Postgres --> UnivTbl
 Postgres --> RegTbl
 Postgres --> ProgressTbl
 Postgres --> InviteTbl
+Postgres --> PayTbl
+Postgres --> ProfTbl
+Postgres --> NotifTbl
+Postgres --> DocTbl
+Postgres --> ProgTbl
+Postgres --> MsgTbl
+Postgres --> ApptTbl
+Postgres --> ScholTbl
+Postgres --> VisaTbl
+Postgres --> PrefTbl
 
 UnivRoutes --> Imgur : upload images
 InviteRoutes --> Email : send invites
 JWTHandler --> JWT : sign/verify
+
+DocRoutes --> Imgur : upload docs
+MsgRoutes --> Email : notify
+NotifRoutes --> Email : notify
+SSEMgr --> Redis : optional cache
 
 @enduml
 

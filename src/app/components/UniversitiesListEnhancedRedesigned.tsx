@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { usePermission, PermissionGuard } from './PermissionGuard';
 import { toast } from 'sonner';
-import { Search, Plus, Trash2, RefreshCw, Eye, EyeOff } from 'lucide-react';
+import { Search, Plus, Trash2, RefreshCw, Eye, EyeOff, AlertTriangle } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { getMaxScholarship } from '../../utils/universityPerks';
 import UniversityForm from './UniversityForm';
@@ -162,7 +162,7 @@ const UniversityRow = React.memo(function UniversityRow({ university, onEdit, on
                 alt={university.name}
                 loading="lazy"
                 decoding="async"
-                fetchPriority="low"
+                {...{ fetchpriority: 'low' }}
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 onError={(e) => {
                   (e.currentTarget as HTMLImageElement).style.display = 'none';
@@ -422,6 +422,11 @@ export default function UniversitiesListEnhancedRedesigned() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [editingUniversity, setEditingUniversity] = useState<University | null>(null);
   const [quickInfoUniversity, setQuickInfoUniversity] = useState<University | null>(null);
+  const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; university: University | null }>({
+    isOpen: false,
+    university: null
+  });
+  const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleted, setShowDeleted] = useState(false);
 
   const palette = useMemo(() => ({
@@ -560,18 +565,27 @@ export default function UniversitiesListEnhancedRedesigned() {
     setEditingUniversity(uni);
   };
 
-  const handleDelete = async (uni: University) => {
-    if (!confirm('Bạn có chắc muốn xóa trường này?')) return;
+  const handleDelete = (uni: University) => {
+    setDeleteModal({ isOpen: true, university: uni });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteModal.university) return;
+    
+    setIsDeleting(true);
     try {
-      await softDeleteUniversity(uni.id);
+      await softDeleteUniversity(deleteModal.university.id);
       // Update local state
       const updated = universities.map(u => 
-        u.id === uni.id ? { ...u, is_active: false } : u
+        u.id === deleteModal.university!.id ? { ...u, is_active: false } : u
       );
       setUniversities(() => updated);
       toast.success('Đã xóa trường');
+      setDeleteModal({ isOpen: false, university: null });
     } catch (error) {
       toast.error('Không thể xóa trường');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -904,6 +918,106 @@ export default function UniversitiesListEnhancedRedesigned() {
             toast.success('Đã lưu thông tin hiển thị!');
           }}
         />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteModal.isOpen && deleteModal.university && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 50
+        }}>
+          <div style={{
+            background: '#fff',
+            borderRadius: 12,
+            boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)',
+            maxWidth: 400,
+            width: '100%',
+            margin: '0 16px',
+            padding: 24
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+              <div style={{
+                width: 48,
+                height: 48,
+                background: '#fee2e2',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <AlertTriangle style={{ width: 24, height: 24, color: '#dc2626' }} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: 18, fontWeight: 600, color: '#111', margin: 0 }}>Xác nhận xóa</h3>
+                <p style={{ fontSize: 14, color: '#666', margin: '4px 0 0' }}>Hành động này không thể hoàn tác</p>
+              </div>
+            </div>
+            
+            <div style={{
+              background: '#f3f4f6',
+              borderRadius: 8,
+              padding: 16,
+              marginBottom: 20
+            }}>
+              <p style={{ fontSize: 14, color: '#666', margin: '0 0 8px' }}>Bạn sắp xóa trường:</p>
+              <p style={{ fontSize: 16, fontWeight: 600, color: '#111', margin: 0 }}>{deleteModal.university.name}</p>
+              <p style={{ fontSize: 14, color: '#888', margin: '4px 0 0' }}>{deleteModal.university.koreanName}</p>
+            </div>
+
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setDeleteModal({ isOpen: false, university: null })}
+                disabled={isDeleting}
+                style={{
+                  padding: '10px 16px',
+                  color: '#374151',
+                  background: '#f3f4f6',
+                  border: 'none',
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                  fontSize: 14,
+                  opacity: isDeleting ? 0.5 : 1
+                }}
+              >
+                Hủy
+              </button>
+              <button
+                onClick={confirmDelete}
+                disabled={isDeleting}
+                style={{
+                  padding: '10px 16px',
+                  background: '#dc2626',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                  fontSize: 14,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  opacity: isDeleting ? 0.5 : 1
+                }}
+              >
+                {isDeleting ? (
+                  <>
+                    <RefreshCw style={{ width: 16, height: 16 }} className="animate-spin" />
+                    Đang xóa...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 style={{ width: 16, height: 16 }} />
+                    Xóa trường
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

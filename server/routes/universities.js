@@ -93,12 +93,20 @@ router.get('/', cacheMiddleware(300), async (req, res) => {
  * Get single university by ID
  */
 router.get('/:id', async (req, res) => {
+  const { id } = req.params;
+  
+  // Validate UUID format to prevent database errors
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(id)) {
+    return res.status(400).json({ error: 'Invalid university ID format. Expected UUID.' });
+  }
+  
   const pool = await getPool();
   
   try {
     const { rows } = await pool.query(
       'SELECT * FROM universities WHERE id = $1',
-      [req.params.id]
+      [id]
     );
     
     if (!rows[0]) {
@@ -111,13 +119,13 @@ router.get('/:id', async (req, res) => {
         try {
           return rows[0].korean_data ? JSON.parse(rows[0].korean_data) : {};
         } catch (e) {
-          logger.warn('Invalid korean_data JSON for university', { id: req.params.id, korean_data: rows[0].korean_data });
+          logger.warn('Invalid korean_data JSON for university', { id, korean_data: rows[0].korean_data });
           return {};
         }
       })()
     });
   } catch (error) {
-    logger.error('Failed to fetch university', { error: error.message, id: req.params.id });
+    logger.error('Failed to fetch university', { error: error.message, id });
     res.status(500).json({ error: 'Failed to fetch university' });
   }
 });
