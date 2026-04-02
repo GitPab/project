@@ -66,7 +66,15 @@ dotenv.config();
 // ============================================
 process.env.PORT = process.env.PORT || '3001';
 process.env.FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
-process.env.JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+// JWT_SECRET - throw error if not set (no fallback for security)
+if (!process.env.JWT_SECRET) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('JWT_SECRET environment variable is required in production');
+  }
+  // Development only: use temporary secret
+  process.env.JWT_SECRET = 'dev-secret-do-not-use-in-production';
+  console.warn('[SECURITY] Using development JWT_SECRET - set JWT_SECRET env var for production');
+}
 
 const parseAllowedOrigins = (value) =>
   value
@@ -209,22 +217,6 @@ app.use('/api/scholarships', scholarshipsRoutes);
 app.use('/api/visa-applications', visaApplicationsRoutes);
 app.use('/api/user-preferences', userPreferencesRoutes);
 
-// TEMP: Reset admin password endpoint
-app.post('/api/reset-admin', async (req, res) => {
-  try {
-    const pool = await getPool();
-    const bcrypt = await import('bcryptjs');
-    const hash = await bcrypt.hash('admin123', 12);
-    await pool.query(
-      "UPDATE users SET password = $1 WHERE email = 'admin@duhoccost.vn'",
-      [hash]
-    );
-    res.json({ message: 'Admin password reset to: admin123' });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
 // ============================================
 // REAL-TIME UPDATES (Server-Sent Events)
 // ============================================
@@ -281,7 +273,7 @@ app.get('/api/sse/registrations', async (req, res) => {
       // Don't close connection on stats error, just skip it
     }
 
-    // Heartbeat to keep connection alive
+    // Heartbeat to keep connection alive (20s for Render - prevents 30s timeout)
     const heartbeat = setInterval(() => {
       try {
         res.write(`:heartbeat\n\n`);
@@ -290,7 +282,7 @@ app.get('/api/sse/registrations', async (req, res) => {
         clearInterval(heartbeat);
         clients.delete(clientId);
       }
-    }, 30000);
+    }, 20000);
 
     // Handle client disconnect
     req.on('close', () => {
@@ -975,8 +967,8 @@ async function startServer() {
           [adminId, 'Administrator', 'admin@duhoccost.vn', adminHash, 'admin', true]
         );
         
-        logger.info('Default admin user created', { email: 'admin@duhoccost.vn', password: 'admin123' });
-        console.log('\n✅ Default admin created: admin@duhoccost.vn / admin123\n');
+        logger.info('Default admin user created', { email: 'admin@duhoccost.vn', password: '***MASKED***' });
+        console.log('\n✅ Default admin created: admin@duhoccost.vn / [PASSWORD_MASKED]\n');
       } else {
         console.log('[DEBUG] Users already exist, skipping admin seed');
       }

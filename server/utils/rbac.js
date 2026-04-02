@@ -18,6 +18,15 @@ export const ROLE_DEFINITIONS = {
       'view:payment',
       'view:analytics',
       'view:student_progress', 'manage:student_progress',
+      'view:scholarship', 'manage:scholarship_application',
+      'view:visa', 'edit:visa',
+      'view:appointment', 'create:appointment', 'edit:appointment',
+      'view:message', 'create:message',
+      'view:document', 'review:document',
+      'view:program',
+      'view:notification',
+      'view:profile', 'edit:profile',
+      'view:feedback', 'manage:feedback',
     ],
   },
   content_editor: {
@@ -25,6 +34,8 @@ export const ROLE_DEFINITIONS = {
       'view:university', 'create:university', 'edit:university',
       'view:student',
       'view:application',
+      'view:program', 'create:program', 'edit:program',
+      'view:media', 'create:media',
     ],
   },
   finance_admin: {
@@ -34,6 +45,8 @@ export const ROLE_DEFINITIONS = {
       'view:application',
       'view:payment', 'create:payment', 'approve:payment',
       'view:analytics',
+      'view:scholarship',
+      'view:exchange_rate',
     ],
   },
   viewer: {
@@ -43,12 +56,28 @@ export const ROLE_DEFINITIONS = {
       'view:application',
       'view:payment',
       'view:analytics',
+      'view:scholarship',
+      'view:visa',
+      'view:appointment',
+      'view:document',
+      'view:program',
+      'view:notification',
+      'view:profile',
+      'view:feedback',
     ],
   },
   student: {
     permissions: [
       'view:university',
       'create:application', 'view:application',
+      'view:scholarship',
+      'view:visa', 'create:visa',
+      'view:appointment', 'create:appointment',
+      'view:message', 'create:message',
+      'view:document', 'create:document',
+      'view:notification',
+      'view:preference', 'edit:preference',
+      'view:profile', 'edit:profile',
     ],
   },
 };
@@ -80,12 +109,14 @@ export function requirePermission(action, resource) {
 
 /**
  * Legacy admin check (backward compatibility)
+ * Note: 'viewer' is NOT included as they are read-only
  */
 export function requireAdmin(req, res, next) {
   if (!req.user) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  const adminRoles = ['admin', 'super_admin', 'admin_manager', 'content_editor', 'finance_admin', 'viewer'];
+  // Admin roles that can make changes (viewer excluded - read only)
+  const adminRoles = ['admin', 'super_admin', 'admin_manager', 'content_editor', 'finance_admin'];
   if (!adminRoles.includes(req.user.role)) {
     return res.status(403).json({ error: 'Admin access required' });
   }

@@ -808,7 +808,158 @@ server {
 
 ---
 
-## 📊 Effort Estimation
+## � Docker + Render Deployment (NEW)
+
+### Dockerfile (Laravel + Reverb)
+```dockerfile
+# sacma-php/Dockerfile
+FROM php:8.2-fpm
+
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    libpq-dev \
+    libzip-dev \
+    unzip \
+    git \
+    curl \
+    && docker-php-ext-install pdo_pgsql pgsql zip \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# Set working directory
+WORKDIR /var/www
+
+# Copy composer files first (for caching)
+COPY composer.json composer.lock ./
+RUN composer install --no-scripts --no-autoloader --no-dev
+
+# Copy application
+COPY . .
+
+# Generate autoloader and run scripts
+RUN composer dump-autoload --optimize \
+    && composer run-script post-autoload-dump
+
+# Set permissions
+RUN chown -R www-data:www-data /var/www \
+    && chmod -R 755 /var/www/storage \
+    && chmod -R 755 /var/www/bootstrap/cache
+
+# Copy startup script
+COPY docker/start.sh /usr/local/bin/start.sh
+RUN chmod +x /usr/local/bin/start.sh
+
+# Expose port for PHP-FPM
+EXPOSE 9000
+
+CMD ["/usr/local/bin/start.sh"]
+```
+
+### Render Web Service Config (render.yaml)
+```yaml
+# sacma-php/render.yaml
+services:
+  # Main Laravel API
+  - type: web
+    name: sacma-php
+    runtime: docker
+    branch: main
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sacma-postgres
+          property: connectionString
+      - key: JWT_SECRET  # For compatibility during migration
+        generateValue: true
+      - key: FRONTEND_URL
+        value: https://your-project.vercel.app
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://your-project.vercel.app,https://www.your-domain.com
+      - key: IMGUR_CLIENT_ID
+        sync: false  # Set manually in Render dashboard
+    healthCheckPath: /api/health
+    buildCommand: composer install --optimize-autoloader --no-dev
+    startCommand: php artisan serve --host=0.0.0.0 --port=8000
+
+  # Laravel Reverb WebSocket (separate service)
+  - type: worker
+    name: sacma-reverb
+    runtime: docker
+    branch: main
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sacma-postgres
+          property: connectionString
+    startCommand: php artisan reverb:start --host=0.0.0.0 --port=6001
+
+  # Queue worker for notifications/emails
+  - type: worker
+    name: sacma-queue
+    runtime: docker
+    branch: main
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sacma-postgres
+          property: connectionString
+    startCommand: php artisan queue:work --sleep=3 --tries=3 --timeout=90
+
+databases:
+  - name: sacma-postgres
+    databaseName: sacma
+    user: sacma
+    plan: free  # Upgrade to starter ($7/month) for production
+```
+
+### Startup Script (docker/start.sh)
+```bash
+#!/bin/bash
+# docker/start.sh - Laravel startup script for Render
+
+cd /var/www
+
+# Clear and cache config
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+
+# Run migrations (skip if failed - for zero-downtime deploys)
+php artisan migrate --force || echo "Migration skipped or failed"
+
+# Start PHP-FPM
+php-fpm
+```
+
+### Build & Deploy Commands
+```bash
+# Local build test
+docker build -t sacma-php .
+docker run -p 8000:8000 -e DATABASE_URL=postgres://... sacma-php
+
+# Deploy to Render
+# 1. Push to GitHub
+# 2. Connect Render to repo
+# 3. Render auto-deploys on push to main
+```
+
+---
+
+## �📊 Effort Estimation
 
 | Task | Effort (days) | Người thực hiện |
 |------|--------------|-----------------|

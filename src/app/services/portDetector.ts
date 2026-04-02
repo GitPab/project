@@ -64,19 +64,33 @@ export async function findServerPort(): Promise<number | null> {
  * Get the current API URL (with detected port)
  */
 export async function getApiUrl(): Promise<string> {
-  // Auto-detect port first (ignore env var for now to force detection)
+  // In production (Vercel), use env var directly - no localhost probing
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (envUrl) {
+    // Verify the env URL is healthy (optional check)
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 3000);
+      const response = await fetch(`${envUrl}/health`, {
+        method: 'GET',
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+      if (response.ok) {
+        console.log(`[PortDetector] Using env URL: ${envUrl}`);
+        return envUrl;
+      }
+    } catch {
+      console.warn(`[PortDetector] Env URL ${envUrl} not healthy, trying local...`);
+    }
+  }
+  
+  // Development: Auto-detect port from localhost
   const port = await findServerPort();
   if (port) {
     const url = `http://localhost:${port}/api`;
-    console.log(`[PortDetector] Using API URL: ${url}`);
+    console.log(`[PortDetector] Using local API URL: ${url}`);
     return url;
-  }
-  
-  // Check environment variable as fallback
-  const envUrl = import.meta.env.VITE_API_URL;
-  if (envUrl) {
-    console.log(`[PortDetector] Falling back to env URL: ${envUrl}`);
-    return envUrl;
   }
   
   // Final fallback
