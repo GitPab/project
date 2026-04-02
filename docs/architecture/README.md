@@ -48,41 +48,34 @@
  * 
  * ## Frontend Architecture (Updated April 2026)
  * 
- * ### Feature-Based Structure
+ * ### Component Organization
  * ```
- * src/
- * ├── app/
- * │   ├── features/
- * │   │   ├── auth/              # Login, Register, ForgotPassword, AuthGuard, useAuth
- * │   │   ├── universities/        # UniversityList, UniversityDetail, UniversityForm, useUniversities
- * │   │   ├── students/           # StudentDashboard, StudentProfile, StudentList, useStudents
- * │   │   ├── registrations/      # Registration forms
- * │   │   ├── payments/           # Payments, invoices
- * │   │   ├── messages/           # Chat system
- * │   │   ├── notifications/      # Notifications
- * │   │   └── admin/              # Admin panel
- * │   ├── layouts/                # Page layouts
- * │   │   ├── MainLayout.tsx      # Public site layout
- * │   │   ├── AdminLayout.tsx     # Admin dashboard
- * │   │   ├── StudentLayout.tsx   # Student portal
- * │   │   └── PublicLayout.tsx    # Marketing pages
- * │   └── shared/                 # Shared resources
- * │       ├── components/         # Reusable UI components
- * │       │   ├── Button.tsx      # Button with variants
- * │       │   ├── Modal.tsx       # Dialog component
- * │       │   ├── Card.tsx        # Container component
- * │       │   ├── Table.tsx       # Data table
- * │       │   ├── Form.tsx        # Form fields
- * │       │   ├── Loading.tsx     # Loading spinner
- * │       │   └── EmptyState.tsx  # Empty state
- * │       ├── hooks/              # Custom React hooks
- * │       │   ├── useFetch.ts     # Data fetching
- * │       │   ├── useLocalStorage.ts
- * │       │   ├── useDebounce.ts
- * │       │   └── useForm.ts
- * │       └── utils/              # Utility functions
- * ├── assets/                     # Images, fonts
- * └── styles/                     # Global styles
+ * src/app/
+ * ├── components/              # Legacy components (50+ files)
+ * │   ├── ui/                 # shadcn/ui components (47 files)
+ * │   ├── AdminInvite.tsx
+ * │   ├── CostCalculator.tsx
+ * │   ├── EditUniversityModal.tsx
+ * │   ├── PermissionGuard.tsx
+ * │   ├── RegistrationModal.tsx
+ * │   └── ... (40+ more)
+ * ├── features/               # NEW Feature-based modules
+ * │   ├── auth/              # Login, Register, ForgotPassword, AuthGuard
+ * │   ├── students/           # StudentDashboard, StudentProfile, StudentList
+ * │   ├── universities/       # UniversityList, UniversityDetail, UniversityForm
+ * │   └── index.ts (barrel exports)
+ * ├── layouts/                # NEW Layout components
+ * │   ├── MainLayout.tsx
+ * │   ├── AdminLayout.tsx
+ * │   ├── StudentLayout.tsx
+ * │   └── PublicLayout.tsx
+ * ├── shared/                 # NEW Shared resources
+ * │   ├── components/         # Button, Modal, Card, Table, Form, Loading, EmptyState
+ * │   ├── hooks/              # useFetch, useLocalStorage, useDebounce, useForm
+ * │   └── utils/              # Utility functions
+ * └── context/               # Context providers
+ *     ├── AuthContext.tsx    # Authentication state
+ *     └── AppContext.tsx     # Application data
  * ```
  * 
  * ## Component Hierarchy

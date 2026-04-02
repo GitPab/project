@@ -126,10 +126,33 @@
  * - **StudentLayout.tsx**: Student portal layout
  * - **PublicLayout.tsx**: Marketing pages layout
  * 
- * ### Shared Components (src/app/shared/)
- * - **components/**: Button, Modal, Card, Table, Form, Loading, EmptyState
- * - **hooks/**: useFetch, useLocalStorage, useDebounce, useForm
- * - **utils/**: Formatters, validators, helpers
+ * ### Shared UI Components (shadcn/ui - 47 components)
+ * - **Layout**: Layout, Header, EnhancedFooter, Sidebar, Navigation
+ * - **Data Display**: Card, Table, DataTable, Chart, StatCard, Badge, Calendar
+ * - **Forms**: Form, Input, Textarea, Select, Checkbox, RadioGroup, Switch, Label
+ * - **Overlays**: Modal, Dialog, AlertDialog, Drawer, Sheet, Popover, Tooltip, HoverCard
+ * - **Navigation**: Tabs, Breadcrumb, Command, NavigationMenu, Menubar, Pagination
+ * - **Feedback**: Alert, Progress, Skeleton, Sonner (toast)
+ * - **Advanced**: Accordion, Collapsible, ContextMenu, DropdownMenu, Resizable, ScrollArea, Slider, Toggle, ToggleGroup, InputOTP, AspectRatio, Avatar, Separator
+ * 
+ * ### Feature Components (src/app/components/)
+ * - **Admin**: AdminInvite, RoleManagement, BulkOperationsPanel, PermissionGuard, PermissionRoute, PrivateRoute
+ * - **Universities**: UniversityCard, SchoolCard, RecommendedSchools, UniversityPartners, UniversitySystemsManager, UniversitiesListEnhancedRedesigned, EditUniversityModal, ImportUniversitiesModal, QuickInfoModal, UniversityForm (legacy)
+ * - **Students**: StudentInfoCard, StudentInfoSidebar, StudentFixedSidebar, StudentUniversityList
+ * - **Cost Management**: CostCalculator, CostInputForm, FeeManager, SplitTuitionInput, PriceInput, TierBreakdownBar, TierMini, TierTab
+ * - **Registration**: RegistrationModal, QuickSearchForm
+ * - **Utilities**: ErrorBoundary, RouteError, RouteValidator, SyncIndicator, QRCodeModal, QRScannerModal
+ * - **Marketing**: ScholarshipBanner, Testimonials, Logo (variants: TBTLogo, NewLogo, LogoTest), Statistics
+ * 
+ * ### Context & Providers (src/app/context/)
+ * - AuthContext.tsx - Authentication state & useAuth hook
+ * - AppContext.tsx - Application data management
+ * 
+ * ### Shared Components (src/app/shared/components/) - NEW
+ * - Button, Modal, Card, Table, Form, Loading, EmptyState
+ * 
+ * ### Shared Hooks (src/app/shared/hooks/) - NEW
+ * - useFetch, useLocalStorage, useDebounce, useForm
  * 
  * ## 🚀 Getting Started
  * 

@@ -58,7 +58,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `useForm.ts` - Form state management
   - `index.ts` - Clean barrel exports
 
-#### 🛠️ Infrastructure Improvements
+#### � Existing Components Inventory
+
+**shadcn/ui Library (47 components)**
+- Layout: accordion, collapsible, resizable, scroll-area, separator, sidebar, aspect-ratio
+- Data Display: avatar, badge, calendar, card, chart, skeleton, table
+- Forms: checkbox, form, input, input-otp, label, radio-group, select, slider, switch, textarea
+- Overlays: alert-dialog, dialog, drawer, hover-card, popover, sheet, tooltip
+- Navigation: breadcrumb, command, context-menu, dropdown-menu, menubar, navigation-menu, pagination, tabs
+- Feedback: alert, progress, sonner
+- Other: toggle, toggle-group
+
+**Legacy Components (src/app/components/)**
+- **Admin & RBAC**: AdminInvite, RoleManagement, PermissionGuard, PermissionRoute, PrivateRoute, BulkOperationsPanel
+- **University Management**: EditUniversityModal, ImportUniversitiesModal, QuickInfoModal, UniversitiesListEnhancedRedesigned, UniversityCard, UniversityForm (legacy), SchoolCard, UniversityPartners, UniversitySystemsManager, RecommendedSchools
+- **Student UI**: StudentInfoCard, StudentInfoSidebar, StudentFixedSidebar, StudentUniversityList
+- **Cost Tools**: CostCalculator, CostInputForm, FeeManager, SplitTuitionInput, PriceInput, TierBreakdownBar, TierMini, TierTab
+- **Registration**: RegistrationModal, QuickSearchForm
+- **Utilities**: ErrorBoundary, RouteError, RouteValidator, SyncIndicator, QRCodeModal, QRScannerModal
+- **Marketing**: ScholarshipBanner, Testimonials, Logo variants (TBTLogo, NewLogo, LogoTest), Statistics, StatCard
+- **Core**: Layout, Header, EnhancedFooter
+
+#### �🛠️ Infrastructure Improvements
 
 - **TypeScript**: All components fully typed
 - **ESLint**: All errors resolved (0 errors in src/)

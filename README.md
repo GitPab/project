@@ -1,8 +1,8 @@
 # SACMA - Student Abroad Cost Management Application
 
-**Version:** 2.0.0  
+**Version:** 2.1.0  
 **Status:** 🟢 Production Ready  
-**Last Updated:** April 2, 2026
+**Last Updated:** April 3, 2026
 
 ---
 
@@ -12,21 +12,22 @@ SACMA is a comprehensive cost management platform for Vietnamese students studyi
 
 ### ✨ Key Features
 
-- ✅ **Student Tracking System** - Unique tracking codes for each student
+- ✅ **Student Tracking System** - Unique tracking codes (SACMA-YYYYMMDD-XXXXXX)
 - ✅ **VND-Based Pricing** - All costs stored in Vietnamese Dong
-- ✅ **Admin Dashboard** - Monitor registrations and track student progress
-- ✅ **Cost Calculator** - Flexible currency inputs and conversions
-- ✅ **Multilingual UI** - Vietnamese, Korean, English support
+- ✅ **Admin Dashboard** - 22 admin pages for comprehensive management
+- ✅ **Student Portal** - 6 student-facing pages with progress tracking
+- ✅ **Cost Calculator** - Multi-currency support (VND, USD, KRW, JPY, CNY)
+- ✅ **Multilingual UI** - Vietnamese (vi) - Full support, Korean and English planned
 - ✅ **Public Onboarding** - No login required for initial registration
-- ✅ **Real-time Updates** - SSE (Server-Sent Events) for live data
+- ✅ **Real-time Updates** - SSE infrastructure ready (API implemented)
 - ✅ **Payment Management** - Track payments and invoices
 - ✅ **Document Management** - Upload and review student documents
-- ✅ **Messaging System** - Internal communication between students and admins
-- ✅ **Appointment Scheduling** - Calendar for meetings and consultations
-- ✅ **Scholarship Management** - Apply for and manage scholarships
-- ✅ **Visa Application Tracking** - Track visa application status
-- ✅ **Offline-First** - Works offline with background sync
-- ✅ **RBAC** - Role-based access control (Admin, Student, Staff)
+- ✅ **Messaging System** - Internal student-admin communication
+- ✅ **Appointment Scheduling** - Calendar-based meeting system
+- ✅ **Scholarship Management** - Apply and manage scholarships
+- ✅ **Visa Application Tracking** - Track visa status through embassy process
+- ✅ **Offline-First Architecture** - SQLite sync with background queue
+- ✅ **RBAC** - Role-based access control (Admin, Student, Staff, 6 roles)
 
 ---
 
@@ -177,22 +178,49 @@ netlify deploy --prod --dir=dist
 project/
 ├── src/
 │   ├── app/
-│   │   ├── components/        # Reusable UI components
-│   │   ├── context/          # React Context (Auth, Currency, Language)
-│   │   ├── pages/            # Page components
-│   │   ├── services/         # Business logic (tracking codes, etc)
-│   │   ├── utils/            # Validation helpers
-│   │   └── data/             # University data
-│   ├── types/                # TypeScript types
-│   ├── styles/               # Global styles
-│   └── main.tsx              # Entry point
-├── dist/                      # Production build
-├── public/                    # Static assets
-├── package.json
-├── tsconfig.json
-├── vite.config.ts
-├── DEPLOYMENT_GUIDE.md        # This file
-└── SUPABASE_SETUP.md          # Database setup guide
+│   │   ├── components/        # 50+ UI components (legacy)
+│   │   │   ├── ui/           # 47 shadcn/ui components
+│   │   │   ├── AdminInvite.tsx
+│   │   │   ├── CostCalculator.tsx
+│   │   │   ├── EditUniversityModal.tsx
+│   │   │   └── ... (50+ more)
+│   │   ├── features/         # NEW: Feature-based modules
+│   │   │   ├── auth/        # Login, Register, ForgotPassword, AuthGuard
+│   │   │   ├── students/     # StudentDashboard, StudentProfile, StudentList
+│   │   │   └── universities/   # UniversityList, UniversityDetail, UniversityForm
+│   │   ├── layouts/          # NEW: Layout components
+│   │   │   ├── MainLayout.tsx
+│   │   │   ├── AdminLayout.tsx
+│   │   │   ├── StudentLayout.tsx
+│   │   │   └── PublicLayout.tsx
+│   │   ├── shared/           # NEW: Shared resources
+│   │   │   ├── components/   # Button, Modal, Card, Table, Form, Loading, EmptyState
+│   │   │   └── hooks/        # useFetch, useLocalStorage, useDebounce, useForm
+│   │   ├── pages/            # 41 page components
+│   │   │   ├── Admin*.tsx    # 22 admin pages
+│   │   │   ├── Student*.tsx  # 10 student pages
+│   │   │   └── Public*.tsx   # 9 public pages
+│   │   ├── context/          # React Context providers
+│   │   │   ├── AuthContext.tsx
+│   │   │   ├── AppContext.tsx
+│   │   │   ├── CurrencyContext.tsx
+│   │   │   └── LanguageContext.tsx
+│   │   ├── services/         # Business logic
+│   │   │   ├── api.ts
+│   │   │   ├── trackingCodeService.ts
+│   │   │   └── sqliteDatabase.ts
+│   │   └── routes.tsx        # 34 route definitions
+│   ├── types/                # TypeScript type definitions
+│   └── styles/               # Global styles
+├── server/                   # Backend API
+│   ├── routes/               # 22 API route handlers
+│   ├── server.js             # Express server entry
+│   └── src/                  # Server source code
+├── docs/                     # Documentation
+│   ├── DISCREPANCY_ANALYSIS.md  # Analysis report
+│   ├── ARCHITECTURE_PLANTUML.puml
+│   └── architecture/
+└── package.json
 ```
 
 ---
@@ -387,24 +415,83 @@ Input Currency → VND (Base) → Output Currency
 ## 🌐 Language Support
 
 ### Supported Languages
-- **Vietnamese** (vi) - Default
-- **Korean** (ko)
-- **English** (en) - Fallback
+- **Vietnamese** (vi) - ✅ Fully Implemented (180+ translated labels)
+- **Korean** (ko) - 🚧 Planned (infrastructure ready)
+- **English** (en) - 🚧 Planned (infrastructure ready)
+
+### Current Implementation
+The application has full i18n infrastructure with:
+- `LanguageProvider` context wrapping the app
+- `useLanguage()` hook for translations
+- `t('key')` function for label lookup
+- 180+ Vietnamese translations in `src/app/context/LanguageContext.tsx`
 
 ### Language Switching
-Users can toggle language in the UI. Current language persists in localStorage.
+Infrastructure is ready for language toggle, but currently only Vietnamese is available.  
+Translation system supports easy addition of Korean and English.
 
-### Label Examples
-| Feature | VI | KO | EN |
-|---------|----|----|-----|
-| Registration | Đăng ký | 등록 | Register |
-| Tracking Code | Mã theo dõi | 추적 코드 | Tracking Code |
-| Status | Trạng thái | 상태 | Status |
-| Cost | Chi phí | 비용 | Cost |
+### Label Examples (Vietnamese)
+| Feature | VI |
+|---------|----|
+| Registration | Đăng ký |
+| Tracking Code | Mã theo dõi |
+| Status | Trạng thái |
+| Cost | Chi phí |
+| Dashboard | Trang chủ |
+| Universities | Danh sách trường |
+| Login | Đăng nhập |
 
 ---
 
-## 🔗 API Endpoints Reference
+## �️ Routes Reference
+
+### Public Routes
+| Route | Page | Description |
+|-------|------|-------------|
+| `/` | PublicOnboarding | Student registration form |
+| `/universities` | UniversityInfo | List all universities |
+| `/university/:id` | UniversityDetailRedesigned | University detail page |
+| `/login` | Login | User authentication |
+| `/first-time-setup` | FirstTimeSetup | Initial admin setup |
+| `/student/tracking` | TrackingLookupSimple | Public tracking lookup |
+
+### Student Routes (Protected)
+| Route | Page | Description |
+|-------|------|-------------|
+| `/student/dashboard` | StudentDashboard | Student home dashboard |
+| `/student/home` | StudentHome | Alternative student view |
+| `/student/universities` | StudentUniversities | Browse universities |
+| `/student/my-costs` | StudentOnboarding | Cost calculator |
+| `/student/my-progress` | ProgressTracker | Track application progress |
+| `/student/feedback` | StudentFeedbackPage | Submit feedback |
+
+### Admin Routes (Protected - 22 pages)
+| Route | Page | Description |
+|-------|------|-------------|
+| `/admin/dashboard` | AdminDashboard | Admin overview |
+| `/admin/universities` | UniversitiesListEnhancedRedesigned | Manage universities |
+| `/admin/university/:id` | UniversityDetailAdmin | Edit university |
+| `/admin/students` | StudentMonitoring | View all students |
+| `/admin/registrations` | AdminRegistrations | Manage registrations |
+| `/admin/audit` | AdminAuditTrail | System audit logs |
+| `/admin/templates` | AdminEmailTemplates | Email template management |
+| `/admin/workflow` | AdminWorkflow | Workflow configuration |
+| `/admin/settings` | AdminSettings | System settings |
+| `/admin/bulk` | AdminBulkOperations | Bulk data operations |
+| `/admin/scholarships` | AdminScholarships | Scholarship management |
+| `/admin/visa` | AdminVisaTracking | Visa application tracking |
+| `/admin/calendar` | AdminCalendar | Appointment scheduling |
+| `/admin/feedback` | AdminFeedback | View student feedback |
+| `/admin/analytics` | AdminAnalyticsDashboard | Analytics & reports |
+| `/admin/users` | AdminUsers | User management |
+| `/admin/roles` | AdminRoles | Role & permission management |
+| `/admin/maintenance` | AdminMaintenance | System maintenance |
+| `/admin/media` | AdminMediaLibrary | Media file management |
+| `/admin/exchange-rates` | AdminExchangeRates | Currency rate management |
+
+---
+
+## � API Endpoints Reference
 
 ### Tracking Code Service
 ```typescript
@@ -495,12 +582,15 @@ Proprietary - SACMA Project 2026
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 1.0.0 | 2026-03-12 | Initial release - All 11 phases complete |
+| 2.1.0 | 2026-04-03 | 25+ UI components, layouts, shared hooks, clean build |
+| 2.0.0 | 2026-04-02 | 22 API routes, feature organization, Phase 12 complete |
+| 1.0.0 | 2026-03-12 | Initial release - Phase 1-11 complete |
 
 ---
 
 ## ✅ Completion Checklist
 
+### Phase 1-11: Core Features (v1.0.0) ✅
 - [x] Phase 1: Tracking infrastructure
 - [x] Phase 2: Demo removal
 - [x] Phase 3: Description validation
@@ -510,12 +600,42 @@ Proprietary - SACMA Project 2026
 - [x] Phase 7: Tracking page
 - [x] Phase 8: Success flow
 - [x] Phase 9: Admin features
-- [x] Phase 10: Multilingual UI
+- [x] Phase 10: Multilingual infrastructure
 - [x] Phase 11: Testing
+
+### Phase 12: API Integration (v2.0.0) ✅
+- [x] 22 API Routes implemented
+- [x] Payment Management API
+- [x] Student Profiles API
+- [x] Notifications API (SSE)
+- [x] Documents API
+- [x] Programs API
+- [x] Messages API
+- [x] Appointments API
+- [x] Scholarships API
+- [x] Visa Applications API
+- [x] User Preferences API
+
+### Phase 13: Project Organization (v2.0.0) ✅
+- [x] Feature-based structure
+- [x] Server organization (src/)
+- [x] Documentation structure
+- [x] Code cleanup (8 files removed)
+
+### Phase 14: UI Components (v2.1.0) ✅
+- [x] Auth components (Login, Register, ForgotPassword, AuthGuard)
+- [x] Student components (Dashboard, Profile, List)
+- [x] University components (List, Detail, Form)
+- [x] Layout system (Main, Admin, Student, Public)
+- [x] Shared components (Button, Modal, Card, Table, Form, Loading, EmptyState)
+- [x] Shared hooks (useFetch, useLocalStorage, useDebounce, useForm)
+- [x] All barrel files updated
+- [x] TypeScript: 0 errors
+- [x] ESLint: 0 errors
 
 ---
 
 **Status:** 🟢 **READY FOR PRODUCTION DEPLOYMENT**
 
-Last updated: 2026-03-12
-Next review: 2026-04-12
+Last updated: 2026-04-03
+Next review: 2026-05-03
