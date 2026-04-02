@@ -372,19 +372,19 @@ mkdir -p src/app/features/newFeature
 # - types.ts
 ```
 
-### Hook Pattern
+### Hook Pattern (Updated)
 
 ```typescript
 // useNewFeature.ts
-import { useState, useEffect } from 'react';
-import { api } from '@/app/shared/utils';
+import { useState, useEffect, useCallback } from 'react';
+import { api } from '@/app/services/api';
 
 export const useNewFeature = () => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const response = await api.get('/new-feature');
@@ -394,38 +394,82 @@ export const useNewFeature = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   return { data, loading, error, refetch: fetchData };
 };
 ```
 
-### Component Pattern
+### Component Pattern (Updated)
 
 ```typescript
 // Component.tsx
 import React from 'react';
 import { useNewFeature } from './useNewFeature';
-import { Loading, ErrorState } from '@/app/shared/components';
+import { Loading, EmptyState, Button, Card } from '@/app/shared/components';
 
 export const FeatureComponent: React.FC = () => {
-  const { data, loading, error } = useNewFeature();
+  const { data, loading, error, refetch } = useNewFeature();
 
   if (loading) return <Loading />;
-  if (error) return <ErrorState error={error} />;
+  if (error) return <EmptyState title="Lỗi tải dữ liệu" action={<Button onClick={refetch}>Thử lại</Button>} />;
 
   return (
     <div>
       {data.map(item => (
-        <div key={item.id}>{item.name}</div>
+        <Card key={item.id} title={item.name}>
+          {item.description}
+        </Card>
       ))}
     </div>
   );
 };
+```
+
+### Using Shared Components
+
+```typescript
+import { 
+  Button, 
+  Modal, 
+  Card, 
+  Table, 
+  Form, 
+  Loading, 
+  EmptyState 
+} from '@/app/shared/components';
+
+import { 
+  useFetch, 
+  useLocalStorage, 
+  useDebounce, 
+  useForm 
+} from '@/app/shared/hooks';
+```
+
+### Using Layouts
+
+```typescript
+import { MainLayout, AdminLayout, StudentLayout } from '@/app/layouts';
+
+// Public page
+<MainLayout>
+  <UniversityList />
+</MainLayout>
+
+// Admin page
+<AdminLayout>
+  <StudentList />
+</AdminLayout>
+
+// Student page
+<StudentLayout>
+  <StudentDashboard />
+</StudentLayout>
 ```
 
 ---
@@ -519,4 +563,26 @@ cat vite.config.ts | grep proxy
 
 ---
 
-**Last Updated:** 2026-04-02
+## Component Inventory (Updated April 2026)
+
+### Auth Components
+- Login, Register, ForgotPassword, AuthGuard
+
+### Student Components  
+- StudentDashboard, StudentProfile, StudentList, useStudents
+
+### University Components
+- UniversityList, UniversityDetail, UniversityForm, useUniversities
+
+### Layouts
+- MainLayout, AdminLayout, StudentLayout, PublicLayout
+
+### Shared Components
+- Button, Modal, Card, Table, Form, Loading, EmptyState
+
+### Shared Hooks
+- useFetch, useLocalStorage, useDebounce, useForm
+
+---
+
+**Last Updated:** 2026-04-03

@@ -86,7 +86,7 @@ DB --> AuditTbl
 @startuml DuHocCost_FrontendComponents
 skinparam componentStyle rectangle
 
-title Frontend Component Architecture
+title Frontend Component Architecture (Updated April 2026)
 
 package "App Entry" {
     [main.tsx] as Main
@@ -105,18 +105,32 @@ package "Context Layer" {
 }
 
 package "Layout Components" {
-    [Layout.tsx] as Layout
-    [Sidebar Navigation] as Sidebar
-    [Header] as Header
-    [Footer] as Footer
+    [MainLayout.tsx] as MainLayout
+    [AdminLayout.tsx] as AdminLayout
+    [StudentLayout.tsx] as StudentLayout
+    [PublicLayout.tsx] as PublicLayout
 }
 
-package "Admin Pages" {
-    [AdminDashboard.tsx] as AdminDashboard
-    [AdminRoles.tsx] as AdminRoles
-    [UniversitiesList] as UniversitiesList
-    [StudentManagement] as StudentManagement
-    [RegistrationManagement] as RegistrationManagement
+package "Auth Feature" {
+    [Login.tsx] as Login
+    [Register.tsx] as Register
+    [ForgotPassword.tsx] as ForgotPassword
+    [AuthGuard.tsx] as AuthGuard
+    [useAuth.ts] as useAuth
+}
+
+package "Students Feature" {
+    [StudentDashboard.tsx] as StudentDashboard
+    [StudentProfile.tsx] as StudentProfile
+    [StudentList.tsx] as StudentList
+    [useStudents.ts] as useStudents
+}
+
+package "Universities Feature" {
+    [UniversityList.tsx] as UniversityList
+    [UniversityDetail.tsx] as UniversityDetail
+    [UniversityForm.tsx] as UniversityForm
+    [useUniversities.ts] as useUniversities
 }
 
 package "RBAC Components" {
@@ -125,35 +139,102 @@ package "RBAC Components" {
     [rbac.ts Constants] as RBACConstants
 }
 
+package "Shared Components" {
+    [Button.tsx] as Button
+    [Modal.tsx] as Modal
+    [Card.tsx] as Card
+    [Table.tsx] as Table
+    [Form.tsx] as Form
+    [Loading.tsx] as Loading
+    [EmptyState.tsx] as EmptyState
+}
+
+package "Shared Hooks" {
+    [useFetch.ts] as useFetch
+    [useLocalStorage.ts] as useLocalStorage
+    [useDebounce.ts] as useDebounce
+    [useForm.ts] as useForm
+}
+
+package "Admin Pages" {
+    [AdminDashboard.tsx] as AdminDashboard
+    [AdminRoles.tsx] as AdminRoles
+    [UniversitiesList] as UniversitiesListAdmin
+    [StudentManagement] as StudentManagement
+    [RegistrationManagement] as RegistrationManagement
+}
+
 package "Reusable Components" {
-    [UniversityForm.tsx] as UniversityForm
     [EditUniversityModal.tsx] as EditUniversityModal
     [ImportUniversitiesModal.tsx] as ImportModal
     [AdminInvite.tsx] as AdminInvite
 }
 
+' Entry Point Connections
 Main --> Routes
 Routes --> AuthContext
 Routes --> AppContext
-Routes --> Layout
 
-Layout --> AdminDashboard
-Layout --> AdminRoles
-Layout --> UniversitiesList
-Layout --> StudentManagement
-Layout --> RegistrationManagement
+' Layout Connections
+Routes --> MainLayout : public
+Routes --> AdminLayout : admin
+Routes --> StudentLayout : student
 
+' Auth Feature
+AuthContext --> useAuth
+useAuth --> Login
+useAuth --> Register
+useAuth --> ForgotPassword
+Routes --> AuthGuard : protection
+AuthGuard --> RBACConstants
+
+' Student Feature
+StudentLayout --> StudentDashboard
+StudentLayout --> StudentProfile
+AdminLayout --> StudentList
+StudentDashboard --> useStudents
+StudentList --> useStudents
+StudentProfile --> useStudents
+
+' University Feature
+MainLayout --> UniversityList
+MainLayout --> UniversityDetail
+AdminLayout --> UniversityForm
+UniversityList --> useUniversities
+UniversityDetail --> useUniversities
+UniversityForm --> useUniversities
+
+' Shared Components (used by all)
+Login --> Button
+Register --> Button
+StudentDashboard --> Card
+StudentList --> Table
+UniversityList --> Card
+UniversityForm --> Form
+AllComponents ..> Loading : uses
+AllComponents ..> Modal : uses
+AllComponents ..> EmptyState : uses
+
+' Shared Hooks (used by features)
+useStudents --> useFetch
+useStudents --> useLocalStorage
+useUniversities --> useFetch
+useUniversities --> useDebounce
+UniversityForm --> useForm
+
+' Admin Pages
+AdminLayout --> AdminDashboard
+AdminLayout --> AdminRoles
+AdminLayout --> UniversitiesListAdmin
+AdminLayout --> StudentManagement
 AdminDashboard --> PermissionGuard
-AdminRoles --> PermissionGuard
-UniversitiesList --> PermissionGuard
-
-PermissionGuard --> RBACConstants
-PermissionRoute --> RBACConstants
-
-UniversitiesList --> UniversityForm
-UniversitiesList --> EditUniversityModal
-UniversitiesList --> ImportModal
 AdminRoles --> AdminInvite
+UniversitiesListAdmin --> EditUniversityModal
+UniversitiesListAdmin --> ImportModal
+
+' RBAC
+PermissionRoute --> RBACConstants
+PermissionGuard --> RBACConstants
 
 @enduml
 
@@ -453,7 +534,7 @@ Frontend --> Email: Redirect to login
 
 @startuml DuHocCost_ClassDiagram
 
-title Component Class Diagram
+title Component Class Diagram (Updated April 2026)
 
 class AuthProvider {
     +User user
@@ -474,11 +555,161 @@ class AppProvider {
     +addUniversities(data)
 }
 
-class Layout {
+class MainLayout {
+    +boolean isAuthenticated
+    +Array navItems
+    +handleLogout()
+    +renderNavigation()
+}
+
+class AdminLayout {
     +boolean sidebarCollapsed
     +Array menuItems
+    +User user
     +toggleSidebar()
     +handleLogout()
+}
+
+class StudentLayout {
+    +boolean sidebarCollapsed
+    +Array menuItems
+    +User user
+    +toggleSidebar()
+    +handleLogout()
+}
+
+class Login {
+    +string email
+    +string password
+    +boolean isLoading
+    +handleSubmit()
+}
+
+class Register {
+    +object formData
+    +boolean isLoading
+    +boolean success
+    +handleSubmit()
+}
+
+class AuthGuard {
+    +string requiredRole
+    +ReactNode children
+    +boolean isAuthenticated
+    +checkAuth()
+}
+
+class StudentDashboard {
+    +Student student
+    +Array stats
+    +Array quickLinks
+    +Array recentActivity
+}
+
+class StudentProfile {
+    +Student profile
+    +boolean isEditing
+    +handleSubmit()
+    +toggleEdit()
+}
+
+class StudentList {
+    +Array students
+    +string searchTerm
+    +string statusFilter
+    +handleSearch()
+    +handleFilter()
+}
+
+class useStudents {
+    +Array students
+    +boolean isLoading
+    +function fetchStudents()
+    +function createStudent()
+    +function updateStudent()
+    +function deleteStudent()
+}
+
+class UniversityList {
+    +Array universities
+    +string searchTerm
+    +string tierFilter
+    +handleSearch()
+    +handleFilter()
+}
+
+class UniversityDetail {
+    +University university
+    +Array relatedUniversities
+}
+
+class UniversityForm {
+    +object formData
+    +Array majors
+    +boolean isLoading
+    +handleSubmit()
+    +addMajor()
+    +removeMajor()
+}
+
+class useUniversities {
+    +Array universities
+    +boolean isLoading
+    +function fetchUniversities()
+    +function createUniversity()
+    +function updateUniversity()
+    +function deleteUniversity()
+}
+
+class Button {
+    +string variant
+    +string size
+    +boolean isLoading
+    +handleClick()
+}
+
+class Modal {
+    +boolean isOpen
+    +string title
+    +ReactNode children
+    +function onClose()
+}
+
+class Card {
+    +string title
+    +string subtitle
+    +ReactNode children
+    +ReactNode footer
+}
+
+class Table {
+    +Array data
+    +Array columns
+    +function keyExtractor
+    +boolean isLoading
+}
+
+class Form {
+    +object values
+    +object errors
+    +function handleSubmit()
+    +function handleChange()
+}
+
+class useFetch {
+    +any data
+    +boolean isLoading
+    +Error error
+    +function refetch()
+}
+
+class useForm {
+    +object values
+    +object errors
+    +boolean isSubmitting
+    +function handleSubmit()
+    +function handleChange()
+    +function resetForm()
 }
 
 class PermissionGuard {
@@ -496,47 +727,45 @@ class PermissionRoute {
     +render()
 }
 
-class AdminInvite {
-    -Array invitedUsers
-    -boolean showInviteForm
-    -string copiedLink
-    +inviteUser(data)
-    +resendInvite(id)
-    +fetchInvitedUsers()
-}
-
-class UniversitiesList {
-    -Array universities
-    -string searchQuery
-    -boolean showAddModal
-    +handleSearch(query)
-    +handleAdd(university)
-    +handleEdit(id, data)
-    +handleDelete(id)
-    +handleQuickInfo(id)
-}
-
-class UniversityForm {
-    -object formData
-    -boolean loading
-    +handleSubmit(data)
-    +handleImageUpload(file)
-}
-
-class AdminDashboard {
-    -object stats
-    -Array recentActivity
-    +fetchDashboardData()
-    +handleImportCSV()
-}
-
-AuthProvider "1" --> "1" Layout : provides auth state
-AppProvider "1" --> "1" UniversitiesList : provides data
+' Relationships
+AuthProvider "1" --> "1" MainLayout : provides auth
+AuthProvider "1" --> "1" AdminLayout : provides auth
+AuthProvider "1" --> "1" StudentLayout : provides auth
 AuthProvider "1" --> "1" PermissionGuard : provides permission check
-Layout "1" --> "1" AdminInvite : contains
-Layout "1" --> "1" UniversitiesList : contains
-Layout "1" --> "1" AdminDashboard : contains
-UniversitiesList "1" --> "1" UniversityForm : uses
+
+AppProvider "1" --> "1" UniversityList : provides data
+AppProvider "1" --> "1" StudentList : provides data
+
+MainLayout "1" --> "1" UniversityList : contains
+MainLayout "1" --> "1" UniversityDetail : contains
+MainLayout "1" --> "1" Login : contains
+
+AdminLayout "1" --> "1" StudentList : contains
+AdminLayout "1" --> "1" UniversityForm : contains
+
+StudentLayout "1" --> "1" StudentDashboard : contains
+StudentLayout "1" --> "1" StudentProfile : contains
+
+StudentDashboard --> useStudents : uses
+StudentList --> useStudents : uses
+StudentProfile --> useStudents : uses
+
+UniversityList --> useUniversities : uses
+UniversityDetail --> useUniversities : uses
+UniversityForm --> useUniversities : uses
+
+useStudents --> useFetch : uses
+useUniversities --> useFetch : uses
+
+UniversityForm --> Form : uses
+UniversityForm --> Button : uses
+StudentList --> Table : uses
+StudentDashboard --> Card : uses
+
+Login --> Button : uses
+Register --> Button : uses
+Register --> Form : uses
+
 PermissionRoute ..> PermissionGuard : uses
 
 @enduml
