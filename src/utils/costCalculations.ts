@@ -1,5 +1,6 @@
 import type { University, UniversitySystem } from '../types/university';
 import type { FlexibleFee } from '../types/fees';
+import { EXCHANGE_RATES, convertCurrency } from '../constants/exchangeRates';
 
 export interface CostBreakdown {
   fixedCosts: number;
@@ -285,18 +286,12 @@ export function formatCostDisplay(cost: EstimatedTotalCost, targetCurrency: stri
   hasRange: boolean;
 } {
   // Simple conversion rates (in real app, use API)
-  const conversionRates: Record<string, number> = {
-    VND: 1,
-    USD: 0.00004,
-    KRW: 0.053,
-    JPY: 0.0061,
-    CNY: 0.00029
-  };
-
-  const rate = conversionRates[targetCurrency] || 1;
+  const rateFrom = 1;
+  const rateTo = EXCHANGE_RATES[targetCurrency as keyof typeof EXCHANGE_RATES] || 1;
+  const convertedAmount = (amount: number) => amount * (rateTo / rateFrom);
   
   const formatCurrency = (amount: number, currency: string) => {
-    const converted = Math.round(amount * rate);
+    const converted = Math.round(convertedAmount(amount));
     
     switch (currency) {
       case 'VND':

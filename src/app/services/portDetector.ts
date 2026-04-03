@@ -62,12 +62,27 @@ export async function findServerPort(): Promise<number | null> {
 
 /**
  * Get the current API URL (with detected port)
+ * Production: Use VITE_API_URL directly without probing
+ * Development: Auto-detect localhost port
  */
 export async function getApiUrl(): Promise<string> {
-  // In production (Vercel), use env var directly - no localhost probing
+  // In production (Vercel/Netlify), use env var directly - NO localhost probing
   const envUrl = import.meta.env.VITE_API_URL;
+  
+  // Detect production environment
+  const isProduction = import.meta.env.PROD === true || 
+                       import.meta.env.MODE === 'production' ||
+                       window.location.hostname !== 'localhost';
+  
+  if (isProduction && envUrl) {
+    // Production: Return env URL immediately without health check
+    // Health checks can timeout and cause 6-10s delays per request
+    console.log(`[PortDetector] Production mode - using env URL: ${envUrl}`);
+    return envUrl;
+  }
+  
+  // If env URL exists (even in dev), try it first with health check
   if (envUrl) {
-    // Verify the env URL is healthy (optional check)
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 3000);
@@ -85,7 +100,7 @@ export async function getApiUrl(): Promise<string> {
     }
   }
   
-  // Development: Auto-detect port from localhost
+  // Development: Auto-detect port from localhost only
   const port = await findServerPort();
   if (port) {
     const url = `http://localhost:${port}/api`;
@@ -93,7 +108,7 @@ export async function getApiUrl(): Promise<string> {
     return url;
   }
   
-  // Final fallback
+  // Final fallback - only for development
   console.log('[PortDetector] Using default fallback: http://localhost:3001/api');
   return 'http://localhost:3001/api';
 }

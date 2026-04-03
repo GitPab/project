@@ -989,8 +989,8 @@ async function startServer() {
           [adminId, 'Administrator', 'admin@duhoccost.vn', adminHash, 'admin', true]
         );
         
-        logger.info('Default admin user created', { email: 'admin@duhoccost.vn', password: '***MASKED***' });
-        console.log('\n✅ Default admin created: admin@duhoccost.vn / [PASSWORD_MASKED]\n');
+        logger.info('Default admin user created', { email: 'admin@duhoccost.vn' }); // Password not logged for security
+        console.log('\n✅ Default admin created: admin@duhoccost.vn / [PASSWORD_HIDDEN]\n');
       } else {
         console.log('[DEBUG] Users already exist, skipping admin seed');
       }

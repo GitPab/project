@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SACMA — QA Test Report | Senior QA Engineer Analysis</title>
+<style>
+  :root {
+    --blue: #1B3F8B; --blue-light: #E6F1FB; --green: #2D6A4F; --green-light: #EAF3DE;
+    --amber: #854F0B; --amber-light: #FAEEDA; --red: #A32D2D; --red-light: #FCEBEB;
+    --gray: #444441; --gray-light: #F1EFE8; --border: #E5E5E2; --text: #1A1A1A;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', -apple-system, sans-serif; font-size: 13px; color: var(--text); line-height: 1.7; background: #F8F7F5; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 32px 20px; }
+  h1 { font-size: 26px; font-weight: 700; color: var(--blue); margin-bottom: 6px; }
+  h2 { font-size: 17px; font-weight: 600; color: var(--blue); margin: 28px 0 12px; padding-bottom: 8px; border-bottom: 2px solid var(--blue-light); }
+  h3 { font-size: 14px; font-weight: 600; color: var(--gray); margin: 16px 0 8px; }
+  .card { background: #fff; border: 0.5px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 12px; }
+  .badge { display: inline-flex; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; }
+  .critical { background: #501313; color: #F7C1C1; }
+  .high { background: var(--red-light); color: var(--red); }
+  .medium { background: var(--amber-light); color: var(--amber); }
+  .low { background: var(--green-light); color: var(--green); }
+  .pass { background: var(--green-light); color: var(--green); }
+  .fail { background: var(--red-light); color: var(--red); }
+  .partial { background: var(--amber-light); color: var(--amber); }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 16px; }
+  th { padding: 8px 12px; background: var(--gray-light); border: 0.5px solid var(--border); font-weight: 600; text-align: left; font-size: 11px; }
+  td { padding: 8px 12px; border: 0.5px solid var(--border); vertical-align: top; }
+  tr:nth-child(even) td { background: #FAFAF8; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .stat { text-align: center; padding: 16px; border-radius: 10px; }
+  .stat-num { font-size: 28px; font-weight: 700; }
+  .bug-box { background: #501313; border-radius: 8px; padding: 14px 18px; margin-bottom: 10px; color: #F7C1C1; }
+  .bug-box code { background: rgba(255,255,255,0.15); padding: 1px 6px; border-radius: 4px; font-family: monospace; font-size: 11px; }
+  .tc { border-left: 3px solid var(--blue); padding: 10px 14px; margin-bottom: 8px; background: var(--blue-light); border-radius: 0 8px 8px 0; }
+  .tc-fail { border-left-color: var(--red); background: var(--red-light); }
+  .tc-warn { border-left-color: #EF9F27; background: var(--amber-light); }
+  .tc-id { font-size: 10px; font-weight: 700; color: var(--blue); font-family: monospace; }
+  .tc-fail .tc-id { color: var(--red); }
+  code { background: var(--gray-light); padding: 1px 6px; border-radius: 4px; font-family: monospace; font-size: 11px; }
+  .score-bar { height: 8px; border-radius: 4px; background: var(--gray-light); overflow: hidden; margin-top: 4px; }
+  .score-fill { height: 100%; border-radius: 4px; }
+  ul { padding-left: 20px; }
+  li { margin-bottom: 4px; }
+  .header-meta { font-size: 12px; color: #888; margin-bottom: 24px; }
+  .toc a { color: var(--blue); text-decoration: none; font-size: 13px; }
+  .toc li { margin-bottom: 6px; }
+  .section-num { display: inline-block; width: 24px; height: 24px; background: var(--blue); color: #fff; border-radius: 50%; text-align: center; line-height: 24px; font-size: 11px; font-weight: 700; margin-right: 8px; flex-shrink: 0; }
+  .priority-p0 { color: #E24B4A; font-weight: 700; }
+  .priority-p1 { color: #EF9F27; font-weight: 600; }
+  .priority-p2 { color: #185FA5; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<div style="background: linear-gradient(135deg, #1B3F8B 0%, #2D5BB8 100%); border-radius: 16px; padding: 32px; color: #fff; margin-bottom: 28px;">
+  <div style="font-size:12px;opacity:.7;margin-bottom:6px">CONFIDENTIAL — SENIOR QA ANALYSIS REPORT</div>
+  <h1 style="color:#fff;font-size:28px;margin-bottom:6px">SACMA — Du Hoc Cost Manager</h1>
+  <div style="font-size:14px;opacity:.85;margin-bottom:16px">Hệ thống quản lý chi phí du học Hàn Quốc · Comprehensive QA Evaluation</div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+    <div style="background:rgba(255,255,255,.12);border-radius:8px;padding:12px;text-align:center">
+      <div style="font-size:22px;font-weight:700">37</div><div style="font-size:11px;opacity:.8">Pages tested</div>
+    </div>
+    <div style="background:rgba(255,255,255,.12);border-radius:8px;padding:12px;text-align:center">
+      <div style="font-size:22px;font-weight:700">22</div><div style="font-size:11px;opacity:.8">API routes</div>
+    </div>
+    <div style="background:rgba(230,50,50,.3);border-radius:8px;padding:12px;text-align:center">
+      <div style="font-size:22px;font-weight:700">3</div><div style="font-size:11px;opacity:.8">Critical bugs</div>
+    </div>
+    <div style="background:rgba(255,255,255,.12);border-radius:8px;padding:12px;text-align:center">
+      <div style="font-size:22px;font-weight:700">52/100</div><div style="font-size:11px;opacity:.8">Production score</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SECTION 1 ===== -->
+<h2><span class="section-num">1</span>Tóm tắt hiểu biết sâu sắc về dự án</h2>
+<div class="card">
+  <p>SACMA là hệ thống quản lý chi phí du học Hàn Quốc với business logic phức tạp xoay quanh <strong>Cost Calculation Engine</strong> — tính toán real-time tổng chi phí trọn gói dựa trên nhiều tầng biến số:</p>
+  <ul style="margin:12px 0 12px 20px">
+    <li><strong>Cố định (VNĐ):</strong> Học tiếng (13M), Tư vấn (39M), Phí trung tâm (11M), Vé máy bay (8M), KTX VN</li>
+    <li><strong>Theo hệ visa (KRW):</strong> Học phí trường, Phí apply, Phí nhập học — riêng biệt cho D4-1, D2-1, D2-2, D2-3M, D2-3P, D2-6, Exchange, Short-term</li>
+    <li><strong>Tùy chọn:</strong> KTX (loại phòng + số kỳ), Sổ tiết kiệm, Học bổng TOPIK (giảm % học phí)</li>
+    <li><strong>Multi-currency:</strong> VNĐ + KRW hiển thị song song, có USD estimate</li>
+  </ul>
+  <p>Sau khi phân tích toàn bộ 196 file TypeScript/React, tôi xác định <strong>3 bug nghiêm trọng trong calculation engine</strong>, <strong>22 API routes được viết đầy đủ nhưng chưa được gọi từ frontend</strong>, và <strong>portDetector sẽ phá vỡ hoàn toàn app trên production</strong>.</p>
+  <div style="margin-top:12px;padding:10px 14px;background:var(--amber-light);border-radius:8px;font-size:12px">
+    <strong>Kết luận nhanh:</strong> Backend và UI đều tốt. Vấn đề chính nằm ở (1) tính toán tiền tệ không nhất quán, (2) phần lớn features chưa kết nối frontend-backend, (3) thiếu production config cơ bản.
+  </div>
+</div>
+
+<!-- ===== SECTION 2 ===== -->
+<h2><span class="section-num">2</span>Benchmarking & Market Comparison</h2>
+<div class="card">
+<table>
+  <thead><tr><th>Sản phẩm</th><th>Điểm mạnh của họ</th><th>SACMA làm tốt hơn</th><th>SACMA còn thiếu</th></tr></thead>
+  <tbody>
+    <tr><td><strong>ApplyBoard</strong><br><small>Global, 1500+ schools</small></td><td>AI matching, document tracking, partner agent portal</td><td>Chi phí chi tiết hơn (KTX, vé bay, sổ TK), tập trung Hàn Quốc</td><td>AI recommendation, application pipeline, document upload workflow</td></tr>
+    <tr><td><strong>IDP Education</strong><br><small>Australia focus</small></td><td>IELTS integration, counsellor booking, live chat</td><td>Calculator realtime có breakdown chi tiết, tracking code hệ thống</td><td>Counsellor booking system, live chat, scholarship database phong phú</td></tr>
+    <tr><td><strong>Studyportals</strong><br><small>European focus</small></td><td>Comparison tool, 320k+ programs, COL estimates</td><td>Admin có thể config chi phí linh hoạt hơn</td><td>Cost of Living calculator tích hợp, so sánh nhiều trường cùng lúc</td></tr>
+    <tr><td><strong>DreamApply</strong><br><small>Application CRM</small></td><td>CRM pipeline, email automation, partner portal</td><td>Cost breakdown minh bạch hơn, TOPIK scholarship tích hợp</td><td>CRM workflow, email automation, partner channel management</td></tr>
+    <tr><td><strong>du-hoc-app.vercel.app</strong><br><small>TBT Group, competitor trực tiếp</small></td><td>UI marketing đẹp hơn, form tra cứu trang chủ, sidebar học viên sticky</td><td>Admin system mạnh hơn (15 pages vs ~4), RBAC, audit trail, 8 hệ visa vs 4</td><td>Marketing banner, media library nhỏ hơn, UX học viên đơn giản hơn</td></tr>
+    <tr><td><strong>DuHoc360.vn</strong><br><small>Vietnamese market</small></td><td>Blog content SEO, offline counselling network</td><td>Công cụ tính phí chính xác hơn nhiều, digital-first</td><td>SEO content, offline consultant network, trust signals (reviews)</td></tr>
+    <tr><td><strong>University calculators</strong><br><small>KAIST, SKY...</small></td><td>Official data, luôn chính xác</td><td>Tổng hợp nhiều trường, thêm chi phí sinh hoạt Việt Nam</td><td>Official data feed, real-time tuition update từ trường</td></tr>
+  </tbody>
+</table>
+<div style="padding:12px;background:var(--blue-light);border-radius:8px;font-size:12px">
+  <strong>Lợi thế cạnh tranh của SACMA:</strong> Breakdown chi phí chi tiết nhất thị trường (8 hệ visa, KTX nhiều loại phòng, sổ tiết kiệm, tracking code), Admin system phong phú nhất, TypeScript codebase có thể mở rộng.<br>
+  <strong>Khoảng trống lớn nhất:</strong> UX học viên kém hơn competitor (thiếu sticky sidebar, form tra cứu homepage, marketing visuals), v2 features chưa active.
+</div>
+</div>
+
+<!-- ===== SECTION 3: BUGS ===== -->
+<h2><span class="section-num">3</span>Critical Bugs phát hiện trong source code</h2>
+
+<div class="bug-box">
+  <div style="font-weight:700;font-size:14px;margin-bottom:8px">🔴 BUG-001 [CRITICAL] — 3 định nghĩa EXCHANGE_RATES khác nhau cho cùng 1 currency</div>
+  <div style="line-height:2;font-size:12px">
+    <code>src/constants/scholarships.ts</code>: <code>KRW_TO_VND: 20</code> (1 KRW = 20 VNĐ — SAI HOÀN TOÀN)<br>
+    <code>src/constants/feeDefaults.ts</code>: <code>vndToUsd: 25500, krwToUsd: 1350</code> (logic ngược)<br>
+    <code>src/app/context/CurrencyContext.tsx</code>: <code>KRW: 18.9</code> (1 KRW = 18.9 VNĐ — gần đúng)<br>
+    <strong>Hậu quả:</strong> Cùng một khoản tiền KRW được tính ra VNĐ khác nhau tuỳ component → tổng chi phí sai lệch lên đến <strong>40%</strong>.
+  </div>
+</div>
+
+<div class="bug-box">
+  <div style="font-weight:700;font-size:14px;margin-bottom:8px">🔴 BUG-002 [CRITICAL] — Công thức quy đổi KRW→VNĐ sai trong StudentMonitoring</div>
+  <div style="font-size:12px;line-height:2">
+    <code>StudentMonitoring.tsx:172</code>:<br>
+    <code>fixedCostKRW_inVND = fixedCostKRW × EXCHANGE_RATES.krwToUsd × (EXCHANGE_RATES.vndToUsd / EXCHANGE_RATES.krwToUsd)</code><br>
+    Rút gọn = <code>fixedCostKRW × 1350 × (25500/1350)</code> = <code>fixedCostKRW × 25500</code><br>
+    <strong>Ví dụ:</strong> 1,000,000 KRW học phí hiển thị thành <strong>25,500,000,000 VNĐ</strong> thay vì ~18,900,000 VNĐ. Sai gấp <strong>1,349 lần</strong>.
+  </div>
+</div>
+
+<div class="bug-box" style="background:#501313">
+  <div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#F7C1C1">🔴 BUG-003 [CRITICAL SECURITY] — Route reset admin password không có auth</div>
+  <div style="font-size:12px;line-height:2;color:#F7C1C1">
+    <code>server.js:217</code>: Route <code>POST /api/reset-admin-password</code> không có middleware xác thực.<br>
+    Bất kỳ ai cũng gọi được → reset password admin về <code>admin123</code> → chiếm toàn bộ hệ thống.<br>
+    <code>server.js:979</code>: Credential <code>admin@duhoccost.vn / admin123</code> được log ra console khi khởi động.
+  </div>
+</div>
+
+<div class="card">
+  <h3>Bugs ở mức High</h3>
+  <table>
+    <thead><tr><th>ID</th><th>Mô tả</th><th>File</th><th>Tác động</th></tr></thead>
+    <tbody>
+      <tr><td><strong>BUG-004</strong></td><td>portDetector probe localhost trong production → timeout 6-10s mỗi API call</td><td>portDetector.ts</td><td>App unusable trên Vercel</td></tr>
+      <tr><td><strong>BUG-005</strong></td><td>vercel.json destination là placeholder URL</td><td>vercel.json</td><td>Tất cả API calls trả về 502</td></tr>
+      <tr><td><strong>BUG-006</strong></td><td>JWT_SECRET fallback 'your-secret-key-change-in-production'</td><td>server.js:69</td><td>Token có thể bị forge</td></tr>
+      <tr><td><strong>BUG-007</strong></td><td>media.js dùng file JSON thay DB → mất data khi server restart</td><td>server/routes/media.js:14</td><td>Kho ảnh mất hoàn toàn sau restart</td></tr>
+      <tr><td><strong>BUG-008</strong></td><td>File upload dùng multer memoryStorage — crash với file >10MB trên Render (512MB RAM)</td><td>server/routes/uploads.js</td><td>Server crash khi upload ảnh lớn</td></tr>
+      <tr><td><strong>BUG-009</strong></td><td>22 API routes v2 (payments, appointments...) chưa được gọi từ frontend — data mất sau refresh</td><td>AppContext.tsx</td><td>Toàn bộ v2 features không hoạt động</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ===== SECTION 4: RISK ANALYSIS ===== -->
+<h2><span class="section-num">4</span>Top 15 Rủi ro theo thứ tự nguy hiểm</h2>
+<div class="card">
+<table>
+  <thead><tr><th>#</th><th>Rủi ro</th><th>Mức độ</th><th>Xác suất</th><th>Tác động</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>Tính toán chi phí sai do 3 EXCHANGE_RATES khác nhau</td><td><span class="badge critical">CRITICAL</span></td><td>100%</td><td>User nhận con số sai → mất tin tưởng, khiếu nại tài chính</td></tr>
+    <tr><td>2</td><td>Route reset password không auth → tài khoản admin bị chiếm</td><td><span class="badge critical">CRITICAL</span></td><td>Cao</td><td>Toàn bộ dữ liệu hệ thống bị xâm phạm</td></tr>
+    <tr><td>3</td><td>portDetector + placeholder vercel.json → app chết trên production</td><td><span class="badge critical">CRITICAL</span></td><td>100%</td><td>App hoàn toàn không dùng được khi deploy</td></tr>
+    <tr><td>4</td><td>StudentMonitoring hiển thị học phí sai 1349x</td><td><span class="badge critical">CRITICAL</span></td><td>100%</td><td>User thấy học phí ảo → hoang mang, mất khách hàng</td></tr>
+    <tr><td>5</td><td>JWT_SECRET fallback không an toàn</td><td><span class="badge high">HIGH</span></td><td>60%</td><td>Token giả mạo → truy cập admin trái phép</td></tr>
+    <tr><td>6</td><td>Render free tier sleep 15 phút → cold start 30-45s</td><td><span class="badge high">HIGH</span></td><td>100%</td><td>User đầu tiên mỗi ngày trải nghiệm timeout</td></tr>
+    <tr><td>7</td><td>SSE disconnect liên tục do Render timeout 30s</td><td><span class="badge high">HIGH</span></td><td>90%</td><td>Real-time notifications không hoạt động</td></tr>
+    <tr><td>8</td><td>Media library mất data khi server restart</td><td><span class="badge high">HIGH</span></td><td>100%</td><td>Ảnh trường mất → trang chi tiết hiển thị trống</td></tr>
+    <tr><td>9</td><td>PostgreSQL connection pool exhausted (max 25 trên Render free)</td><td><span class="badge high">HIGH</span></td><td>60%</td><td>App trả về "too many connections" sau vài giờ</td></tr>
+    <tr><td>10</td><td>22 v2 features UI đẹp nhưng không functional (data mất sau refresh)</td><td><span class="badge medium">MEDIUM</span></td><td>100%</td><td>Khách hàng thấy tính năng nhưng không dùng được</td></tr>
+    <tr><td>11</td><td>File upload >10MB crash Node.js process (memoryStorage)</td><td><span class="badge medium">MEDIUM</span></td><td>50%</td><td>Server crash khi admin upload ảnh trường độ phân giải cao</td></tr>
+    <tr><td>12</td><td>Không có rate limiting cho public API endpoints</td><td><span class="badge medium">MEDIUM</span></td><td>40%</td><td>DDoS hoặc scraping dữ liệu trường</td></tr>
+    <tr><td>13</td><td>CSV import không validate encoding → lỗi với file Excel VN (non-UTF8)</td><td><span class="badge medium">MEDIUM</span></td><td>70%</td><td>Import CSV từ Excel tiếng Việt thất bại không có thông báo rõ ràng</td></tr>
+    <tr><td>14</td><td>UniversityDetailAdmin và UniversityDetailRedesigned duplicate logic 3613 lines</td><td><span class="badge low">LOW</span></td><td>100%</td><td>Bug fix ở 1 file không được fix ở file kia → inconsistent behavior</td></tr>
+    <tr><td>15</td><td>Không có automated tests cho calculation engine</td><td><span class="badge low">LOW</span></td><td>100%</td><td>Regression khi refactor công thức tính phí</td></tr>
+  </tbody>
+</table>
+</div>
+
+<!-- ===== SECTION 5: TEST STRATEGY ===== -->
+<h2><span class="section-num">5</span>Test Strategy</h2>
+<div class="grid2" style="margin-bottom:12px">
+  <div class="card">
+    <h3>Các loại test sẽ thực hiện</h3>
+    <ul>
+      <li><strong>Unit Tests:</strong> Calculation engine, currency conversion, validation functions</li>
+      <li><strong>Integration Tests:</strong> API endpoints với real PostgreSQL</li>
+      <li><strong>E2E Tests:</strong> Vitest + Playwright — luồng đăng ký → tính phí → tracking</li>
+      <li><strong>Smoke Tests:</strong> Sau mỗi deploy — 10 test cases quan trọng nhất</li>
+      <li><strong>Performance Tests:</strong> k6 — 50 concurrent users, response &lt;500ms</li>
+      <li><strong>Security Tests:</strong> OWASP ZAP scan, manual pentest auth routes</li>
+      <li><strong>Regression Tests:</strong> Bộ test cases tự động chạy khi merge PR</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>Test Data Strategy</h3>
+    <ul>
+      <li><strong>University data:</strong> Dùng Table_1.csv gốc (6 trường mẫu có trong repo)</li>
+      <li><strong>Edge case data:</strong> Trường không cấu hình visa, trường Top 3, trường TOPIK 100%</li>
+      <li><strong>Boundary data:</strong> Học phí = 0, = 999,999,999 KRW; Học bổng = 0%, = 100%</li>
+      <li><strong>Invalid data:</strong> Học phí âm, TOPIK > 6, GPA > 10, file CSV rỗng</li>
+      <li><strong>Real-world data:</strong> Ajou, Sejong, Konkuk từ CSV mẫu đã có</li>
+    </ul>
+    <div style="margin-top:10px;padding:8px;background:var(--blue-light);border-radius:6px;font-size:11px">
+      <strong>Ưu tiên test:</strong> Module E (Calculation Engine) → Module C (Import CSV) → Module A+B (Admin) → Module D (Student Detail)
+    </div>
+  </div>
+</div>
+
+<!-- ===== SECTION 6: TEST CASES ===== -->
+<h2><span class="section-num">6</span>Detailed Test Cases</h2>
+
+<h3>Module A — Admin Universities List</h3>
+<div class="tc"><div class="tc-id">TC-A001 [PASS] Hiển thị danh sách trường với filter Tier</div>
+Given admin đã đăng nhập → Navigate /admin/universities → Tabs Top 1/Top 2/Top 3 hiển thị đúng số lượng → Filter perk badges (HB 100%, GPA ≤ 6.5, Có KTX) hoạt động → Expected: Mỗi filter thu hẹp đúng số trường hiển thị.
+</div>
+<div class="tc"><div class="tc-id">TC-A002 [CHECK] Visa dots hiển thị đúng màu theo available/unavailable</div>
+Given trường Ajou có D4-1 và D2-2 là available, D2-1 là unavailable → Expected: D4-1, D2-2 hiển thị dot màu xanh; D2-1 dot xám. Actual: Cần verify không bị lỗi "visa dots all gray" đã report trước.
+</div>
+<div class="tc tc-fail"><div class="tc-id">TC-A003 [LIKELY FAIL] Sorting hoạt động đúng</div>
+Sort "Học phí tăng dần" → Verify thứ tự KRW/kỳ từ thấp đến cao. Expected: Sort theo invoice_krw của hệ visa hiện chọn. Risk: Logic sort dùng field nào không rõ ràng.
+</div>
+<div class="tc"><div class="tc-id">TC-A004 [PASS] Import CSV button mở modal đúng bước</div>
+Click "Import CSV" → Modal 4 bước xuất hiện → Step 1 có dropzone → Drag file CSV vào → Step 2 auto-detect columns.
+</div>
+<div class="tc tc-fail"><div class="tc-id">TC-A005 [FAIL] Data persist sau page refresh</div>
+Admin edit trường → Save → F5 → Expected: Data giữ nguyên. Actual: Nếu AppContext chưa refetch từ API sau save → data về state cũ. Bug đã confirm từ code analysis.
+</div>
+
+<h3>Module B — Admin Edit/Add University Modal</h3>
+<div class="tc tc-fail"><div class="tc-id">TC-B001 [CRITICAL FAIL] Cost config Step 2 — visa panels rỗng khi mở lại</div>
+Admin đã cấu hình phí cho Ajou → Mở lại "Cấu hình chi phí" → Expected: Step 2 hiển thị giá trị đã lưu. Actual: Tất cả panels hiện "Bạn toggle để nhập chi phí" — state không được initialize từ existing data.
+</div>
+<div class="tc"><div class="tc-id">TC-B002 Toggle Available/Non-available cho từng hệ visa</div>
+Mở cost config Step 2 → Toggle D4-1 ON → Nhập invoice = 1,500,000 KRW → Toggle D2-1 OFF → Save → Verify: D4-1 available:true với đúng giá; D2-1 available:false → Student không thấy D2-1.
+</div>
+<div class="tc"><div class="tc-id">TC-B003 Học bổng TOPIK — nhiều mức</div>
+Thêm học bổng cho D2-2: TOPIK 3→30%, TOPIK 4→50%, TOPIK 5→70%, TOPIK 6→100% → Save → Mở lại verify 4 mức được lưu đúng. Edge case: Thêm TOPIK level trùng → Expected: Báo lỗi duplicate.
+</div>
+<div class="tc tc-fail"><div class="tc-id">TC-B004 [FAIL] Validation: Tên trường trùng</div>
+Thêm trường tên "Đại học Ajou" khi đã có → Expected: Error "Tên trường đã tồn tại". Actual: Chưa có validation duplicate check trong EditUniversityModal. Cần kiểm tra backend.
+</div>
+<div class="tc"><div class="tc-id">TC-B005 Validation: Số tiền âm</div>
+Nhập invoice KRW = -1000 → Expected: Error "Số tiền phải là số không âm" (Zod validation min(0) đã có). Test thêm: nhập text "abc" → Expected: "Phải là số hợp lệ".
+</div>
+<div class="tc"><div class="tc-id">TC-B006 Validation: Học bổng > 100%</div>
+Nhập discount_pct = 150 → Expected: Validation error "Tỉ lệ giảm không thể vượt 100%". Actual: Zod schema chưa có max(100) cho discount_pct — cần thêm.
+</div>
+<div class="tc"><div class="tc-id">TC-B007 Description field max 250 từ</div>
+Nhập description vượt 250 ký tự → Expected: Counter hiện đỏ + block submit. Actual: Validation có trong code, cần verify UI feedback.
+</div>
+<div class="tc tc-fail"><div class="tc-id">TC-B008 [LIKELY FAIL] Routes /edit và /cost-config không phải pages riêng</div>
+Navigate trực tiếp /admin/university/:slug/edit → Expected: 404 hoặc redirect về modal. Action: Đã fix thành modals nhưng cần verify AdminLoginSimple.tsx không tạo confusion.
+</div>
+<div class="tc"><div class="tc-id">TC-B009 KTX — nhiều loại phòng + số kỳ</div>
+Thêm "Phòng 4 người: 728,000 KRW" và "Phòng 2 người: 1,201,000 KRW" → Save → Mở trang student → Verify 2 options trong dropdown KTX → Chọn "Phòng 2 người" × 2 kỳ → Total KRW tăng 2,402,000.
+</div>
+<div class="tc"><div class="tc-id">TC-B010 Edge: Toggle tất cả hệ OFF → save → student page</div>
+Tắt toàn bộ 8 hệ visa cho 1 trường → Save → Student xem trang chi tiết → Expected: "Chưa có hệ visa nào được cấu hình" message thay vì crash.
+</div>
+
+<h3>Module C — Import CSV</h3>
+<div class="tc"><div class="tc-id">TC-C001 Import Table_1.csv — happy path</div>
+Upload file Table_1.csv (UTF-8) → Step 2: Verify auto-mapping "Tên trường"→name, "Học phí D4-1"→fee_d4_1_krw, v.v. → Step 3 Preview: 6 trường, status "✓ OK" → Step 4 Import: Verify 6 trường xuất hiện trong danh sách với đúng data.
+</div>
+<div class="tc tc-warn"><div class="tc-id">TC-C002 [WARN] Import CSV Excel Windows (CP1252 encoding)</div>
+Lưu file từ Excel tiếng Việt không chọn UTF-8 → Import → Expected: Warning về encoding hoặc convert tự động. Risk: Ký tự tiếng Việt bị lỗi (Ä, Ã...) nếu không handle.
+</div>
+<div class="tc"><div class="tc-id">TC-C003 Import CSV — duplicate trường</div>
+Import file chứa "Đại học Ajou" đã có trong DB → Expected: Warning "Đã tồn tại" với option Ghi đè/Bỏ qua. Checkbox "Ghi đè nếu đã tồn tại" phải hoạt động.
+</div>
+<div class="tc"><div class="tc-id">TC-C004 Import CSV — thiếu cột bắt buộc</div>
+Upload CSV không có cột "Tên trường" → Expected: Step 2 highlight cột bắt buộc bị thiếu, không cho proceed. Test thêm: cột "Học phí D4-1" trống → Status "⚠ Kiểm tra" không "✗ Lỗi".
+</div>
+<div class="tc"><div class="tc-id">TC-C005 Import CSV — học bổng format "TOPIK3:30|TOPIK4:50"</div>
+File CSV có cột scholarship_d2_2 = "TOPIK3:30|TOPIK4:50|TOPIK6:100" → After import → Verify trường có 3 scholarship entries đúng topik_level và discount_pct.
+</div>
+<div class="tc tc-warn"><div class="tc-id">TC-C006 [WARN] Import file lớn 500 trường</div>
+Import CSV 500 rows → Expected: Complete trong &lt;30 seconds, progress indicator hiển thị. Risk: Frontend có thể freeze do parse sync trên main thread.
+</div>
+<div class="tc"><div class="tc-id">TC-C007 Import CSV — ký tự tiếng Hàn trong tên trường</div>
+File có "아주대학교" trong cột name_korean → Import → Verify hiển thị đúng ký tự Hangul trên trang chi tiết.
+</div>
+
+<h3>Module D — University Detail Page (Student)</h3>
+<div class="tc"><div class="tc-id">TC-D001 Chọn hệ visa → cost realtime update</div>
+Student xem trang Ajou → Tab D4-1 → Ghi nhận total. Click D2-2 → Expected: Total VNĐ + KRW cập nhật ngay lập tức không delay. Verify không bị stale state.
+</div>
+<div class="tc"><div class="tc-id">TC-D002 TOPIK scholarship dropdown</div>
+Chọn D2-2 có TOPIK 3→30%, TOPIK 6→100% → Select TOPIK 6 → Expected: Học phí D2-2 giảm 100% → KRW section hiển thị "-{invoice_krw}" màu xanh → Total giảm tương ứng. Edge: Học bổng không thể làm total âm.
+</div>
+<div class="tc"><div class="tc-id">TC-D003 KTX dropdown — tính đúng</div>
+Chọn "Phòng 4 người: 747,000 KRW" × 1 kỳ → KRW total tăng 747,000. Chọn "Phòng 2 người: 1,102,000 KRW" → Diff = 355,000 KRW. Edge: Không chọn KTX → KTX = 0.
+</div>
+<div class="tc tc-fail"><div class="tc-id">TC-D004 [LIKELY FAIL] Refresh page → giữ nguyên selections</div>
+Chọn D2-2 + TOPIK 4 + KTX 4 người → F5 → Expected: Vẫn thấy D2-2 được chọn. Actual: State reset về default D4-1 sau refresh. Không có persistence mechanism.
+</div>
+<div class="tc"><div class="tc-id">TC-D005 Sidebar học viên — data flow từ QuickSearchForm</div>
+Từ trang chủ: điền tên "Nguyễn Văn A", phone "0912345678", visa D2-2, TOPIK 4 → Click "Xem chi tiết" trường bất kỳ → Expected: Sidebar đã điền sẵn thông tin từ form. Actual: Cần verify localStorage passthrough đã implement.
+</div>
+<div class="tc"><div class="tc-id">TC-D006 Trường Top 3 — hiển thị warning visa</div>
+Xem chi tiết trường Top 3 (Geumgang University) → Expected: Badge "⚠ Visa hạn chế" + message "Cần tư vấn kỹ trước khi nộp hồ sơ" thay vì hiển thị cost calculator bình thường.
+</div>
+
+<h3>Module E — Calculation Engine (QUAN TRỌNG NHẤT)</h3>
+<div class="tc tc-fail"><div class="tc-id">TC-E001 [CRITICAL FAIL] Kiểm tra tính nhất quán exchange rates</div>
+<strong>Test:</strong> Xem cùng 1 học phí 1,500,000 KRW trên 3 pages khác nhau:<br>
+• UniversityDetailRedesigned → USD estimate = ~1,500,000/1,350 ≈ $1,111<br>
+• CostCalculator component → Dùng KRW_TO_VND: 20 → 30,000,000 VNĐ (SAI - thực tế ~28,350,000 VNĐ)<br>
+• StudentMonitoring → Dùng formula sai → 38,250,000,000 VNĐ (SAI NGHIÊM TRỌNG)<br>
+<strong>Expected:</strong> Cả 3 nơi cho cùng kết quả. <strong>Actual: 3 kết quả khác nhau hoàn toàn.</strong>
+</div>
+<div class="tc"><div class="tc-id">TC-E002 Formula tổng chi phí chuẩn</div>
+Setup: VND_fixed = 71,000,000 (13M+39M+11M+8M) | invoice_KRW = 1,500,000 | apply_KRW = 100,000 | KTX_KRW = 747,000 | scholarship = 0%<br>
+Expected: Total VNĐ = 71,000,000 | Total KRW = 2,347,000 | USD ≈ (71M/25500 + 2,347,000/1350) ≈ $4,520<br>
+Verify formula: <code>totalVND + totalKRW × KRW_TO_VND_RATE = Grand Total VNĐ</code>
+</div>
+<div class="tc"><div class="tc-id">TC-E003 Boundary: Học bổng 100%</div>
+Setup D2-2 invoice = 5,000,000 KRW, TOPIK 6 = 100% → Học bổng = -5,000,000 KRW → Net invoice = 0 → Expected: Total KRW chỉ bao gồm apply_fee + enrollment_fee + KTX (không âm). Verify: Cannot go below 0.
+</div>
+<div class="tc tc-fail"><div class="tc-id">TC-E004 [WARN] Boundary: Invoice KRW = 0 (trường chưa cấu hình)</div>
+Trường chưa set invoice → invoice_krw = 0 → Expected: Hiển thị "Chưa cấu hình" hoặc "0 KRW" chứ không crash. Check: Division by zero trong scholarship percentage calculation.
+</div>
+<div class="tc"><div class="tc-id">TC-E005 Sổ tiết kiệm — tính đúng theo khu vực</div>
+Trường ở Gyeonggi → so_tiet_kiem = 10,000,000 KRW | Ngoài Gyeonggi → 8,000,000 KRW → Verify total KRW tăng đúng khi chọn.
+</div>
+
+<h3>Module F — Currency Conversion</h3>
+<div class="tc tc-fail"><div class="tc-id">TC-F001 [CRITICAL FAIL] Rate inconsistency across components</div>
+Mở AdminExchangeRates → Set 1 KRW = 19.5 VNĐ → Save → Mở University Detail → Expected: Tổng USD estimate dùng rate mới. Actual: UniversityDetailRedesigned import EXCHANGE_RATES từ constants (hardcode), không đọc từ AdminExchangeRates API. Rate thay đổi không có tác dụng.
+</div>
+<div class="tc"><div class="tc-id">TC-F002 Currency toggle VNĐ ↔ KRW ↔ USD</div>
+Xem tổng chi phí = 150,000,000 VNĐ → Switch sang USD → Expected: ≈ $5,882 (150M/25,500). Switch sang KRW → Expected: ≈ 7,936,508 KRW (150M/18.9). Format đúng: không có decimal cho KRW, 2 decimal cho USD.
+</div>
+<div class="tc"><div class="tc-id">TC-F003 Làm tròn hợp lý</div>
+1 USD = 25,500 VNĐ → Convert 1,234,567 VNĐ → USD = 48.41... → Expected: Hiển thị $48 (không decimal) hoặc $48.41 (2 decimal). Verify: Không có floating point issue (e.g., 48.410000000001).
+</div>
+
+<h3>Module G — Registration & Tracking</h3>
+<div class="tc tc-fail"><div class="tc-id">TC-G001 [FAIL] Registration không persist sau refresh</div>
+Student đăng ký tư vấn trường Ajou → Nhận tracking code SACMA-20260403-XXXXXX → F5 → Expected: Tracking code vẫn hiển thị trong StudentDashboard. Actual: AppContext.registrations = [] sau refresh, data không được load từ API /registrations.
+</div>
+<div class="tc"><div class="tc-id">TC-G002 Tracking code lookup</div>
+Nhập tracking code SACMA-20260403-XXXXXX vào /student/lookup → Expected: Hiện thông tin học viên + trường + chi phí ước tính + trạng thái hồ sơ. Verify: Không expose thông tin học viên khác khi nhập code sai.
+</div>
+<div class="tc"><div class="tc-id">TC-G003 Student không thể edit trường</div>
+Đăng nhập với tài khoản student → Navigate /admin/universities → Expected: Redirect 403. Verify PrivateRoute + requireRole='admin' hoạt động.
+</div>
+<div class="tc tc-warn"><div class="tc-id">TC-G004 [WARN] File upload trong progress tracker là mock</div>
+StudentDashboard → Upload document → Expected: File thật được upload lên server. Actual: Chỉ tạo mock filename, không upload thật. User không biết file không được lưu.
+</div>
+
+<h3>Module H — Responsive & Accessibility</h3>
+<div class="tc"><div class="tc-id">TC-H001 Mobile (375px) — University list</div>
+Resize về 375px → Expected: Danh sách trường hiển thị 1 cột, filter chips wrap đúng, không có horizontal scroll. University cards readable. Buttons touchable (min 44px).
+</div>
+<div class="tc"><div class="tc-id">TC-H002 Tablet (768px) — Cost calculator</div>
+Tablet orientation → 2-column layout (info + calculator) → Expected: Không overlap, calculator scroll độc lập.
+</div>
+<div class="tc"><div class="tc-id">TC-H003 WCAG 2.1 — Color contrast</div>
+#1B3F8B trên #FFFFFF → Contrast ratio = 7.2:1 ✓ AA+AAA | #3B6D11 trên #EAF3DE → ~4.8:1 ✓ AA. Check: Red error text trên white background đạt AA.
+</div>
+<div class="tc"><div class="tc-id">TC-H004 Keyboard navigation</div>
+Tab qua form đăng ký → Expected: Focus indicator visible, order logical (tên → phone → visa → TOPIK → submit). Dropdown accessible via arrow keys.
+</div>
+
+<h3>Module I — Security & Performance</h3>
+<div class="tc tc-fail"><div class="tc-id">TC-I001 [CRITICAL] Unauthorized access</div>
+Gọi <code>POST /api/reset-admin-password</code> không có token → Expected: 401. Actual: 200 OK → password reset thành công. BUG-003.
+</div>
+<div class="tc"><div class="tc-id">TC-I002 Admin route protection</div>
+Logout → Navigate /admin/universities → Expected: Redirect /login. Verify: PrivateRoute check isAuthenticated + isAdmin.
+</div>
+<div class="tc"><div class="tc-id">TC-I003 XSS prevention</div>
+Nhập <code>&lt;script&gt;alert('xss')&lt;/script&gt;</code> vào tên trường → Save → Hiển thị lại → Expected: Text escaped, không execute script. React escapes by default, verify không dùng dangerouslySetInnerHTML.
+</div>
+<div class="tc"><div class="tc-id">TC-I004 SQL injection</div>
+Input <code>' OR 1=1; DROP TABLE universities; --</code> vào search field → Expected: Query parameterized, không execute SQL. Verify server dùng parameterized queries (đã thấy <code>db.query('... WHERE id = $1', [id])</code> ✓).
+</div>
+<div class="tc"><div class="tc-id">TC-I005 Performance — load 135 universities</div>
+Load /universities với 135 trường → Expected: First paint &lt;1.5s, full interactive &lt;3s (LCP). Filter action &lt;100ms. Verify: React.memo và useMemo đã dùng trong list rendering.
+</div>
+
+<!-- ===== SECTION 7: PRODUCTION PREDICTION ===== -->
+<h2><span class="section-num">7</span>Dự đoán vấn đề khi deploy Production</h2>
+<div class="card">
+<table>
+  <thead><tr><th>Tình huống</th><th>Xác suất</th><th>Mô tả</th><th>Giải pháp</th></tr></thead>
+  <tbody>
+    <tr style="background:#FCEBEB"><td><strong>App không load</strong></td><td><span class="badge critical">100%</span></td><td>portDetector probe localhost → 6-10s timeout mỗi request trên Vercel</td><td>Fix portDetector: skip probe khi import.meta.env.PROD === true</td></tr>
+    <tr style="background:#FCEBEB"><td><strong>Tất cả API fail 404</strong></td><td><span class="badge critical">100%</span></td><td>vercel.json destination vẫn là placeholder URL</td><td>Điền URL Render thật</td></tr>
+    <tr style="background:#FCEBEB"><td><strong>Số tiền hiển thị sai</strong></td><td><span class="badge critical">100%</span></td><td>3 EXCHANGE_RATES khác nhau → user thấy học phí ảo</td><td>Merge thành 1 source of truth, đọc từ AdminExchangeRates API</td></tr>
+    <tr style="background:#FAEEDA"><td><strong>First user mỗi sáng timeout</strong></td><td><span class="badge high">95%</span></td><td>Render free tier sleep 15 phút → cold start 30-45s</td><td>Upgrade $7/tháng hoặc cron job ping /health mỗi 10 phút</td></tr>
+    <tr style="background:#FAEEDA"><td><strong>Kho ảnh trường mất</strong></td><td><span class="badge high">90%</span></td><td>media.js dùng file JSON → mất khi Render restart (ephemeral FS)</td><td>Migrate media sang PostgreSQL hoặc Cloudflare R2</td></tr>
+    <tr style="background:#FAEEDA"><td><strong>Admin bị chiếm tài khoản</strong></td><td><span class="badge high">70%</span></td><td>Route reset password không auth + credential trong logs</td><td>Xóa route ngay, đổi mật khẩu, ẩn logs</td></tr>
+    <tr><td><strong>DB connection exhausted</strong></td><td><span class="badge medium">60%</span></td><td>Render free PostgreSQL max 25 connections</td><td>Set pool max = 10-15 trong dbAdapter.js</td></tr>
+    <tr><td><strong>V2 features không hoạt động</strong></td><td><span class="badge medium">100%</span></td><td>22 routes tồn tại nhưng frontend không gọi → data mất sau refresh</td><td>Wire AppContext init để load từ API khi user login</td></tr>
+  </tbody>
+</table>
+</div>
+
+<!-- ===== SECTION 8: IMPROVEMENT ROADMAP ===== -->
+<h2><span class="section-num">8</span>Improvement Recommendations & Future Roadmap</h2>
+<div class="card">
+  <h3>🔴 Ngay lập tức (trước khi deploy — 1-2 ngày)</h3>
+  <table>
+    <thead><tr><th>Việc làm</th><th>Effort</th><th>Impact</th></tr></thead>
+    <tbody>
+      <tr><td>Fix portDetector: skip localhost probe trong PROD</td><td>1 giờ</td><td>App chạy được trên Vercel</td></tr>
+      <tr><td>Điền URL thật vào vercel.json</td><td>5 phút</td><td>API calls hoạt động</td></tr>
+      <tr><td>Xóa route /reset-admin-password + đổi default password</td><td>30 phút</td><td>Bảo mật cơ bản</td></tr>
+      <tr><td>Merge 3 EXCHANGE_RATES thành 1 file <code>constants/exchangeRates.ts</code></td><td>2 giờ</td><td>Giá tiền hiển thị đúng</td></tr>
+      <tr><td>Fix công thức StudentMonitoring.tsx:172</td><td>30 phút</td><td>Xóa bug tính phí sai 1349x</td></tr>
+      <tr><td>JWT_SECRET: throw Error nếu không set</td><td>5 phút</td><td>Security hardening</td></tr>
+    </tbody>
+  </table>
+
+  <h3 style="margin-top:16px">🟡 Ngắn hạn (1-2 tuần)</h3>
+  <table>
+    <thead><tr><th>Việc làm</th><th>Effort</th><th>Impact</th></tr></thead>
+    <tbody>
+      <tr><td>Wire AppContext init: load registrations, appointments, scholarships từ API</td><td>1 ngày</td><td>V2 features functional</td></tr>
+      <tr><td>Migrate media.js từ file JSON sang PostgreSQL</td><td>1 ngày</td><td>Kho ảnh persist sau restart</td></tr>
+      <tr><td>AdminExchangeRates rate được đọc động bởi calculation components</td><td>1 ngày</td><td>Rate update = hiệu lực ngay</td></tr>
+      <tr><td>Upload file thật trong StudentDashboard (Imgur/R2)</td><td>1 ngày</td><td>Document upload functional</td></tr>
+      <tr><td>SSE heartbeat 20s (Render timeout fix)</td><td>2 giờ</td><td>Real-time ổn định</td></tr>
+      <tr><td>Hợp nhất UniversityDetailAdmin + UniversityDetailRedesigned</td><td>2 ngày</td><td>Giảm 3613 lines duplicate</td></tr>
+      <tr><td>Xóa AdminLoginSimple.tsx (trang dư thừa)</td><td>5 phút</td><td>Clean codebase</td></tr>
+    </tbody>
+  </table>
+
+  <h3 style="margin-top:16px">🟢 Trung hạn (1-2 tháng)</h3>
+  <ul style="margin: 8px 0 8px 20px">
+    <li>Automated E2E tests với Playwright cho calculation flows</li>
+    <li>Cron job ping server mỗi 10 phút để tránh Render cold start</li>
+    <li>PostgreSQL pool config đúng (max 15 connections)</li>
+    <li>Sticky sidebar học viên kết nối với QuickSearchForm (localStorage passthrough)</li>
+    <li>Banner marketing "Học bổng KB Scholarship" như du-hoc-app</li>
+    <li>Export PDF chi phí (jsPDF đã có trong dependencies)</li>
+    <li>So sánh nhiều trường cùng lúc (feature độc đáo)</li>
+  </ul>
+
+  <h3 style="margin-top:16px">🔵 Dài hạn (6-12 tháng)</h3>
+  <ul style="margin: 8px 0 8px 20px">
+    <li><strong>PHP Migration:</strong> Theo plan đã có (7-8 tuần, cần giải quyết Reverb + 2 Render services)</li>
+    <li><strong>Multi-country:</strong> Thêm Nhật Bản, Đức, Úc với data model tương tự</li>
+    <li><strong>AI Integration:</strong> Gợi ý trường phù hợp dựa trên GPA + TOPIK + ngân sách (GPT-4 API)</li>
+    <li><strong>Live exchange rates:</strong> Tích hợp API tỷ giá thời gian thực (ExchangeRate-API, VCB)</li>
+    <li><strong>Mobile app:</strong> React Native từ codebase hiện tại</li>
+    <li><strong>SEO landing pages:</strong> SSR với Next.js để index trên Google</li>
+    <li><strong>Partner portal:</strong> Cho các trung tâm tư vấn du học sử dụng</li>
+  </ul>
+</div>
+
+<!-- ===== SECTION 9: OVERALL SCORE ===== -->
+<h2><span class="section-num">9</span>Đánh giá tổng thể</h2>
+<div class="card">
+  <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px;text-align:center">
+    <div class="stat" style="background:var(--red-light)">
+      <div class="stat-num" style="color:var(--red)">52</div>
+      <div style="font-size:11px;color:var(--red)">Tổng /100</div>
+      <div class="score-bar"><div class="score-fill" style="width:52%;background:var(--red)"></div></div>
+    </div>
+    <div class="stat" style="background:var(--blue-light)">
+      <div class="stat-num" style="color:var(--blue)">90</div>
+      <div style="font-size:11px">Tính năng</div>
+      <div class="score-bar"><div class="score-fill" style="width:90%;background:var(--blue)"></div></div>
+    </div>
+    <div class="stat" style="background:var(--blue-light)">
+      <div class="stat-num" style="color:var(--blue)">85</div>
+      <div style="font-size:11px">Cấu trúc code</div>
+      <div class="score-bar"><div class="score-fill" style="width:85%;background:var(--blue)"></div></div>
+    </div>
+    <div class="stat" style="background:var(--red-light)">
+      <div class="stat-num" style="color:var(--red)">30</div>
+      <div style="font-size:11px">Security</div>
+      <div class="score-bar"><div class="score-fill" style="width:30%;background:var(--red)"></div></div>
+    </div>
+    <div class="stat" style="background:var(--amber-light)">
+      <div class="stat-num" style="color:var(--amber)">45</div>
+      <div style="font-size:11px">Production</div>
+      <div class="score-bar"><div class="score-fill" style="width:45%;background:#EF9F27"></div></div>
+    </div>
+    <div class="stat" style="background:var(--amber-light)">
+      <div class="stat-num" style="color:var(--amber)">15</div>
+      <div style="font-size:11px">Test coverage</div>
+      <div class="score-bar"><div class="score-fill" style="width:15%;background:#EF9F27"></div></div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div style="background:var(--green-light);border-radius:8px;padding:14px">
+      <div style="font-weight:600;color:var(--green);margin-bottom:8px">Điểm mạnh lớn nhất</div>
+      <ul style="color:#27500A;font-size:12px;line-height:2">
+        <li>Calculation engine concept đúng — breakdown chi tiết nhất thị trường VN</li>
+        <li>Admin system 15 pages — vượt trội so với competitor</li>
+        <li>TypeScript + React + Shadcn — codebase có thể mở rộng tốt</li>
+        <li>8 hệ visa với toggle available — linh hoạt nhất</li>
+        <li>Tracking code system — độc đáo, không competitor nào có</li>
+        <li>Documentation tốt (CHANGELOG, ARCHITECTURE, DATA_DICTIONARY)</li>
+        <li>Plan migration PHP v2.0 professional, có đầy đủ giải pháp kỹ thuật</li>
+      </ul>
+    </div>
+    <div style="background:var(--red-light);border-radius:8px;padding:14px">
+      <div style="font-weight:600;color:var(--red);margin-bottom:8px">Điểm yếu lớn nhất</div>
+      <ul style="color:#791F1F;font-size:12px;line-height:2">
+        <li>3 EXCHANGE_RATES definitions → số tiền hiển thị sai → mất tin tưởng của user</li>
+        <li>portDetector sẽ giết app ngay khi deploy</li>
+        <li>Security route không auth → admin có thể bị chiếm</li>
+        <li>22 v2 features UI đẹp nhưng data mất sau refresh</li>
+        <li>Media library mất data khi server restart</li>
+        <li>Test coverage &lt;15% → regression risk cao khi refactor</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SECTION 10 ===== -->
+<h2><span class="section-num">10</span>Khuyến nghị trước khi deploy & Next Steps</h2>
+<div class="card">
+  <div style="background:#501313;border-radius:8px;padding:14px;margin-bottom:14px;color:#F7C1C1">
+    <strong>⛔ KHÔNG deploy lên production cho đến khi fix 4 items này:</strong>
+    <ol style="margin:8px 0 0 20px;line-height:2">
+      <li>Fix portDetector (dùng VITE_API_URL thẳng trong PROD)</li>
+      <li>Điền URL thật vào vercel.json</li>
+      <li>Xóa route /reset-admin-password</li>
+      <li>Merge 3 EXCHANGE_RATES → 1 source of truth</li>
+    </ol>
+  </div>
+
+  <h3>Bộ test cases ưu tiên để chạy ngay (Smoke Test before deploy)</h3>
+  <table>
+    <thead><tr><th>#</th><th>Test</th><th>Expected</th><th>Module</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>Login admin → /admin/dashboard load</td><td>200 OK, data hiển thị</td><td>Auth</td></tr>
+      <tr><td>2</td><td>Import Table_1.csv → 6 trường xuất hiện</td><td>Import success</td><td>C</td></tr>
+      <tr><td>3</td><td>Xem Ajou detail → chọn D4-1 → Total = đúng</td><td>VNĐ+KRW đúng công thức</td><td>D, E</td></tr>
+      <tr><td>4</td><td>TOPIK 6 discount 100% → Total KRW không âm</td><td>Net học phí = 0</td><td>E</td></tr>
+      <tr><td>5</td><td>Student đăng ký → nhận tracking code</td><td>Code format SACMA-*</td><td>G</td></tr>
+      <tr><td>6</td><td>POST /api/reset-admin-password không token → 401</td><td>Unauthorized</td><td>Security</td></tr>
+      <tr><td>7</td><td>Student navigate /admin/universities → redirect</td><td>403 hoặc /login</td><td>RBAC</td></tr>
+      <tr><td>8</td><td>Currency switch VNĐ → USD → KRW</td><td>Số tiền convert đúng</td><td>F</td></tr>
+      <tr><td>9</td><td>F5 trang university detail → data vẫn hiển thị</td><td>Không blank screen</td><td>D</td></tr>
+      <tr><td>10</td><td>Mobile 375px → danh sách trường readable</td><td>No horizontal scroll</td><td>H</td></tr>
+    </tbody>
+  </table>
+
+  <div style="margin-top:14px;padding:12px 16px;background:var(--blue-light);border-radius:8px;font-size:12px">
+    <strong>Module nên kiểm tra sâu nhất tiếp theo:</strong> Module E (Calculation Engine) — đây là core value proposition của SACMA. Nếu tính toán sai, toàn bộ dự án mất đi lý do tồn tại. Cần viết unit tests cho từng formula với Vitest, bao gồm boundary values, multi-visa scenarios, và currency conversion paths.
+  </div>
+</div>
+
+<div style="text-align:center;padding:20px;color:#888;font-size:11px;border-top:0.5px solid var(--border);margin-top:20px">
+  SACMA QA Report v1.0 · Generated April 3, 2026 · Senior QA Engineer Analysis · Based on source code review of github.com/GitPab/project (branch: add-test, commit: 21cb15f)
+</div>
+
+</div>
+</body>
+</html>

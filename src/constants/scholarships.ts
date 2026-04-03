@@ -1,7 +1,14 @@
 /**
  * Scholarship and Fee Constants
  * Centralized definitions for TOPIK discounts and common fees
+ * 
+ * NOTE: EXCHANGE_RATES moved to exchangeRates.ts for single source of truth
+ * Import from: import { EXCHANGE_RATES, KRW_TO_VND } from './exchangeRates'
  */
+
+import { EXCHANGE_RATES, KRW_TO_VND } from './exchangeRates';
+
+export { EXCHANGE_RATES, KRW_TO_VND }; // Re-export for backward compatibility
 
 export const TOPIK_DISCOUNT_LEVELS = [
   { level: 0, discount: 0 },
@@ -12,11 +19,6 @@ export const TOPIK_DISCOUNT_LEVELS = [
   { level: 5, discount: 70 },
   { level: 6, discount: 100 },
 ] as const;
-
-export const EXCHANGE_RATES = {
-  KRW_TO_VND: 20,
-  USD_TO_VND: 25000,
-} as const;
 
 export const DEFAULT_COMMON_FEES = [
   { id: 'hoc_tieng', name: 'Học tiếng Hàn', amount: 13000000, note: 'Học từ 0 lên TOPIK 2 + Tài khoản E-Learning', editable: true },

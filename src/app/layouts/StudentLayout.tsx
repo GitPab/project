@@ -17,19 +17,19 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
 
   const menuItems = [
     { label: 'Dashboard', href: '/student/dashboard', icon: '📊' },
-    { label: 'Hồ sơ', href: '/student/profile', icon: '👤' },
-    { label: 'Đăng ký trường', href: '/universities', icon: '🏫' },
-    { label: 'Tài liệu', href: '/student/documents', icon: '📄' },
-    { label: 'Thanh toán', href: '/student/payments', icon: '💳' },
-    { label: 'Lịch hẹn', href: '/student/appointments', icon: '📅' },
-    { label: 'Tin nhắn', href: '/student/messages', icon: '💬' },
+    { label: 'Hồ sơ', href: '/student/home', icon: '👤' },
+    { label: 'Đăng ký trường', href: '/student/universities', icon: '🏫' },
+    { label: 'Chat trực tuyến', href: '/student/chat', icon: '�' },
+    { label: 'Đặt lịch tư vấn', href: '/student/appointments', icon: '�' },
+    { label: 'Tiến trình', href: '/student/my-progress', icon: '�' },
+    { label: 'Đánh giá', href: '/student/feedback', icon: '⭐' },
   ];
 
   return (
     <div className="min-h-screen bg-gray-100">
       <div className="flex">
-        {/* Sidebar */}
-        <aside className="w-64 bg-white shadow-md min-h-screen">
+        {/* Sticky Sidebar - stays visible while scrolling */}
+        <aside className="w-64 bg-white shadow-md sticky top-0 h-screen overflow-y-auto z-20">
           <div className="p-6 border-b">
             <Link to="/student/dashboard" className="text-xl font-bold text-blue-600">
               SACMA Student
@@ -49,7 +49,7 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
             ))}
           </nav>
 
-          <div className="absolute bottom-0 left-0 right-0 p-4 border-t">
+          <div className="p-4 border-t mt-auto">
             <div className="flex items-center mb-4">
               <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-medium">
                 {user?.name?.charAt(0).toUpperCase() || 'S'}
@@ -68,9 +68,9 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
           </div>
         </aside>
 
-        {/* Main Content */}
-        <div className="flex-1 flex flex-col min-h-screen">
-          <header className="bg-white shadow-sm px-8 py-4">
+        {/* Main Content - scrollable */}
+        <div className="flex-1 flex flex-col min-h-screen overflow-y-auto">
+          <header className="bg-white shadow-sm px-8 py-4 sticky top-0 z-10">
             <div className="flex items-center justify-between">
               <h1 className="text-xl font-semibold text-gray-800">Student Portal</h1>
               <div className="flex items-center space-x-4">

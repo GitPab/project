@@ -3,7 +3,8 @@ import { ChevronDown, ChevronUp, Plane, Home, BookOpen, Wallet, GraduationCap, P
 import { Badge } from './ui/badge';
 import type { University, KoreanUniversityData, VisaSystemDetail, CommonFeeVND, CalculatedCosts, KTXOption, FinancialRequirementOption } from '../../types/university';
 import { useCurrency } from '../context/CurrencyContext';
-import { TOPIK_DISCOUNT_LEVELS, DEFAULT_COMMON_FEES, EXCHANGE_RATES } from '../../constants/scholarships';
+import { TOPIK_DISCOUNT_LEVELS, DEFAULT_COMMON_FEES } from '../../constants/scholarships';
+import { EXCHANGE_RATES } from '../../constants/exchangeRates';
 import { VISA_SYSTEMS } from '../../constants/visaSystems';
 
 interface CostCalculatorProps {
@@ -111,8 +112,15 @@ export default function CostCalculator({ university }: CostCalculatorProps) {
     const invoice = currentVisaSystem?.invoiceKRWPerYear || 0;
     
     // Scholarship calculation
+    // TC-E004: Guard against division by zero when invoice = 0
+    const safeInvoice = invoice || 0;
     const scholarshipDiscount = TOPIK_DISCOUNT_LEVELS.find(d => d.level === topikLevel)?.discount || 0;
-    const hocBong = scholarshipDiscount > 0 ? -Math.round((invoice * scholarshipDiscount) / 100) : 0;
+    const hocBong = (scholarshipDiscount > 0 && safeInvoice > 0) 
+      ? -Math.round((safeInvoice * scholarshipDiscount) / 100) 
+      : 0;
+    
+    // Show warning if invoice is 0 (unconfigured university)
+    const showInvoiceWarning = safeInvoice === 0;
     
     // KTX HQ
     const ktxOptions = currentVisaSystem?.ktxOptions || [];
@@ -124,9 +132,12 @@ export default function CostCalculator({ university }: CostCalculatorProps) {
     
     const totalKRW = applyFee + enrollmentFee + invoice + hocBong + ktxHQ + soTietKiem;
     
-    // USD conversion (approximate)
-    const totalVNDinUSD = totalVND / EXCHANGE_RATES.USD_TO_VND;
-    const totalKRWinUSD = (totalKRW * EXCHANGE_RATES.KRW_TO_VND) / EXCHANGE_RATES.USD_TO_VND;
+    // USD conversion (approximate) using centralized exchange rates
+    // TC-E004: Guard against zero rates
+    const usdRate = EXCHANGE_RATES.USD || 25500;
+    const krwRate = EXCHANGE_RATES.KRW || 18.9;
+    const totalVNDinUSD = usdRate > 0 ? totalVND / usdRate : 0;
+    const totalKRWinUSD = (totalKRW * krwRate) / usdRate;
     const approximateUSD = totalVNDinUSD + totalKRWinUSD;
     
     return {
@@ -146,6 +157,7 @@ export default function CostCalculator({ university }: CostCalculatorProps) {
       approximateUSD,
       scholarshipApplied: scholarshipDiscount > 0,
       scholarshipDescription: scholarshipDiscount > 0 ? `Học bổng TOPIK ${topikLevel} (−${scholarshipDiscount}%)` : undefined,
+      showInvoiceWarning, // TC-E004: Add warning flag
     };
   }, [commonFees, currentVisaSystem, topikLevel, selectedKTXOption, selectedSoTietKiemOption, ktxVNMonths, includeFlight]);
   
@@ -176,6 +188,18 @@ export default function CostCalculator({ university }: CostCalculatorProps) {
   return (
     <div className="bg-white rounded-3xl p-8 shadow-sm">
       <h2 className="text-2xl font-bold mb-8">Chi phí du học chi tiết</h2>
+      
+      {/* TC-E004: Warning for unconfigured university */}
+      {calculatedCosts.showInvoiceWarning && (
+        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+          <p className="text-amber-800 font-medium">
+            ⚠️ Trường chưa được cấu hình đầy đủ - Một số chi phí có thể hiển thị 0
+          </p>
+          <p className="text-amber-700 text-sm mt-1">
+            Vui lòng liên hệ admin để cập nhật thông tin chi phí cho trường này.
+          </p>
+        </div>
+      )}
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Panel - Controls */}

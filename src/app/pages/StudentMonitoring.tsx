@@ -169,7 +169,10 @@ export default function StudentMonitoring() {
       // Calculate fixed cost breakdown using constants
       const fixedCostVND = DEFAULT_FEES_VND.phiTuVan + DEFAULT_FEES_VND.phiTrungTam + DEFAULT_FEES_VND.hocTieng;
       const fixedCostKRW = 100000 + 5800000 + DEFAULT_SO_TIET_KIEM_KRW.gyeonggi; // Apply + Invoice + Savings
-      const fixedCostKRW_inVND = fixedCostKRW * EXCHANGE_RATES.krwToUsd * (EXCHANGE_RATES.vndToUsd / EXCHANGE_RATES.krwToUsd);
+      // BUG-002 FIXED: Use correct KRW to VND conversion (18.9, not 25,500)
+      // Old formula: fixedCostKRW * krwToUsd * (vndToUsd / krwToUsd) = fixedCostKRW * 25,500 (WRONG - 1,349x too high)
+      // New formula: fixedCostKRW * KRW_RATE (18.9) = correct VND amount
+      const fixedCostKRW_inVND = fixedCostKRW * EXCHANGE_RATES.KRW;
       const totalFixedVND = fixedCostVND + fixedCostKRW_inVND;
 
       return {

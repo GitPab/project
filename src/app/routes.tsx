@@ -38,6 +38,8 @@ const AdminRoles = lazy(() => import('./pages/AdminRoles'));
 const AdminMaintenance = lazy(() => import('./pages/AdminMaintenance'));
 const AdminMediaLibrary = lazy(() => import('./pages/AdminMediaLibrary'));
 const AdminExchangeRates = lazy(() => import('./pages/AdminExchangeRates'));
+const StudentLiveChat = lazy(() => import('./pages/StudentLiveChat'));
+const StudentBookCounselor = lazy(() => import('./pages/StudentBookCounselor'));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -160,6 +162,14 @@ export const router = createHashRouter([
       {
         path: 'feedback',
         Component: withSuspense(StudentFeedbackPage)
+      },
+      {
+        path: 'chat',
+        Component: withSuspense(StudentLiveChat)
+      },
+      {
+        path: 'appointments',
+        Component: withSuspense(StudentBookCounselor)
       },
       {
         path: 'university/:id',

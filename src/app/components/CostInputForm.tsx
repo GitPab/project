@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Plus, Trash2, Info, CheckCircle, AlertCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -284,7 +284,18 @@ export default function CostInputForm({
   onCancel 
 }: CostInputFormProps) {
   const [currentStep, setCurrentStep] = useState(1);
-  const [formData, setFormData] = useState<CostFormData>(() => {
+  
+  // TC-B001 FIXED: Add useEffect to reload data when initialData changes
+  // This fixes the issue where visa panels appear empty when reopening the form
+  const [formData, setFormData] = useState<CostFormData>(() => createInitialFormData(initialData));
+  
+  useEffect(() => {
+    // Reload form data when initialData changes (e.g., when reopening modal with different university)
+    setFormData(createInitialFormData(initialData));
+    setCurrentStep(1); // Reset to first step when data changes
+  }, [initialData]);
+  
+  function createInitialFormData(data: Partial<CostFormData> | undefined): CostFormData {
     const visaSystems: VisaSystems = {};
     VISA_SYSTEMS.forEach(visa => {
       const defaults = VISA_DEFAULTS[visa.key];
@@ -306,14 +317,14 @@ export default function CostInputForm({
         phi_trung_tam: 11000000,
         ve_may_bay: { amount: 8000000, optional: true },
         ktx_vn: { amount_per_month: 800000, optional: true },
-        ...initialData?.common_fees_vnd,
+        ...data?.common_fees_vnd,
       },
       visa_systems: {
         ...visaSystems,
-        ...initialData?.visa_systems,
+        ...data?.visa_systems,
       },
     };
-  });
+  }
 
   const formatNumber = (num: number) => {
     return num.toLocaleString('vi-VN');
@@ -745,7 +756,9 @@ export default function CostInputForm({
                             value={scholarship.discount_pct}
                             onChange={(e) => {
                               const scholarships = [...system.scholarships];
-                              scholarships[index].discount_pct = parseInt(e.target.value) || 0;
+                              // TC-B006: Clamp discount between 0-100
+                              const rawValue = parseInt(e.target.value) || 0;
+                              scholarships[index].discount_pct = Math.min(100, Math.max(0, rawValue));
                               updateFormData(`visa_systems.${visa.key}.scholarships`, scholarships);
                             }}
                             className="w-20 text-right"

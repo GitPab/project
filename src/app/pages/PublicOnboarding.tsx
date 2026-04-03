@@ -323,12 +323,151 @@ export default function PublicOnboarding() {
       </div>
       
       {/* Hero Section with Background Image - Below Header */}
-      <div className="relative w-full h-[600px] overflow-hidden mt-20">
+      <div className="relative w-full min-h-[700px] overflow-hidden mt-20">
         <img 
           src="https://api.builder.io/api/v1/image/assets/TEMP/837bae42c20ab2474078bc4c99a3b73de0e38775?width=3840" 
           alt="Hero Banner" 
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover absolute inset-0"
         />
+        {/* Dark overlay for text readability */}
+        <div className="absolute inset-0 bg-gradient-to-r from-[#003AB7]/90 via-[#003AB7]/70 to-transparent" />
+        
+        {/* Hero Content with Embedded Form */}
+        <div className="relative z-10 container mx-auto px-4 lg:px-12 h-full flex items-center">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 w-full py-12">
+            {/* Left: Hero Text */}
+            <div className="text-white flex flex-col justify-center">
+              <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full w-fit mb-6">
+                <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                <span className="text-sm font-medium">Tư vấn miễn phí - Phản hồi trong 24h</span>
+              </div>
+              <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 font-['Be_Vietnam_Pro'] leading-tight">
+                Du Học Hàn Quốc<br />
+                <span className="text-[#558EFF]">Trọn Gói Chi Phí</span>
+              </h1>
+              <p className="text-lg text-white/90 mb-6 font-['Be_Vietnam_Pro'] max-w-lg">
+                Tính toán chi phí du học chính xác với hệ thống visa D2, D4. 
+                Hỗ trợ từ A-Z bởi TBT GROUP - Đối tác chính thức 40+ trường đại học Hàn Quốc.
+              </p>
+              
+              {/* Trust badges */}
+              <div className="flex flex-wrap gap-4 mb-6">
+                <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-3 py-2 rounded-lg">
+                  <Award className="w-5 h-5 text-yellow-400" />
+                  <span className="text-sm">TOPIK 5-6: Giảm 40-50% học phí</span>
+                </div>
+                <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-3 py-2 rounded-lg">
+                  <Globe className="w-5 h-5 text-green-400" />
+                  <span className="text-sm">40+ Trường đối tác</span>
+                </div>
+              </div>
+              
+              {/* Scroll indicator */}
+              <div className="hidden lg:flex items-center gap-2 text-white/70 text-sm animate-bounce">
+                <span>Kéo xuốn để xem chi tiết</span>
+                <ChevronRight className="w-4 h-4 rotate-90" />
+              </div>
+            </div>
+            
+            {/* Right: Quick Consultation Form */}
+            <div className="bg-white rounded-2xl shadow-2xl p-6 lg:p-8">
+              <div className="text-center mb-6">
+                <h2 className="text-xl font-bold text-[#003AB7] mb-2 font-['Be_Vietnam_Pro']">
+                  ĐĂNG KÝ TƯ VẤN MIỄN PHÍ
+                </h2>
+                <p className="text-sm text-[#4D4D4D] font-['Be_Vietnam_Pro']">
+                  Nhận báo giá chi tiết trong 24 giờ
+                </p>
+              </div>
+              
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Full Name */}
+                <div>
+                  <label className="block mb-1.5 text-sm font-bold text-[#4D4D4D] font-['Be_Vietnam_Pro']">
+                    Họ và tên <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    className="w-full px-4 py-3 bg-[#F8F9FA] rounded-lg border border-[#558EFF] focus:outline-none focus:ring-2 focus:ring-[#558EFF]/50 focus:border-[#003AB7] transition-all font-['Be_Vietnam_Pro']"
+                    placeholder="Nguyễn Văn A"
+                    required
+                  />
+                </div>
+                
+                {/* Phone Number */}
+                <div>
+                  <label className="block mb-1.5 text-sm font-bold text-[#4D4D4D] font-['Be_Vietnam_Pro']">
+                    Số điện thoại <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    value={phoneNumber}
+                    onChange={(e) => handlePhoneChange(e.target.value)}
+                    className={`w-full px-4 py-3 bg-[#F8F9FA] rounded-lg border transition-all font-['Be_Vietnam_Pro'] ${
+                      phoneError ? 'border-red-500 focus:ring-red-500/50' : 'border-[#558EFF] focus:outline-none focus:ring-2 focus:ring-[#558EFF]/50 focus:border-[#003AB7]'
+                    }`}
+                    placeholder="0987654321"
+                    required
+                  />
+                  {phoneError && (
+                    <p className="text-red-500 text-xs mt-1 font-['Be_Vietnam_Pro']">{phoneError}</p>
+                  )}
+                </div>
+                
+                {/* TOPIK Level & System in one row */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block mb-1.5 text-sm font-bold text-[#4D4D4D] font-['Be_Vietnam_Pro']">
+                      TOPIK
+                    </label>
+                    <select
+                      value={topikLevel}
+                      onChange={(e) => setTopikLevel(Number(e.target.value))}
+                      className="w-full px-3 py-3 bg-[#F8F9FA] rounded-lg border border-[#558EFF] focus:outline-none focus:ring-2 focus:ring-[#558EFF]/50 focus:border-[#003AB7] transition-all font-['Be_Vietnam_Pro'] text-sm"
+                    >
+                      {TOPIK_LEVELS.map(level => (
+                        <option key={level.value} value={level.value}>
+                          {level.value === 0 ? 'Chưa có' : `TOPIK ${level.value}`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block mb-1.5 text-sm font-bold text-[#4D4D4D] font-['Be_Vietnam_Pro']">
+                      Hệ visa
+                    </label>
+                    <select
+                      value={selectedSystem}
+                      onChange={(e) => setSelectedSystem(e.target.value)}
+                      className="w-full px-3 py-3 bg-[#F8F9FA] rounded-lg border border-[#558EFF] focus:outline-none focus:ring-2 focus:ring-[#558EFF]/50 focus:border-[#003AB7] transition-all font-['Be_Vietnam_Pro'] text-sm"
+                    >
+                      <option value="D2-2">D2-2</option>
+                      <option value="D2-3">D2-3</option>
+                      <option value="D2-6">D2-6</option>
+                      <option value="D4-1">D4-1</option>
+                    </select>
+                  </div>
+                </div>
+                
+                {/* Submit Button */}
+                <button
+                  type="submit"
+                  className="w-full bg-gradient-to-r from-[#003AB7] to-[#558EFF] text-white py-4 rounded-xl hover:from-[#002A8F] hover:to-[#447DFF] transition-all font-bold text-lg shadow-lg hover:shadow-xl flex items-center justify-center gap-2 font-['Be_Vietnam_Pro'] mt-2"
+                >
+                  <Phone className="w-5 h-5" />
+                  NHẬN TƯ VẤN NGAY
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+                
+                <p className="text-center text-xs text-gray-500 font-['Be_Vietnam_Pro']">
+                  Cam kết bảo mật thông tin • Phản hồi trong 24h
+                </p>
+              </form>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Quick Search Form - Conversion Feature */}

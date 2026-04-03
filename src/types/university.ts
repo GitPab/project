@@ -384,6 +384,7 @@ export interface CalculatedCosts {
   approximateUSD: number;
   scholarshipApplied: boolean;
   scholarshipDescription?: string;
+  showInvoiceWarning?: boolean; // TC-E004: Flag for unconfigured university
 }
 
 // ============================================

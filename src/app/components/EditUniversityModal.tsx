@@ -89,12 +89,14 @@ type EditUniversityModalProps = {
   university: University | null;
   onClose: () => void;
   onSave: (data: Partial<University>) => Promise<void>;
+  existingUniversities?: University[]; // TC-B004: For duplicate name check
 };
 
 export default function EditUniversityModal({
   onClose,
   university,
   onSave,
+  existingUniversities = [], // TC-B004: Receive existing universities for duplicate check
 }: EditUniversityModalProps) {
   const { currency, formatFrom, convertAmount } = useCurrency();
   const isEditMode = !!university;
@@ -250,6 +252,16 @@ export default function EditUniversityModal({
 
   const handleSave = handleSubmit(async (values) => {
     try {
+      // TC-B004: Check for duplicate university name
+      const isDuplicateName = existingUniversities.some(
+        (u) => u.name?.toLowerCase().trim() === values.name?.toLowerCase().trim() && u.id !== university?.id
+      );
+      
+      if (isDuplicateName) {
+        toast.error('Tên trường đã tồn tại. Vui lòng chọn tên khác.');
+        return;
+      }
+      
       const topVisaLabel = values.topTier === 'Top1' ? 'Top 1' : values.topTier === 'Top2' ? 'Top 2' : 'Top 3';
       const enabledVisaSystemsData = currentVisaSystems.filter(vs => enabledVisaSystems.has(vs.visaType));
 

@@ -1,7 +1,11 @@
 /**
  * Default fee amounts and financial constants
  * Centralized to avoid hardcoded values across the application
+ * 
+ * NOTE: EXCHANGE_RATES moved to exchangeRates.ts for single source of truth
  */
+
+import { EXCHANGE_RATES, USD_RATES } from './exchangeRates';
 
 // Default fee amounts in VND
 export const DEFAULT_FEES_VND = {
@@ -24,10 +28,14 @@ export const SO_TIET_KIEM_LABELS = {
   ngoaiGyeonggi: 'Ngoài Gyeonggi',
 } as const;
 
-// Exchange rates (for USD estimation display)
-export const EXCHANGE_RATES = {
-  vndToUsd: 25500,  // 1 USD = 25,500 VND
-  krwToUsd: 1350,   // 1 USD = 1,350 KRW
+// Exchange rates (re-exported from exchangeRates.ts for backward compatibility)
+// All rates are relative to VND as base currency
+export { EXCHANGE_RATES } from './exchangeRates';
+
+// Legacy USD-based rates for backward compatibility
+export const USD_RATES_LEGACY = {
+  vndToUsd: EXCHANGE_RATES.USD,      // 1 USD = 25,500 VND
+  krwToUsd: EXCHANGE_RATES.USD / EXCHANGE_RATES.KRW,  // ~1,349 KRW = 1 USD
 } as const;
 
 // Default admission requirements
